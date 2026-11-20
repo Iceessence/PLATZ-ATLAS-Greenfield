@@ -60,7 +60,8 @@ public partial class PlayerWindow : Window
         {
             _room = RoomPackage.Open(path);
             StartRoom(_room);
-            Log("room-opened", new { _room.ProjectId, _room.SceneId, _room.SourceRevision, profile = RoomPackage.RuntimeProfile });
+            var profile = _room.Entities is null ? RoomPackage.RuntimeProfile : RoomPackage.SceneProfile;
+            Log("room-opened", new { _room.ProjectId, _room.SceneId, _room.SourceRevision, profile });
         }
         catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
         {
@@ -149,7 +150,9 @@ public partial class PlayerWindow : Window
         ActionLabel.Text = _lastSwitch is { } change ? $"{change.TargetLocation} · {State(change.WasOn)} → {State(change.IsOn)}" : "";
         LightLabel.Text = string.Join("\n", session.Current.Objects.OrderBy(item => item.X)
             .Select(item => $"{item.Location} · {State(item.IsOn)}"));
-        Viewport.Show(MuseumArt.CreatePlayer(session, _lastSwitch?.TargetId));
+        Viewport.Show(_room?.Entities is { } entities
+            ? SceneArt.Create(_room.ProjectId, _room.SourceRevision, entities, null, visitor: session.Current.Visitor)
+            : MuseumArt.CreatePlayer(session, _lastSwitch?.TargetId));
     }
 
     private void SetStatus(string message, bool error = false)

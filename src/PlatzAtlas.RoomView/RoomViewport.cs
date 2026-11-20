@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using PlatzAtlas.Rendering;
@@ -16,6 +17,8 @@ public sealed record ViewportFrame(
 
 public sealed record VulkanValidationSummary(
     bool ValidationEnabled, int ErrorCount, int WarningCount, IReadOnlyList<string> Messages);
+
+public enum PointerPhase { Down, Move, Up, Cancel }
 
 public sealed class RoomViewport : Grid
 {
@@ -58,7 +61,7 @@ public sealed class RoomViewport : Grid
     public bool MeasureFrames { get; set; }
     public event Action<ViewportFrame>? FrameCompleted;
     public event Action<VulkanValidationSummary>? VulkanValidated;
-    public event Action<double, double>? LanternClicked;
+    public event Action<PointerPhase, double, double>? PointerInput;
 
     public void SetPreference(RendererPreference preference)
     {
@@ -191,7 +194,7 @@ public sealed class RoomViewport : Grid
     {
         if (_native is null)
         {
-            _native = new NativeSurface(QueueDraw, ReleaseBackends, (x, y) => LanternClicked?.Invoke(x, y));
+            _native = new NativeSurface(QueueDraw, ReleaseBackends, (phase, x, y) => PointerInput?.Invoke(phase, x, y));
             Fit(_native);
             Children.Add(_native);
             window = 0;
@@ -218,13 +221,36 @@ public sealed class RoomViewport : Grid
             _cpu = new CpuPreview(OnCpuDrawn);
             Fit(_cpu);
             RenderOptions.SetEdgeMode(_cpu, EdgeMode.Aliased);
-            _cpu.MouseLeftButtonDown += (_, e) =>
+            var surface = _cpu;
+            surface.MouseLeftButtonDown += (_, e) =>
             {
-                var point = e.GetPosition(_cpu);
-                if (_cpu.ActualWidth > 0 && _cpu.ActualHeight > 0)
-                    LanternClicked?.Invoke(point.X / _cpu.ActualWidth, point.Y / _cpu.ActualHeight);
+                if (PointerInput is null)
+                    return;
+                surface.CaptureMouse();
+                Send(PointerPhase.Down, e);
             };
-            Children.Add(_cpu);
+            surface.MouseMove += (_, e) =>
+            {
+                if (surface.IsMouseCaptured)
+                    Send(PointerPhase.Move, e);
+            };
+            surface.MouseLeftButtonUp += (_, e) =>
+            {
+                if (!surface.IsMouseCaptured)
+                    return;
+                Send(PointerPhase.Up, e);
+                surface.ReleaseMouseCapture();
+            };
+            surface.LostMouseCapture += (_, _) => PointerInput?.Invoke(PointerPhase.Cancel, 0, 0);
+            Children.Add(surface);
+
+            void Send(PointerPhase phase, MouseEventArgs e)
+            {
+                if (surface.ActualWidth <= 0 || surface.ActualHeight <= 0)
+                    return;
+                var point = e.GetPosition(surface);
+                PointerInput?.Invoke(phase, point.X / surface.ActualWidth, point.Y / surface.ActualHeight);
+            }
         }
         _cpu.Snapshot = snapshot;
         _cpu.InvalidateVisual();
@@ -358,8 +384,9 @@ public sealed class RoomViewport : Grid
         private static byte ToByte(float channel) => (byte)Math.Round(Math.Clamp(channel, 0, 1) * 255);
     }
 
-    private sealed class NativeSurface(Action changed, Action closing, Action<double, double> clicked) : HwndHost
+    private sealed class NativeSurface(Action changed, Action closing, Action<PointerPhase, double, double> input) : HwndHost
     {
+        private bool _dragging;
         public (int Width, int Height) PixelSize => Handle != 0 && GetClientRect(Handle, out var rect)
             ? (Math.Max(0, rect.Right - rect.Left), Math.Max(0, rect.Bottom - rect.Top))
             : (0, 0);
@@ -386,12 +413,28 @@ public sealed class RoomViewport : Grid
 
         protected override nint WndProc(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
         {
-            const int click = 0x0201;
-            if (message == click && PixelSize is (> 0, > 0) size)
+            const int down = 0x0201, up = 0x0202, move = 0x0200, captureChanged = 0x0215;
+            if (_dragging && message == captureChanged)
+            {
+                _dragging = false;
+                input(PointerPhase.Cancel, 0, 0);
+            }
+            if ((message == down || (_dragging && message is move or up)) && PixelSize is (> 0, > 0) size)
             {
                 var x = unchecked((short)((long)lParam & 0xffff));
                 var y = unchecked((short)(((long)lParam >> 16) & 0xffff));
-                clicked((double)x / size.Width, (double)y / size.Height);
+                var phase = message == down ? PointerPhase.Down : message == up ? PointerPhase.Up : PointerPhase.Move;
+                if (message == down)
+                {
+                    _dragging = true;
+                    SetCapture(hwnd);
+                }
+                input(phase, (double)x / size.Width, (double)y / size.Height);
+                if (message == up)
+                {
+                    _dragging = false;
+                    ReleaseCapture();
+                }
                 handled = true;
             }
             return base.WndProc(hwnd, message, wParam, lParam, ref handled);
@@ -420,5 +463,12 @@ public sealed class RoomViewport : Grid
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool DestroyWindow(nint hwnd);
+
+        [DllImport("user32.dll")]
+        private static extern nint SetCapture(nint hwnd);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool ReleaseCapture();
     }
 }

@@ -42,6 +42,7 @@
           </StackPanel>
         </StackPanel>
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <Button x:Name="NewBlank" Content="_Blank project" Click="NewBlankClicked" Margin="0,0,6,0"/>
           <Button Content="_New museum" Command="ApplicationCommands.New" Margin="0,0,6,0" ToolTip="New museum (Ctrl+N)" />
           <Button Content="_Open…" Command="ApplicationCommands.Open" Margin="0,0,6,0" ToolTip="Open a local project (Ctrl+O)"/>
           <Button Content="_Save" Command="ApplicationCommands.Save" Margin="0,0,6,0" ToolTip="Save the project (Ctrl+S)"/>
@@ -66,6 +67,10 @@
             <TextBlock Text="Scene" FontSize="18" FontWeight="SemiBold"/>
             <TextBlock x:Name="ObjectCount" Style="{StaticResource Caption}" Margin="0,4,0,0"/>
           </StackPanel>
+          <WrapPanel x:Name="SceneActions" DockPanel.Dock="Top" Visibility="Collapsed" Margin="0,0,0,10">
+            <Button x:Name="AddWall" Content="+ Wall" Tag="Wall" Click="AddSceneClicked" Margin="0,0,4,4" Padding="6,4"/>
+            <Button x:Name="AddLamp" Content="+ Lamp" Tag="Lamp" Click="AddSceneClicked" Margin="0,0,4,4" Padding="6,4"/>
+          </WrapPanel>
           <ListBox x:Name="Objects" SelectionChanged="SelectionChanged" Background="Transparent" BorderThickness="0"
                    AutomationProperties.Name="Scene objects" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <ListBox.Template>
@@ -233,7 +238,7 @@
           <StackPanel Margin="15,21,15,14">
             <TextBlock x:Name="SelectedName" FontSize="25" FontWeight="SemiBold" TextWrapping="Wrap"/>
             <TextBlock x:Name="SelectedLocation" Foreground="{StaticResource Muted}" Margin="0,3,0,0" TextWrapping="Wrap"/>
-            <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource Border}"
+            <Border x:Name="MuseumInspector" Background="{StaticResource Surface}" BorderBrush="{StaticResource Border}"
                     BorderThickness="1" CornerRadius="6" Margin="0,20,0,0" Padding="11">
               <StackPanel>
                 <TextBlock x:Name="SwitchHeading" FontWeight="SemiBold"/>
@@ -254,6 +259,44 @@
                 </StackPanel>
               </StackPanel>
             </Border>
+            <StackPanel x:Name="SceneInspector" Visibility="Collapsed" Margin="0,15,0,0">
+              <StackPanel.Resources>
+                <Style TargetType="TextBox">
+                  <Setter Property="Background" Value="{StaticResource Page}"/>
+                  <Setter Property="Foreground" Value="{StaticResource Text}"/>
+                  <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+                  <Setter Property="CaretBrush" Value="{StaticResource Accent}"/>
+                  <Setter Property="Padding" Value="5,4"/>
+                  <Setter Property="Margin" Value="2"/>
+                  <Setter Property="IsUndoEnabled" Value="False"/>
+                </Style>
+              </StackPanel.Resources>
+              <TextBlock Text="Name" Style="{StaticResource Caption}"/>
+              <TextBox x:Name="SceneName" AutomationProperties.Name="Object name" MaxLength="96"/>
+              <Button x:Name="RenameObject" Content="Rename" Click="RenameSceneClicked" Margin="2,5,2,10"/>
+              <TextBlock Text="Transform" Style="{StaticResource Caption}"/>
+              <Grid Margin="0,4,0,0">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <StackPanel>
+                  <TextBlock Text="X" Style="{StaticResource Caption}"/>
+                  <TextBox x:Name="SceneX" AutomationProperties.Name="Position X"/>
+                  <TextBlock Text="Width" Style="{StaticResource Caption}"/>
+                  <TextBox x:Name="SceneWidth" AutomationProperties.Name="Width"/>
+                  <TextBlock Text="Rotation °" Style="{StaticResource Caption}"/>
+                  <TextBox x:Name="SceneRotation" AutomationProperties.Name="Rotation in degrees"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1">
+                  <TextBlock Text="Y" Style="{StaticResource Caption}"/>
+                  <TextBox x:Name="SceneY" AutomationProperties.Name="Position Y"/>
+                  <TextBlock Text="Height" Style="{StaticResource Caption}"/>
+                  <TextBox x:Name="SceneHeight" AutomationProperties.Name="Height"/>
+                </StackPanel>
+              </Grid>
+              <Button x:Name="ApplyTransform" Content="Apply transform" Click="ApplyTransformClicked" Margin="2,5,2,10"/>
+              <Button x:Name="ChangeColor" Content="Change wall color" Click="ChangeSceneColorClicked" Margin="2,2"/>
+              <Button x:Name="ChangeLight" Click="ChangeSceneLampClicked" Margin="2,2"/>
+              <Button x:Name="DeleteObject" Content="Delete object" Click="DeleteSceneClicked" Margin="2,9,2,0"/>
+            </StackPanel>
             <TextBlock Text="Object ID" Style="{StaticResource Caption}" Margin="0,22,0,4"/>
             <TextBlock x:Name="ObjectId" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>
             <TextBlock Text="Project ID" Style="{StaticResource Caption}" Margin="0,15,0,4"/>
@@ -276,7 +319,7 @@
           </StackPanel>
             </ScrollViewer>
           </TabItem>
-          <TabItem Header="ATLAS">
+          <TabItem x:Name="MuseumAtlasTab" Header="ATLAS">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <StackPanel Margin="15,17,15,14">
                 <TextBlock x:Name="AtlasScopeLabel" Foreground="{StaticResource Muted}" TextWrapping="Wrap"

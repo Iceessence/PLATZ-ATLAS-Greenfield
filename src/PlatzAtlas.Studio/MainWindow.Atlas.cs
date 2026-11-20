@@ -65,7 +65,7 @@ public partial class MainWindow
 
     private ProjectReadScope? CurrentSavedScope()
     {
-        if (_play is not null || _session.IsDirty || _session.FilePath is null)
+        if (_play is not null || _session.IsDirty || _session.FilePath is null || _session.Current.Scene is not null)
             return null;
         return ScopeOf(_session.Current);
     }

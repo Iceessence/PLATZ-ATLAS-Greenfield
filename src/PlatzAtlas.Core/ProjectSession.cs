@@ -1,7 +1,7 @@
 namespace PlatzAtlas.Core;
 
 // Studio owns a session on its dispatcher. ProjectStore serializes saves across editor processes.
-public sealed class ProjectSession
+public sealed partial class ProjectSession
 {
     internal static readonly Guid PublicFixtureId = new("9e67d909-655c-489f-87c1-0dbbfe50d4b1");
     private readonly LightHistory history = new();
@@ -13,6 +13,9 @@ public sealed class ProjectSession
         {
             history.Record(edit);
         }
+        if (project.Scene is { } scene)
+            foreach (var edit in scene.History)
+                sceneJournal.Record(edit);
 
         Current = project;
         FilePath = filePath;
@@ -24,8 +27,8 @@ public sealed class ProjectSession
     public string? FilePath { get; private set; }
     public long? SavedRevision { get; private set; }
     public bool IsDirty => Current.Revision != SavedRevision;
-    public bool CanUndo => history.NextUndo is not null;
-    public bool CanRedo => history.NextRedo is not null;
+    public bool CanUndo => history.NextUndo is not null || sceneJournal.NextUndo is not null;
+    public bool CanRedo => history.NextRedo is not null || sceneJournal.NextRedo is not null;
     public LightCommitReceipt? LatestAtlasCommit =>
         Current.History.LastOrDefault(edit => edit.AtlasCommit is not null) is { } last
             ? LightCommitReceipt.FromEdit(Current, last)
@@ -198,9 +201,11 @@ public sealed class ProjectSession
                 $"This edit was based on revision {revision}. The room is at revision {Current.Revision}.");
     }
 
-    public bool Undo() => Reverse(history.NextUndo, LightEditKind.Undo);
+    public bool Undo() => Current.Scene is null ? Reverse(history.NextUndo, LightEditKind.Undo) :
+        ReverseScene(sceneJournal.NextUndo, LightEditKind.Undo);
 
-    public bool Redo() => Reverse(history.NextRedo, LightEditKind.Redo);
+    public bool Redo() => Current.Scene is null ? Reverse(history.NextRedo, LightEditKind.Redo) :
+        ReverseScene(sceneJournal.NextRedo, LightEditKind.Redo);
 
     public void Save(string? path = null, bool overwriteExisting = false)
     {

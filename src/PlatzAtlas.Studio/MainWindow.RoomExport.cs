@@ -17,11 +17,11 @@ public partial class MainWindow
         RoomPackage.Save(path, RuntimeRoom.FromProject(project.ReadSavedSnapshot()), overwrite);
 
     private void CanExportRoom(object sender, CanExecuteRoutedEventArgs e) =>
-        e.CanExecute = _play is null && CanStartPlay;
+        e.CanExecute = _play is null && HasSavedRevision;
 
     private void ExportRoomExecuted(object sender, ExecutedRoutedEventArgs e)
     {
-        if (_play is not null || !CanStartPlay)
+        if (_play is not null || !HasSavedRevision)
             return;
         var dialog = new SaveFileDialog
         {

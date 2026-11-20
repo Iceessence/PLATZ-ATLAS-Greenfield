@@ -10,11 +10,17 @@ namespace PlatzAtlas.Runtime;
 public sealed record RuntimeRoom(Guid ProjectId, Guid SceneId, long SourceRevision, string Name,
     IReadOnlyList<Lantern> Objects, IReadOnlyList<LightSwitch> Switches)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<SceneEntity>? Entities { get; init; }
+
     public static RuntimeRoom FromProject(MuseumProject project)
     {
         ArgumentNullException.ThrowIfNull(project);
         return new RuntimeRoom(project.ProjectId, project.SceneId, project.Revision, project.Name,
-            Array.AsReadOnly(project.Objects.ToArray()), Array.AsReadOnly(project.Switches.ToArray()));
+            Array.AsReadOnly(project.Objects.ToArray()), Array.AsReadOnly(project.Switches.ToArray()))
+        {
+            Entities = project.Scene?.Entities
+        };
     }
 }
 
@@ -22,6 +28,7 @@ public static class RoomPackage
 {
     public const string Extension = ".platzroom";
     public const string RuntimeProfile = "night-museum/1";
+    public const string SceneProfile = "room-scene/2";
     private const int MaxBytes = 256 * 1024;
     private const int MaxRecords = 128;
     private static readonly JsonSerializerOptions Json = new()
@@ -32,7 +39,11 @@ public static class RoomPackage
         AllowDuplicateProperties = false,
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
         MaxDepth = 12,
-        Converters = { new JsonStringEnumConverter<SwitchBehavior>(JsonNamingPolicy.CamelCase, false) }
+        Converters =
+        {
+            new JsonStringEnumConverter<SwitchBehavior>(JsonNamingPolicy.CamelCase, false),
+            new JsonStringEnumConverter<PanelColor>(JsonNamingPolicy.CamelCase, false)
+        }
     };
 
     public static byte[] Encode(RuntimeRoom room)
@@ -43,8 +54,8 @@ public static class RoomPackage
         using (var writer = new Utf8JsonWriter(buffer))
         {
             writer.WriteStartObject();
-            writer.WriteNumber("version", 1);
-            writer.WriteString("runtimeProfile", RuntimeProfile);
+            writer.WriteNumber("version", room.Entities is null ? 1 : 2);
+            writer.WriteString("runtimeProfile", room.Entities is null ? RuntimeProfile : SceneProfile);
             writer.WriteString("sha256", Digest(payload));
             writer.WritePropertyName("room");
             writer.WriteRawValue(payload);
@@ -63,18 +74,21 @@ public static class RoomPackage
         {
             var package = JsonSerializer.Deserialize<Envelope>(bytes, Json)
                 ?? throw new InvalidDataException("The room package has no manifest.");
-            if (package.Version != 1 || package.RuntimeProfile != RuntimeProfile)
+            if ((package.Version, package.RuntimeProfile) is not ((1, RuntimeProfile) or (2, SceneProfile)))
                 throw new InvalidDataException("This room package needs a different player profile.");
             var payload = Encoding.UTF8.GetBytes(package.Room.GetRawText());
             if (!string.Equals(package.Sha256, Digest(payload), StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("The room package checksum does not match.");
             var room = JsonSerializer.Deserialize<RuntimeRoom>(payload, Json)
                 ?? throw new InvalidDataException("The room package is missing its scene.");
+            if ((package.Version == 1) != (room.Entities is null))
+                throw new InvalidDataException("The scene does not match the declared player profile.");
             Validate(room);
             return room with
             {
                 Objects = Array.AsReadOnly(room.Objects.ToArray()),
-                Switches = Array.AsReadOnly(room.Switches.ToArray())
+                Switches = Array.AsReadOnly(room.Switches.ToArray()),
+                Entities = room.Entities is null ? null : Array.AsReadOnly(room.Entities.ToArray())
             };
         }
         catch (JsonException error)
@@ -131,6 +145,14 @@ public static class RoomPackage
             room.SourceRevision < 1 || !Label(room.Name) || room.Objects is null || room.Switches is null ||
             room.Objects.Count > MaxRecords || room.Switches.Count > MaxRecords)
             throw new InvalidDataException("The room package has invalid identity, labels, or size.");
+
+        if (room.Entities is { } entities)
+        {
+            if (room.Objects.Count != 0 || room.Switches.Count != 0)
+                throw new InvalidDataException("The scene contains incompatible museum records.");
+            SceneValidation.ValidateEntities(entities, room.ProjectId, room.SceneId);
+            return;
+        }
 
         var ids = new HashSet<Guid> { room.ProjectId, room.SceneId };
         var targets = new HashSet<Guid>();

@@ -16,7 +16,8 @@ public partial class MainWindow
     private MuseumPlaySession? _play;
     private PlaySwitchResult? _lastPlaySwitch;
 
-    private bool CanStartPlay => !_session.IsDirty && _session.FilePath is not null;
+    private bool HasSavedRevision => !_session.IsDirty && _session.FilePath is not null;
+    private bool CanStartPlay => _session.Current.Scene is null && HasSavedRevision;
 
     private void CanTogglePlay(object sender, CanExecuteRoutedEventArgs e) =>
         e.CanExecute = _play is not null || CanStartPlay;

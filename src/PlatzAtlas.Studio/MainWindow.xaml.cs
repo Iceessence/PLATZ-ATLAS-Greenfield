@@ -35,7 +35,7 @@ public partial class MainWindow : Window
         Viewport.MeasureFrames = measureFrames;
         Viewport.FrameCompleted += FrameCompleted;
         Viewport.VulkanValidated += summary => _diagnostics.Log("vulkan-validation", summary);
-        Viewport.LanternClicked += SelectAt;
+        Viewport.PointerInput += ScenePointerInput;
         StateChanged += (_, _) => Viewport.Refresh();
 
         UpdateRendererButtons();
@@ -83,9 +83,9 @@ public partial class MainWindow : Window
         _session = session;
         ResetAtlasSession();
         _openedRevision = session.Current.Revision;
-        Objects.ItemsSource = session.Current.Objects.OrderBy(lantern => lantern.X)
-            .Select(lantern => new SceneObjectItem(lantern.Id, lantern.Name, lantern.Location)).ToArray();
-        Objects.SelectedIndex = 0;
+        _sceneDrag = null;
+        RefreshSceneList(null);
+        SideTabs.SelectedItem = InspectorTab;
         _changingProject = false;
         ShowStatus(message);
         UpdateStudio();
@@ -104,7 +104,7 @@ public partial class MainWindow : Window
 
         var dialog = new OpenFileDialog
         {
-            Title = "Open a museum project",
+            Title = "Open a PLATZ project",
             Filter = "PLATZ project (*.platz)|*.platz|Recover previous (*.platz.previous)|*.platz.previous",
             CheckFileExists = true
         };
@@ -157,12 +157,12 @@ public partial class MainWindow : Window
             {
                 var dialog = new SaveFileDialog
                 {
-                    Title = "Save museum project",
+                    Title = "Save PLATZ project",
                     Filter = "PLATZ project (*.platz)|*.platz",
                     DefaultExt = ".platz",
                     AddExtension = true,
                     OverwritePrompt = true,
-                    FileName = path is not null ? Path.GetFileName(path) : "Night Museum.platz"
+                    FileName = path is not null ? Path.GetFileName(path) : _session.Current.Name + ".platz"
                 };
                 if (dialog.ShowDialog(this) != true)
                     return false;
@@ -195,7 +195,7 @@ public partial class MainWindow : Window
         if (!_session.IsDirty || (_session.FilePath is null && _session.Current.Revision == _openedRevision))
             return true;
 
-        var answer = MessageBox.Show(this, $"Save changes to {_session.Current.Name}?", "Unsaved museum",
+        var answer = MessageBox.Show(this, $"Save changes to {_session.Current.Name}?", "Unsaved project",
             MessageBoxButton.YesNoCancel, MessageBoxImage.Question, MessageBoxResult.Yes);
         return answer == MessageBoxResult.No || (answer == MessageBoxResult.Yes && SaveProject());
     }
@@ -254,6 +254,8 @@ public partial class MainWindow : Window
         var started = Stopwatch.GetTimestamp();
         if (_play is null && _session.Undo())
         {
+            if (_session.Current.Scene is not null)
+                RefreshSceneList(SelectedEntityId);
             ShowStatus("Undid the last scene change.");
             UpdateStudio(started);
         }
@@ -264,6 +266,8 @@ public partial class MainWindow : Window
         var started = Stopwatch.GetTimestamp();
         if (_play is null && _session.Redo())
         {
+            if (_session.Current.Scene is not null)
+                RefreshSceneList(SelectedEntityId);
             ShowStatus("Redid the last scene change.");
             UpdateStudio(started);
         }
@@ -272,6 +276,16 @@ public partial class MainWindow : Window
     private void UpdateStudio(long? editStarted = null)
     {
         var project = _session.Current;
+        var general = project.Scene is not null;
+        SceneActions.Visibility = general ? Visibility.Visible : Visibility.Collapsed;
+        MuseumAtlasTab.Visibility = MuseumInspector.Visibility = general ? Visibility.Collapsed : Visibility.Visible;
+        if (general)
+        {
+            UpdateGeneralEditor(editStarted);
+            return;
+        }
+        SceneInspector.Visibility = Visibility.Collapsed;
+        PlayToggle.Visibility = Visibility.Visible;
         var selected = Selection;
         var control = project.Switches.FirstOrDefault(item => item.TargetId == selected?.Id);
         RoomTitle.Text = project.Name;
@@ -296,6 +310,11 @@ public partial class MainWindow : Window
     private void UpdateScenePresentation(long? editStarted = null)
     {
         var project = _session.Current;
+        if (project.Scene is not null)
+        {
+            UpdateGeneralPresentation(editStarted);
+            return;
+        }
         var play = _play?.Current;
         var selection = play is null ? Selection?.Id : _lastPlaySwitch?.TargetId;
         var preview = _atlasPreview;

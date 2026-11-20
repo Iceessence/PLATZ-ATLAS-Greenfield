@@ -18,7 +18,8 @@ internal static class ProjectFormat
         Converters =
         {
             new JsonStringEnumConverter<LightEditKind>(JsonNamingPolicy.CamelCase, allowIntegerValues: false),
-            new JsonStringEnumConverter<SwitchBehavior>(JsonNamingPolicy.CamelCase, allowIntegerValues: false)
+            new JsonStringEnumConverter<SwitchBehavior>(JsonNamingPolicy.CamelCase, allowIntegerValues: false),
+            new JsonStringEnumConverter<PanelColor>(JsonNamingPolicy.CamelCase, allowIntegerValues: false)
         }
     };
 
@@ -47,9 +48,9 @@ internal static class ProjectFormat
                 !project.TryGetProperty("schemaVersion", out var schema) ||
                 schema.ValueKind != JsonValueKind.Number ||
                 !schema.TryGetInt32(out var version) ||
-                version is < MuseumProject.LegacyFormatVersion or > MuseumProject.FormatVersion)
+                version is < MuseumProject.LegacyFormatVersion or > MuseumProject.SceneFormatVersion)
             {
-                throw new InvalidDataException("This editor supports PLATZ project schemas 1 through 3.");
+                throw new InvalidDataException("This editor supports PLATZ project schemas 1 through 4.");
             }
 
             var snapshot = JsonSerializer.Deserialize<MuseumProject>(payload, Settings)
@@ -83,6 +84,21 @@ internal static class ProjectFormat
         {
             throw new InvalidDataException("The project has an invalid identity or room coordinate convention.");
         }
+
+        if (project.SchemaVersion == MuseumProject.SceneFormatVersion)
+        {
+            if (project.Scene is null || project.Objects.Count != 0 || project.Switches.Count != 0 ||
+                project.Assets.Count != 0 || project.History.Count != 0)
+                throw new InvalidDataException("The scene document contains incompatible project records.");
+            return project with
+            {
+                Scene = SceneJournal.Validate(project.Scene, project.ProjectId, project.SceneId, project.Revision),
+                Objects = [], Switches = [], Assets = [], History = []
+            };
+        }
+
+        if (project.Scene is not null)
+            throw new InvalidDataException("Scene objects require project schema 4.");
 
         var identities = new HashSet<Guid> { project.ProjectId, project.SceneId };
         var assets = new HashSet<Guid>();
