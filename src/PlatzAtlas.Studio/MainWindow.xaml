@@ -7,6 +7,53 @@
         WindowStartupLocation="CenterScreen" Background="{StaticResource Page}"
         Foreground="{StaticResource Text}" FontFamily="Segoe UI" FontSize="14"
         UseLayoutRounding="True" PreviewKeyDown="StudioPlayKeyDown">
+  <Window.Resources>
+    <Style x:Key="WorkspaceTabs" TargetType="TabControl">
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TabControl">
+            <DockPanel KeyboardNavigation.TabNavigation="Local">
+              <Border DockPanel.Dock="Top" BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1">
+                <TabPanel IsItemsHost="True" Margin="11,6,11,0" KeyboardNavigation.TabIndex="0"/>
+              </Border>
+              <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent"
+                                KeyboardNavigation.TabIndex="1"/>
+            </DockPanel>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+      <Setter Property="ItemContainerStyle">
+        <Setter.Value>
+          <Style TargetType="TabItem">
+            <Setter Property="Template">
+              <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                  <Border x:Name="TabFace" Background="Transparent" BorderBrush="Transparent"
+                          BorderThickness="0,0,0,2" Padding="12,9" Margin="0,0,3,0">
+                    <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"/>
+                  </Border>
+                  <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                      <Setter TargetName="TabFace" Property="Background" Value="{StaticResource Surface}"/>
+                    </Trigger>
+                    <Trigger Property="IsSelected" Value="True">
+                      <Setter TargetName="TabFace" Property="BorderBrush" Value="{StaticResource Accent}"/>
+                      <Setter TargetName="TabFace" Property="Background" Value="{StaticResource Selection}"/>
+                      <Setter Property="FontWeight" Value="SemiBold"/>
+                    </Trigger>
+                    <Trigger Property="IsKeyboardFocused" Value="True">
+                      <Setter TargetName="TabFace" Property="BorderBrush" Value="{StaticResource Accent}"/>
+                      <Setter TargetName="TabFace" Property="BorderThickness" Value="1,1,1,2"/>
+                    </Trigger>
+                  </ControlTemplate.Triggers>
+                </ControlTemplate>
+              </Setter.Value>
+            </Setter>
+          </Style>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
   <Window.CommandBindings>
     <CommandBinding Command="ApplicationCommands.New" Executed="NewExecuted" CanExecute="CanAuthor"/>
     <CommandBinding Command="ApplicationCommands.Open" Executed="OpenExecuted" CanExecute="CanAuthor"/>
@@ -237,46 +284,7 @@
       <Border Grid.Column="4" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1,0,0,0">
         <Grid>
         <Grid.RowDefinitions><RowDefinition Height="51*" MinHeight="145"/><RowDefinition Height="5"/><RowDefinition Height="49*" MinHeight="150"/></Grid.RowDefinitions>
-        <TabControl x:Name="SideTabs" BorderThickness="0" AutomationProperties.Name="Editing panels">
-          <TabControl.Template>
-            <ControlTemplate TargetType="TabControl">
-              <DockPanel KeyboardNavigation.TabNavigation="Local">
-                <Border DockPanel.Dock="Top" BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1">
-                  <TabPanel IsItemsHost="True" Margin="11,6,11,0" KeyboardNavigation.TabIndex="0"/>
-                </Border>
-                <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent"
-                                  KeyboardNavigation.TabIndex="1"/>
-              </DockPanel>
-            </ControlTemplate>
-          </TabControl.Template>
-          <TabControl.ItemContainerStyle>
-            <Style TargetType="TabItem">
-              <Setter Property="Template">
-                <Setter.Value>
-                  <ControlTemplate TargetType="TabItem">
-                    <Border x:Name="TabFace" Background="Transparent" BorderBrush="Transparent"
-                            BorderThickness="0,0,0,2" Padding="12,9" Margin="0,0,3,0">
-                      <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"/>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                      <Trigger Property="IsMouseOver" Value="True">
-                        <Setter TargetName="TabFace" Property="Background" Value="{StaticResource Surface}"/>
-                      </Trigger>
-                      <Trigger Property="IsSelected" Value="True">
-                        <Setter TargetName="TabFace" Property="BorderBrush" Value="{StaticResource Accent}"/>
-                        <Setter TargetName="TabFace" Property="Background" Value="{StaticResource Selection}"/>
-                        <Setter Property="FontWeight" Value="SemiBold"/>
-                      </Trigger>
-                      <Trigger Property="IsKeyboardFocused" Value="True">
-                        <Setter TargetName="TabFace" Property="BorderBrush" Value="{StaticResource Accent}"/>
-                        <Setter TargetName="TabFace" Property="BorderThickness" Value="1,1,1,2"/>
-                      </Trigger>
-                    </ControlTemplate.Triggers>
-                  </ControlTemplate>
-                </Setter.Value>
-              </Setter>
-            </Style>
-          </TabControl.ItemContainerStyle>
+        <TabControl x:Name="SideTabs" Style="{StaticResource WorkspaceTabs}" BorderThickness="0" AutomationProperties.Name="Editing panels">
           <TabItem x:Name="InspectorTab" Header="Inspector">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
           <StackPanel Margin="15,21,15,14">
@@ -441,7 +449,7 @@
         </TabControl>
         <GridSplitter x:Name="AssistantSplitter" Grid.Row="1" Height="5" HorizontalAlignment="Stretch"
                       Background="{StaticResource Border}" ResizeBehavior="PreviousAndNext" AutomationProperties.Name="Resize ATLAS panel"/>
-        <TabControl x:Name="AssistantTabs" Grid.Row="2" BorderThickness="0" AutomationProperties.Name="ATLAS workspace">
+        <TabControl x:Name="AssistantTabs" Style="{StaticResource WorkspaceTabs}" Grid.Row="2" BorderThickness="0" AutomationProperties.Name="ATLAS workspace">
           <TabItem x:Name="SceneAtlasTab" Header="ATLAS" Visibility="Collapsed">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <StackPanel Margin="15,17,15,14">
