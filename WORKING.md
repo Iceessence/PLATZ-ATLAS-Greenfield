@@ -2,11 +2,29 @@
 
 ## Current assignment
 
-### GF-007 through GF-011 acceptance before implementation
+The owner assigned GF-012 through GF-016 after Gemini Neon's audit. The latest independently accepted baseline is **NONE**. The prior Night Museum checkpoint is **REPAIRS_REQUIRED** in the audit. This session repaired the four audit findings and verified the fixes on the reference host. The repair and feature commits still need independent review.
+
+- **GF-012 · PENDING_INDEPENDENT_REVIEW** at `6f838d2` (`gf-012`). Blank projects, stable scene objects, two editable object types, direct dragging, numeric transforms, persistent undo/redo, save/recovery and standalone scene readback.
+- **GF-013 · PENDING_INDEPENDENT_REVIEW** at `da4cfb1` (`gf-013`). PNG import, asset browser, textured placements on Vulkan, OpenGL and CPU Reference, embedded asset validation and standalone readback.
+- **GF-014 · PENDING_INDEPENDENT_REVIEW** at `97de488` (`gf-014`). Placeable switches and doors, editable stable links, proximity, collision, isolated Play and standalone room export.
+- **GF-015 · PENDING_INDEPENDENT_REVIEW** at `57b887a` (`gf-015`). Version 2 project evidence, inspection of arbitrary saved objects, source navigation, typed previews and checked, reversible approved saves.
+- **GF-016 · PENDING_INDEPENDENT_REVIEW** at local tag `gf-016`. Studio starts in an empty room. The original locally trained router and reproducible benchmark are delivered. Learned routing **FAILED_QUALIFICATION** and Studio retains deterministic behavior. The canonical [agent handoff](docs/ai/ATLAS_HANDOFF.md) tracks the review scope and next steps.
+
+### Reference-host receipt
+
+- Run `Build.ps1 -Offline -Test -Bundle` from the checkout. The final build passed 23 test groups. Evidence, fixtures and probes are in `C:\PLATZ ATLAS\.platz-atlas-verification\gf-012-016`.
+- The extracted Release bundle is in `player-final`. All 24 manifest entries matched. Two builds produced SHA-256 `3dfca061bad256a0f36bffd1a6a917a789a255387396865c8b55d368c3827a60`. The publication path keeps identical archives in place and retries transient Windows sharing errors on replacement.
+- `observatory-artwork.platz` contains the original authored gate, walls, lamp, switch and three placements of the synthetic Observatory emblem PNG. `observatory-artwork.platzroom` is its r26 export. In the extracted Player, Up six times reaches collision, E opens the linked door, and Up five more times crosses it. [Owner walkthrough](README.md#create-and-play-an-original-room)
+- The texture run measured 120 redraws per renderer at 852 × 497 after 10 warmups. Median/p95 draw callbacks were 0.10/0.14 ms (CPU Reference), 3.30/3.47 ms (OpenGL) and 3.28/3.41 ms (Vulkan). The CPU values cover WPF drawing work in the callback. GPU values cover their backend frame calls, including presentation. See `texture-performance.json` and `texture-render-probe.txt`.
+- `scene-atlas.platz` has the approved Bench light move and receipt. `scene-atlas-approved.platzroom` reads back that same lamp at (0.62, 0.33). The stale probe preserved the competing head, and cancellation left the door unchanged. See `scene-atlas.ndjson`, `scene-atlas-stale.ndjson` and the two ATLAS screenshots.
+- The specialist trained on 84 synthetic examples and scored 17/42 overall, 2/24 on supported prompts and three accepts among 18 unsupported prompts. Two runs produced byte-identical model and evaluation JSON. [Exact training and evaluation](tools/AtlasSpecialist/README.md)
+- The final Studio desktop startup showed an empty project. The native PNG picker imported the synthetic emblem, the visible placement button drew it on Vulkan, and Save wrote `native-first-use.platz` at r3. The actual Studio exporter and extracted Player were also used for package checks.
+
+### Historical GF-007 through GF-011 acceptance before implementation
 
 Export a verified saved Night Museum to a portable room package. Open the package in a standalone Windows player, walk into range, and verify two switch activations. Set the switch to Turn on in Studio, verify undo and redo, save and re-export, then demonstrate that a second activation keeps it on. Run the extracted player bundle outside the checkout with Studio closed. Reject tampered, unsupported or invalid package data, compare the authored files and export digests independently, and keep earlier project schemas readable.
 
-### GF-006 acceptance before implementation
+### Historical GF-006 acceptance before implementation
 
 Open the saved GF-005 revision 5 museum (west off, east on), start Play, and use the west switch twice. Only its referenced west lantern should change, first on then off. A third activation followed by Stop must still return to the saved west-off scene. Play must keep the source revision and receipt, undo and redo state, and file bytes intact. Restart and close tests must prove that old inputs cannot affect a new session and that reopening the saved file recovers the original states. Deny starting from an unsaved or externally replaced head. Use CPU Reference and Vulkan on the same fixture.
 
@@ -14,17 +32,17 @@ For this small scene, measure input handling through scheduling the next frame o
 
 - Project root: `C:\PLATZ ATLAS\PLATZ-ATLAS-Greenfield`. This is the blank-machine project from the supplied starter kit.
 - Product source: [Ultimate PLATZ ATLAS Master Version 1](docs/Ultimate_PLATZ_ATLAS_MASTER_Version_1.docx). Verified SHA-256 `ee95a50f205f85a3867488d7fc4a5e066b694b291f5657764eda8b35a2b32ebc` from the ZIP entry. The implementation brief is the starter kit's `01_START_HERE.txt`. The combined guide and current PLATZ renderer requirements govern product design. Inherited paths, commands and status describe older projects.
-- Frozen source: local tag **gf-011**, following **gf-006** at `c3768bb`. Run `git rev-parse gf-011` for the commit and `git status --short` before resuming.
+- Frozen previous source: local tag **gf-011**, following **gf-006** at `c3768bb`. The current candidate is above.
 - Last independently accepted revision: **NONE**.
 - Candidate: **GF-007–GF-011 · PENDING_INDEPENDENT_REVIEW**. Author-tested export, standalone play, walk-to-use, editable switch behavior and Windows distribution.
 - Last verified result: Studio saved and reopened **Turn on** in schema 3 after Undo and Redo. Player used the same west switch twice in two exports. Toggle at r5 went off → on → off. Turn on at r8 went off → on → on. East stayed on in both. The extracted Windows player presented the saved room on Vulkan with Studio closed. Two builds produced an identical ZIP on this host.
-- Next action: give the switch its own editable position, with a typed Studio edit and durable Undo/Redo. Pass when moving the west switch changes where Player can use it after save, reopen and export, while its stable link still controls the west lantern. Keep the prior placement as the default for earlier saves and packages. A door and collision are subsequent U3 work. Independently reproduce the current walkthrough before broader qualification.
+- Next action for the current batch is independent reproduction, including a second Windows machine, DPI and screen reader checks, and review of the router experiment with untouched evaluation data. No milestone has been promoted.
 
 ## Product objective
 
 Build one local workspace where the owner can create, edit, inspect, undo, reopen, play and export their work, with assistance grounded in authorized evidence. PLATZ Core owns canonical state and typed edits. Studio owns the authoring interface and Runtime plays pinned snapshots. ATLAS reads authorized evidence and proposes a change through the same typed operation that manual editing uses. The trusted host controls scope and commits. GF-001 exercised editing and persistence (U0/U1). GF-002 added OpenGL compatibility and Vulkan validation. GF-003 added the authorized evidence lookup. GF-004 staged the detached preview. GF-005 added an approved, reversible commit. GF-006 started U3 with isolated Play. GF-007–GF-011 extended that path from a saved Studio room to a separate Player and began the distribution work in U7.
 
-## Specification read for GF-001 through GF-011
+## Specification read for GF-001 through GF-016
 
 The master outline, **What you can make**, **One application with clear ownership**, **From a blank machine to the first project**, **Run the smallest possible rehearsal**, **Delivery timeline and master work breakdown**, **Building the first PLATZ frame that belongs to a project**, **How the intelligence and creation tools work as one application**, and **The first combined release** were read from the DOCX body. The relevant detailed references were **A.1 Current Fresh-Rebuild Overlay**, **M.1 GPU-First / Vulkan-First Permanent Architecture**, **M.2 GPU/Vulkan-First Next-Work Decision Rule**, the PLATZ Phase 00–04 overview, **Phase 01 Detail** (project validation and crash protection), **Phase 02 Detail** (property types, units, save, history, undo and serialization), **Phase 03 Detail** (input/windowing and rendering), and **Phase 04 Detail** (main editor layout, inspector and accessibility). **Ordinary applications as measurable workflows**, **Creative production** and **How ATLAS contributes to its own construction** inform later tracks. Coverage below maps the full roadmap without assigning current acceptance.
 
@@ -37,6 +55,8 @@ GF-005 rechecked the master checksum and followed the same combined guide sectio
 GF-006 rechecked the master checksum, **A first hour with the intended application**, **U3 Author and play a complete room**, the isolation paragraph under **From a suggestion to a reversible edit**, and the heading for **Phase 03 Detail — Runtime Scene, Rendering Baseline, Input, Windowing, Camera, and Play Mode**.
 
 GF-007–GF-011 rechecked the checksum and read **A first hour with the intended application**, **U3 Author and play a complete room**, **Make exports reproducible and explainable**, and the **Phase 05 Detail** gate for editable behavior.
+
+GF-012–GF-016 rechecked the master checksum and read the first-hour walkthrough, U3, the Phase 02–07 gates, **The project identity that survives the trip**, **The smallest exchange protocol**, and **From a suggestion to a reversible edit**. The owner-supplied batch assignment sets the delivery scope.
 
 ## How to reproduce
 
@@ -59,12 +79,12 @@ GF-007–GF-011 rechecked the checksum and read **A first hour with the intended
 | U1 · PLATZ 02 canonical data, identity, properties, serialization, undo and variants | Edit one of two same-named objects and reopen the saved project | U0 | Stable IDs, undo/redo, stale rejection and failed-save retry verified | Crash at publication boundaries and migration |
 | U1 · PLATZ 03 runtime scene, rendering, input, windowing, camera and play | See and resize the saved scene across backends, then use its saved switch in Play | 02 snapshot | Vulkan (Khronos validation 0 errors/warnings), OpenGL 3.3 Core, CPU Reference, resize and fallback verified in earlier batches. GF-006 Play and GF-008 Player exercised on CPU Reference and Vulkan | Camera/depth and real device-loss qualification |
 | U1 · PLATZ 04 editor shell, UX, inspector, assets, search, import and hot reload | Select and change a light in context, choose renderer preference, and inspect revision | 02/03 | Keyboard edit, fresh-process reopen and accessible Renderer selector verified | High DPI, interactive desktop keyboard walkthrough and unfamiliar tester |
-| U2 · ATLAS scoped research, privacy and bridge | Ask which lantern the west switch controls, preview, approve an edit and reopen its receipt | U1 stable read snapshot and a trusted grant | GF-003 lookup, GF-004 preview and GF-005 reversible commit author-tested | Owner-selected cross-process snapshot exchange and independent interoperability verdict |
-| U3 · PLATZ 05 behavior, 06 creation core, 07 physics, 08 animation and 09 UI/HUD | Build a door and switch, walk to it and share a playable room | U1/U2 identity and editor | Saved Night Museum export, standalone proximity input and two editable switch modes author-tested | Editable switch placement, then door and collision |
+| U2 · ATLAS scoped research, privacy and bridge | Inspect a saved object or its linked target, approve an edit and reopen its receipt | U1 stable read snapshot and a trusted grant | GF-015 versioned scene evidence and reversible commits author-tested | Cross-process snapshot exchange and independent review |
+| U3 · PLATZ 05 behavior, 06 creation core, 07 physics, 08 animation and 09 UI/HUD | Build a textured room with a switch and door, walk through it and share a playable room | U1/U2 identity and editor | Blank authoring, PNG placements, switch links and door collision verified on reference host | Independent owner walkthrough, animation and expanded collision testing |
 | U4 · ATLAS/PLATZ creative tracks | Revise a shared illustration, comic or 3D source and open its export | U2 revision/dependency contracts | Planned | One editable asset and independent export readback |
 | U4 · ATLAS productivity tracks | Revise a document or worksheet and inspect the changed source references | U2 typed operations | Planned | Editable file and separately opened export |
 | U5 · PLATZ 10 worlds, 11 agents, 12 gameplay, 13 genre frameworks and 14 presentation | Stream a changed voxel region or reopen a blocked factory | U3 and measured frame baseline | Planned | Persistent region reload and independently balanced factory ledger |
-| U6 · ATLAS native learning and timed assistance | Compare a learned recommendation with simpler controls, then halt a bounded session | U2 trusted reads, rights and protected evaluation custody | Planned | Shadow comparison on held-out project families and observed stop/restart |
+| U6 · ATLAS native learning and timed assistance | Compare a learned recommendation with simpler controls, then halt a bounded session | U2 trusted reads, rights and protected evaluation custody | First offline router experiment failed qualification | New held-out scene families, real object-name resolution and independently demonstrated gains |
 | U7 · PLATZ 15 extensions, 16 profiling/scale, 17 templates, 18 export/distribution and 19 acceptance | Install offline, open, play, export and restore without Studio dependencies in the runtime | U3–U6 qualified workflows | First framework-dependent Windows player bundle verified on the reference host | Second-machine installation and independent compatibility/restore matrix |
 | U8 · Advanced creation, productivity, research and consented private workspaces | Carry a project from editable source to deliverable with independently verified assistance | Earlier qualified profiles | Planned | One bounded workflow per new supported format or capability |
 

@@ -1,0 +1,85 @@
+group	label	text
+garden prompts	inspect	Inspect <object>
+workshop prompts	inspect	Describe <object>
+dock prompts	inspect	Tell me about <object>
+garden prompts	inspect	Show details for <object>
+workshop prompts	inspect	List the properties of <object>
+dock prompts	inspect	What kind of object is <object>?
+garden prompts	inspect	Give me the object facts for <object>
+workshop prompts	inspect	Show me the saved settings of <object>
+dock prompts	inspect	What are the attributes on <object>
+garden prompts	inspect	Identify <object> in the scene
+workshop prompts	inspect	Give an overview of <object>
+dock prompts	inspect	Which component is <object> using?
+garden prompts	inspect	Show all available fields for <object>
+workshop prompts	inspect	Summarize the selected item <object>
+dock prompts	inspect	Read the object information for <object>
+garden prompts	inspect	Check the properties of <object>
+garden prompts	locate	Where is <object>?
+workshop prompts	locate	What position is <object> at?
+dock prompts	locate	Show coordinates for <object>
+garden prompts	locate	Tell me the X and Y for <object>
+workshop prompts	locate	Find the location of <object>
+dock prompts	locate	Where did I place <object>?
+garden prompts	locate	Read the transform of <object>
+workshop prompts	locate	Show the position of <object>
+dock prompts	locate	What is the location of <object>?
+garden prompts	locate	Get the room coordinates of <object>
+workshop prompts	locate	Where on the canvas is <object>?
+dock prompts	locate	Look up the X coordinate of <object>
+garden prompts	locate	Which corner holds <object>?
+workshop prompts	locate	Find <object> on the room canvas
+dock prompts	locate	Give the precise location for <object>
+garden prompts	locate	Locate <object> in the saved room
+garden prompts	link	What does <object> control?
+workshop prompts	link	What is <object> wired to?
+dock prompts	link	Show the target for <object>
+garden prompts	link	Which object is linked to <object>?
+workshop prompts	link	Read the connection from <object>
+dock prompts	link	Which door is connected to <object>?
+garden prompts	link	What does <object> trigger?
+workshop prompts	link	Which lamp does <object> control?
+dock prompts	link	Find the destination of the <object> link
+garden prompts	link	Show the controlled object for <object>
+workshop prompts	link	Trace the link from <object>
+dock prompts	link	Follow the target ID for <object>
+garden prompts	link	Identify the object that reacts to <object>
+workshop prompts	link	Is <object> linked to a door?
+dock prompts	link	Which entity is <object> connected to?
+garden prompts	link	Show me the switch connection of <object>
+garden prompts	state	What state is <object>?
+workshop prompts	state	Is <object> open?
+dock prompts	state	Is <object> on or off?
+garden prompts	state	Is <object> still closed?
+workshop prompts	state	Read the state of <object>
+dock prompts	state	Tell me whether <object> is lit
+garden prompts	state	Check if <object> starts open
+workshop prompts	state	Is the starting state of <object> off?
+dock prompts	state	Does <object> begin closed?
+garden prompts	state	Report the saved state of <object>
+workshop prompts	state	Show whether <object> is open or closed
+dock prompts	state	Does the scene start with <object> lit?
+garden prompts	state	Is the light <object> currently enabled?
+workshop prompts	state	What is the initial on state of <object>?
+dock prompts	state	Look up the open state for <object>
+garden prompts	state	Does <object> start switched on?
+garden prompts	unsupported	Delete <object> permanently
+workshop prompts	unsupported	Move <object> to the left side
+dock prompts	unsupported	Rename <object>
+garden prompts	unsupported	Switch <object> on for me
+workshop prompts	unsupported	Change <object> to an obstacle
+dock prompts	unsupported	Export the room and <object>
+garden prompts	unsupported	Connect <object> to every door
+workshop prompts	unsupported	Open a personal document
+dock prompts	unsupported	Build an animation for <object>
+garden prompts	unsupported	Send <object> to another account
+workshop prompts	unsupported	Is there a recipe for soup?
+dock prompts	unsupported	Write a story about a night museum
+garden prompts	unsupported	Give me the weather forecast
+workshop prompts	unsupported	Simulate changes to <object> for a minute
+dock prompts	unsupported	Set <object> to position 0.4 0.7
+garden prompts	unsupported	Rotate <object> two degrees
+workshop prompts	unsupported	Clear the state of <object>
+dock prompts	unsupported	Copy <object> to a new project
+garden prompts	unsupported	Search outside this room for <object>
+workshop prompts	unsupported	Switch to a different renderer

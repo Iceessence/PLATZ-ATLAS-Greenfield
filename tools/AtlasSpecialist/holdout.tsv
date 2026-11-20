@@ -1,0 +1,43 @@
+group	label	text
+observatory probes	inspect	Describe the saved properties on <object>.
+archive probes	inspect	Read out the characteristics of <object>.
+transit probes	inspect	What sort of scene element is <object>?
+observatory probes	inspect	Which values define <object>?
+archive probes	inspect	Inspect the entity <object> for me.
+transit probes	inspect	I want a rundown of <object>.
+observatory probes	locate	Pinpoint <object> on the floor plan.
+archive probes	locate	Can you give me the position coordinates for <object>?
+transit probes	locate	How far left is <object> placed?
+observatory probes	locate	Which part of the scene contains <object>?
+archive probes	locate	Show me exactly where <object> sits.
+transit probes	locate	Where in this layout did we put <object>?
+observatory probes	link	Which element will respond when I use <object>?
+archive probes	link	What does pressing <object> affect?
+transit probes	link	Find the element or target behind <object>.
+observatory probes	link	Does <object> feed into any other item?
+archive probes	link	Which door does <object> operate?
+transit probes	link	If I use <object>, what responds?
+observatory probes	state	Tell me if <object> is currently open or closed.
+archive probes	state	Would the visitor find <object> lit at spawn?
+transit probes	state	Does <object> look on to you in the saved revision?
+observatory probes	state	What's the default status of <object>?
+archive probes	state	Check the starting on/off value of <object>.
+transit probes	state	Will <object> begin shut?
+observatory probes	unsupported	Move the position of <object> to 0.5, 0.5.
+archive probes	unsupported	Inspect the file system for a copy of <object>.
+transit probes	unsupported	Rename <object> to Emergency gate.
+observatory probes	unsupported	Build an inventory system for <object>.
+archive probes	unsupported	Is there any way to add physics to <object>?
+transit probes	unsupported	Erase everything in the saved room.
+observatory probes	unsupported	Don't tell me the state, just turn <object> off.
+archive probes	unsupported	Tell me the state of the internet.
+transit probes	unsupported	Change the switch target of <object> to the nearest door.
+observatory probes	unsupported	What would happen if you made <object> open forever?
+archive probes	unsupported	Give me the coordinates of my home.
+transit probes	unsupported	Start recording a replay around <object>.
+observatory probes	unsupported	Look up the owner of <object> on the web.
+archive probes	unsupported	Paste the settings from an unsaved different project.
+transit probes	unsupported	Send the location of <object> to somebody.
+observatory probes	unsupported	What does <object> smell like?
+archive probes	unsupported	Set <object> closed.
+transit probes	unsupported	Swap <object> with a prop from another project.

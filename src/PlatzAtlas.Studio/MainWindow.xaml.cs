@@ -27,7 +27,7 @@ public partial class MainWindow : Window
     {
         _diagnostics = diagnostics;
         _saveTargetPath = saveTargetPath;
-        _session = ProjectSession.NewMuseum();
+        _session = ProjectSession.NewScene();
         InitializeComponent();
         InitializeAtlas();
         SceneAtlasQuestion.TextChanged += (_, _) =>
@@ -50,7 +50,7 @@ public partial class MainWindow : Window
         StateChanged += (_, _) => Viewport.Refresh();
 
         UpdateRendererButtons();
-        SetSession(_session, "Select a lantern in the scene to inspect its light.");
+        SetSession(_session, "Create a room from blank, open a saved project, or choose New museum.");
         if (projectPath is not null)
             OpenProject(projectPath);
 
@@ -290,6 +290,7 @@ public partial class MainWindow : Window
     {
         var project = _session.Current;
         var general = project.Scene is not null;
+        BlankRoomHelp.Visibility = project.Scene is { Entities.Count: 0 } ? Visibility.Visible : Visibility.Collapsed;
         SceneActions.Visibility = SceneAssetsTab.Visibility = SceneAtlasTab.Visibility =
             general ? Visibility.Visible : Visibility.Collapsed;
         MuseumAtlasTab.Visibility = MuseumInspector.Visibility = general ? Visibility.Collapsed : Visibility.Visible;

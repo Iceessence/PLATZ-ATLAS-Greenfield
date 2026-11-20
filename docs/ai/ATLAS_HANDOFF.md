@@ -1,5 +1,40 @@
 # PLATZ ATLAS Greenfield — Independent Audit & Persistent Agent Handoff
 
+## Current implementation handoff
+
+The owner assigned GPT to repair the audit findings and implement GF-012 through GF-016. The audit below remains the independent record for `gf-011`. The latest independently accepted Greenfield baseline remains **NONE**.
+
+| Checkpoint | Author status | Frozen commit |
+| --- | --- | --- |
+| Audit repair | Verified by the implementation agent and awaiting Gemini Neon review | `528a49b` |
+| GF-012 | Blank room authoring, durable history and room export verified by the implementation agent | `6f838d2`, tag `gf-012` |
+| GF-013 | PNG import, durable asset placement and GPU/CPU pixel readback verified by the implementation agent | `da4cfb1`, tag `gf-013` |
+| GF-014 | Authorable switches and doors with isolated Play and standalone Player verified by the implementation agent | `97de488`, tag `gf-014` |
+| GF-015 | Scoped scene evidence, stable source navigation and approved reversible edits verified by the implementation agent | `57b887a`, tag `gf-015` |
+| GF-016 | Blank-workflow onboarding and reproducible original router experiment delivered. Router failed its acceptance thresholds. | tag `gf-016` |
+
+- Work and evidence are local. The master DOCX still hashes to `ee95a50f205f85a3867488d7fc4a5e066b694b291f5657764eda8b35a2b32ebc`.
+- Evidence directory is `C:\PLATZ ATLAS\.platz-atlas-verification\gf-012-016`. `repairs-build.txt`, `stale-before.ndjson`, `stale-after.ndjson` and the CLI stderr receipts show the repaired cases. Player rendered under all three requested backends. The first Vulkan validation run logged two Overwolf implicit-layer loader errors. The process-scoped `VK_LOADER_LAYERS_DISABLE=~implicit~` retry retained Khronos validation and logged zero errors and warnings. No machine settings changed. [Khronos Vulkan Loader](https://github.com/KhronosGroup/Vulkan-Loader/blob/main/docs/LoaderLayerInterface.md#layer-filtering)
+- `first-original-room.platz`, `original-room-reopened.png`, `desktop-drag-room.platz` and `gf012-extracted-player.ndjson` show GF-012. A native Windows drag moved the lamp from (0.74, 0.65) to (0.534601, 0.736519) in one revision. The raw file readback confirmed the saved transform. The original export opened in extracted Player on Vulkan.
+- `Observatory emblem.png`, `artwork-room-reopened.png`, `observatory-artwork.platzroom`, `texture-render-probe.txt` and `texture-performance.json` show GF-013. A checked PNG import was placed three times, transformed and reopened. The CPU Reference capture counted 10,991 pixels matching a known image color. Vulkan and OpenGL matched exact expected RGB samples on the RTX 5080, including full and half transparency. The extracted Player checked and presented the actual export. Studio's 120 warm redraws per backend recorded p95 of 0.14 ms for CPU draw callbacks, 3.47 ms for the OpenGL backend frame call and 3.41 ms for Vulkan.
+- `observatory-gate.platz`, `observatory-gate.platzroom`, the two gate PNGs and `observatory-player.ndjson` show GF-014. The built application wrote the project at r19. Studio's routed Play input left source bytes intact. In the extracted Player, Windows keyboard input stopped at Y=0.70, E opened the exact linked door, and the visitor moved to Y=0.50. Khronos validation logged zero errors and warnings on the isolated loader run.
+- `scene-atlas.ndjson`, `scene-atlas-stale.ndjson`, `scene-atlas-approved.platzroom` and the ATLAS PNGs show GF-015. The host read the authorized switch and an unrelated lamp, navigated to the door, canceled a door preview, then saved a lamp move to (0.62, 0.33) with a receipt. Undo, Redo and Save retained the receipt. A competing write caused Confirm to clear the grant and preserve the competing bytes.
+- `tools/AtlasSpecialist` holds the locked training project, separate synthetic train and held-out sets, preset thresholds, model parameters and per-prompt evaluation. The classifier scored 17/42 overall and 2/24 supported, with three unsupported accepts. It is absent from Studio and Player. Two locally trained results were byte-identical. The owner walkthrough uses deterministic queries and the playable export uses no model.
+- `final-build.txt` records 23 passing groups. The verified final archive SHA-256 is `3dfca061bad256a0f36bffd1a6a917a789a255387396865c8b55d368c3827a60`, with 24/24 manifest entries verified after extraction. The bundle now keeps identical archives in place and retries transient sharing errors. Logged desktop input on the final Studio used the native PNG picker and saved the first placed image to `native-first-use.platz`. `final-player.ndjson` records the final extracted Player rendering the textured export, blocking the sixth Up press, opening the linked door and crossing it with Studio closed. Vulkan validation logged zero errors and warnings for that session.
+- GF-014 precedes GF-013 in Git history. Each tag points to its own development commit.
+
+### Assignment for Gemini Neon
+
+Review the frozen commits in a separate checkout of this repository. Run `Build.ps1 -Offline -Test -Bundle`. Reproduce each repair with a disposable project, including edits from a competing writer before and after an ATLAS grant and headless failures with existing diagnostics or missing output. Verify Player's explicit renderer selection, DPI metadata and Vulkan validation log, and check that case-insensitive hex acceptance still rejects modified payloads.
+
+Create your own room from the startup canvas. Add, rename, drag, numerically transform, delete, undo and redo. Import a fresh PNG with transparency using the native file dialog. Place it more than once, compare the renderer paths and open the exported asset readback. Save, reopen and recover the prior revision. Replay a legacy museum project with history and its earlier room package. Wire a door and switch in the new project, verify collision and Play/Stop isolation, and walk through the door from the extracted Player with Studio closed. Attempt invalid links, stale saves and corrupted source and export data.
+
+For scene ATLAS, choose duplicate names, use selection and stable IDs, check exact field citations, and try an unauthorized query, forged preview, expired confirmation, revocation and a competing save. Verify the confirmed edit by reopening, checking its receipt and running Undo and Redo. Then reproduce the router evaluation and use a new untouched test set with actual scene names before considering any deployment. Keep unsupported and write requests separate from the supported read task.
+
+The current runtime profile covers bounded 2D scenes, PNG imports use a 256 × 256 per-image limit, and gameplay uses a fixed starting area plus a fallback clear spawn. Multiple-switch and arbitrary user scenes need independent stress tests. The first independent review should also cover another supported Windows machine, DPI, screen-reader use and non-NVIDIA coverage. Report evidence and limits separately from the implementation record. Only the owner initiates the review session.
+
+## Historical Gemini Neon audit of gf-011
+
 > **Audit role notice:** This document was authored by an independent auditor against the unmodified repository at `gf-011` (`7b9b7a643f1ae4e05ec593d72d7c95e10b7cbd12`). No application source code, tests, or `WORKING.md` were modified during this audit.
 
 ---

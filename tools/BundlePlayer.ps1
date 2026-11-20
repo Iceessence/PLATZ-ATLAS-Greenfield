@@ -10,6 +10,26 @@ $distribution = [IO.Directory]::CreateDirectory((Join-Path $repo 'artifacts/dist
 $stage = Join-Path $distribution ('player-stage-' + [Guid]::NewGuid().ToString('N'))
 $archive = Join-Path $distribution ("PlatzAtlas.Player-{0}.zip" -f $Configuration.ToLowerInvariant())
 $pending = $stage + '.zip'
+
+function Publish-PlayerArchive([string] $source, [string] $destination) {
+    $hash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
+    for ($attempt = 0; $attempt -lt 5; $attempt++) {
+        try {
+            if (![IO.File]::Exists($destination)) {
+                [IO.File]::Move($source, $destination)
+            } elseif ((Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash -ne $hash) {
+                [IO.File]::Replace($source, $destination, [NullString]::Value)
+            }
+            return
+        } catch {
+            $failure = $_.Exception.GetBaseException()
+            $retryable = $failure -is [IO.IOException] -and ($failure.HResult -band 0xffff) -in @(32, 33, 80, 183, 1175)
+            if (!$retryable -or $attempt -eq 4 -or ![IO.File]::Exists($source)) { throw }
+            Start-Sleep -Milliseconds (100 * ($attempt + 1))
+        }
+    }
+}
+
 [IO.Directory]::CreateDirectory($stage) | Out-Null
 try {
     $publishOptions = @('-c', $Configuration, '--no-restore', '--no-self-contained', '--output', $stage,
@@ -66,11 +86,7 @@ try {
             }
         } finally { $zip.Dispose() }
     } finally { $stream.Dispose() }
-    if ([IO.File]::Exists($archive)) {
-        [IO.File]::Replace($pending, $archive, [NullString]::Value)
-    } else {
-        [IO.File]::Move($pending, $archive)
-    }
+    Publish-PlayerArchive $pending $archive
     Write-Output "Player bundle: $archive"
 } finally {
     [IO.File]::Delete($pending)

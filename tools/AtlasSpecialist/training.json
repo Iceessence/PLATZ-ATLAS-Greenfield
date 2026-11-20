@@ -1,0 +1,8 @@
+{
+  "modelVersion": "scene-query-router/0.1",
+  "alpha": 1.0,
+  "minimumPosterior": 0.83,
+  "minimumMargin": 0.16,
+  "minimumSupportedAccuracy": 0.9,
+  "minimumAdditionalCorrect": 2
+}

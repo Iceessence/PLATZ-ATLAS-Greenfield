@@ -1,6 +1,6 @@
 # PLATZ ATLAS Studio
 
-PLATZ ATLAS Studio is a local Windows editor for the Night Museum scene. Studio identifies its two identically named lanterns by gallery and stable object ID. You can test the west switch in Play, export the saved room to PLATZ Player, or ask ATLAS about the saved museum and review a proposed light change.
+PLATZ ATLAS Studio is a local Windows room editor. Create an original room from blank, configure a switch and door, and export the saved revision to PLATZ Player. The Night Museum template also includes the initial ATLAS workflow for saved evidence and owner-approved light changes.
 
 ## Build and launch
 
@@ -23,6 +23,29 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\Build.ps1 -Offli
 ```
 
 Vulkan presentation uses the machine's Vulkan loader and compatible display driver, with OpenGL 3.3 Core compatibility and CPU Reference fallbacks. The Inspector includes a **Renderer** selector (**Auto**, **Vulkan**, **OpenGL**, **CPU**) and Studio reports the active backend in the status bar. The source build uses checked-in SPIR-V, so the editor build needs no Vulkan SDK. Set `PLATZ_ATLAS_VK_VALIDATION=1` in the environment to enable `VK_LAYER_KHRONOS_validation` diagnostics when the Khronos validation layer is available on the host.
+
+## Create and play an original room
+
+1. Studio opens with a blank room. Choose **Blank project** any time to start another. Use **+ Wall**, **+ Lamp**, **+ Door**, or **+ Switch**. Select objects in the Scene list or on the canvas. Drag to move. The Inspector accepts exact room fractions for X, Y, width and height, and degrees for rotation. Click **Apply transform** after typing values. Rename, delete, undo and redo work on stable object IDs.
+2. To build the Observatory Gate layout, set a door to **X 0.50**, **Y 0.60**, **width 0.20**, **height 0.09**, **rotation 0**. Leave it initially closed. Set a switch at **X 0.54**, **Y 0.73**. In the switch Inspector, choose the door as **Switch target**, leave **Toggle** selected, and choose **Apply switch link**. Add other walls or lamps around the room, leaving the approach from the bottom clear.
+3. **Save**, then choose **Play**. From spawn, press **Up** six times. The closed door blocks the sixth step. Press **E** when the switch is in range and press **Up** five more times to go through. **Stop** restores the saved state. You can also use the visible movement and interaction controls.
+4. Choose **Export room…** and open the package in Player. The package contains the source revision, object transforms, and links. The door starts closed and can be opened again without Studio.
+
+New scenes use project schema 4. Studio continues to open and edit the original museum projects in schemas 1–3, including their receipts and history. Back up a prior saved revision through **Open… → Recover previous**.
+
+## Import and place PNG artwork
+
+Open **Assets** and choose **Import PNG…**. Select a PNG up to 256 × 256 pixels and 2 MiB. The browser lists each imported image with its dimensions. Select one and choose **Place selected image**. Place the same art again for a second instance. Each instance has its own stable ID, position, size and rotation. Studio stores the decoded RGBA pixels in the project and includes referenced images in the room export. The project supports up to 262,144 imported pixels, including imports retained in history.
+
+Transparent pixels blend with the scene in Vulkan, OpenGL and CPU Reference. The Studio status bar identifies the renderer handling the current scene. Import feedback reports invalid files before adding them to the asset browser.
+
+## Ask ATLAS about an original room
+
+1. **Save**. Select any object in the Scene list and open **ATLAS → Allow scene read**. Try **Inspect selection**, **Where is Bench light?**, or **What does Badge reader control?** with matching names in your room. Use the full object ID if multiple objects share a name.
+2. **Show object** and **Show linked target** navigate to the objects cited by the answer. **Saved source details** shows the project, scene, revision, stable object ID, exact transform and evidence digest.
+3. Try **Move Bench light to 0.62, 0.33**, **Rename Bench light to Desk lamp**, **Set Bench light off**, or **Set Observatory gate open**. Choose **Preview change** and inspect the named file and change. Choose **Confirm and save** within one minute or **Cancel preview**. The commit records the stable object and operation IDs. Undo and Redo work after reopen.
+
+The Studio lookup is deterministic and reads only the granted saved revision. The locally trained router failed its qualification gate and remains an offline experiment. [Dataset, model and evaluation](tools/AtlasSpecialist/README.md)
 
 ## Try the museum
 
@@ -79,7 +102,7 @@ This first version uses a deterministic local lookup for the supplied question. 
 3. While previewing, choose **Review save…** in **ATLAS**. Check the named file and light change, then choose **Confirm and save** within one minute. Studio saves a new revision, preserves the previous file and displays **Latest saved ATLAS edit** with the operation ID and payload checksum.
 4. Reopen the saved project to inspect the receipt or choose **Undo** to reverse the light change. Save the reversal to keep it. **Cancel review** returns to the preview. If another window has saved a newer revision, reopen that revision before starting a new review.
 
-**Save** writes the actual scene when a preview is open. Studio opens project schemas 1 through 3. The first approved edit on a schema 1 file saves its receipt in schema 2. The first switch behavior edit uses schema 3 and preserves earlier receipts. The adjacent `.platz.previous` file retains the preceding saved bytes.
+**Save** writes the actual scene when a preview is open. The first approved museum edit on a schema 1 file saves its receipt in schema 2. The first museum switch behavior edit uses schema 3 and preserves earlier receipts. The adjacent `.platz.previous` file retains the preceding saved bytes.
 
 [WORKING.md](WORKING.md) records which paths were exercised, the evidence and the next milestone.
 

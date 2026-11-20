@@ -41,7 +41,8 @@ public partial class MainWindow
         var project = _session.Current;
         var entity = SelectedEntity;
         RoomTitle.Text = project.Name;
-        ObjectCount.Text = $"{project.Scene!.Entities.Count} objects";
+        var count = project.Scene!.Entities.Count;
+        ObjectCount.Text = count == 1 ? "1 object" : $"{count} objects";
         SelectedName.Text = entity?.Name ?? "Select an object";
         SelectedLocation.Text = entity is null ? "" : ComponentLabel(entity.Component);
         SceneInspector.Visibility = entity is null ? Visibility.Collapsed : Visibility.Visible;
