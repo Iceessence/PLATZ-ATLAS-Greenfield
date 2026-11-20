@@ -295,7 +295,7 @@ public partial class MainWindow : Window
     {
         var project = _session.Current;
         var general = project.Scene is not null;
-        BlankRoomHelp.Visibility = project.Scene is { Entities.Count: 0 } ? Visibility.Visible : Visibility.Collapsed;
+        BlankRoomHelp.Visibility = _play is null && project.Scene is { Entities.Count: 0 } ? Visibility.Visible : Visibility.Collapsed;
         SceneActions.Visibility = SceneAssetsTab.Visibility = SceneAtlasTab.Visibility =
             general ? Visibility.Visible : Visibility.Collapsed;
         RoomAppearanceEditor.Visibility = SceneActions.Visibility;

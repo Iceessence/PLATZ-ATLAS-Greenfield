@@ -123,6 +123,7 @@ public partial class MainWindow
         SideTabs.Visibility = playing ? Visibility.Collapsed : Visibility.Visible;
         AssistantTabs.Visibility = AssistantSplitter.Visibility = SideTabs.Visibility;
         ViewportTools.Visibility = !playing && _session.Current.Scene is not null ? Visibility.Visible : Visibility.Collapsed;
+        BlankRoomHelp.Visibility = !playing && _session.Current.Scene is { Entities.Count: 0 } ? Visibility.Visible : Visibility.Collapsed;
         Objects.IsEnabled = !playing;
         SceneActions.IsEnabled = NewBlank.IsEnabled = SnapToGrid.IsEnabled = !playing;
         PlayBannerText.Text = snapshot is null ? "" : snapshot.Progress is { } progress
