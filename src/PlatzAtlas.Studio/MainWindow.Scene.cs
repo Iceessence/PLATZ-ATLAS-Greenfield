@@ -90,8 +90,10 @@ public partial class MainWindow
         var play = _play?.Current;
         var entities = play?.Entities ?? current.Scene!.Entities;
         if (play is null && _sceneAtlasDraft is { } draft)
-            entities = draft.Preview.Before is null ? entities.Append(draft.Preview.After).ToArray() :
-                entities.Select(entity => entity.Id == draft.Preview.After.Id ? draft.Preview.After : entity).ToArray();
+            entities = draft.Plan is { } plan ? plan.Entities : draft.Preview is { } preview
+                ? preview.Before is null ? entities.Append(preview.After).ToArray() :
+                    entities.Select(entity => entity.Id == preview.After.Id ? preview.After : entity).ToArray()
+                : entities;
         if (play is null && _sceneDrag is { } drag)
             entities = entities.Select(entity => entity.Id == drag.Id ? entity with { Transform = drag.Preview } : entity).ToArray();
         if (!drawOnly)
@@ -106,7 +108,7 @@ public partial class MainWindow
             AutomationProperties.SetName(Viewport, play is null ? "Room canvas" : "Playable room canvas");
         }
         Viewport.Show(SceneArt.Create(current.ProjectId, current.Revision, entities,
-            play is null ? _sceneAtlasDraft?.Preview.After.Id ?? SelectedEntityId : _lastPlaySwitch?.TargetId,
+            play is null ? _sceneAtlasDraft?.Preview?.After.Id ?? SelectedEntityId : _lastPlaySwitch?.TargetId,
             grid: play is null, play: play, nearbySwitch: _play?.NearbySwitch?.SwitchId, assets: current.Assets,
             backgroundRgb: current.Scene!.Appearance?.BackgroundRgb, paintOrder: current.Scene.Appearance?.PaintOrder,
             editHandles: play is null && _sceneAtlasDraft is null,

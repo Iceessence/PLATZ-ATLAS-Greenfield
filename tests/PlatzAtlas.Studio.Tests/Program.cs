@@ -22,6 +22,7 @@ internal static partial class Program
                 WorkingRoom(folder);
                 PresetsInStudio(folder);
                 AnimateRoom(folder);
+                PlanInStudio(folder);
             }
             return 0;
         }

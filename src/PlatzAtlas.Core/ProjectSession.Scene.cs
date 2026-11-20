@@ -82,6 +82,9 @@ public sealed partial class ProjectSession
     }
 
     private bool ReverseScene(SceneEdit? prior, LightEditKind kind)
+        => prior is { Group: not null } ? ReverseSceneGroup(prior, kind) : ReverseSingleScene(prior, kind);
+
+    private bool ReverseSingleScene(SceneEdit? prior, LightEditKind kind)
     {
         if (prior is null)
             return false;
@@ -89,7 +92,8 @@ public sealed partial class ProjectSession
             prior.After, prior.Before, kind, prior.Revision)
         {
             AssetChange = SceneJournal.InvertAssetChange(prior.AssetChange),
-            AppearanceChange = prior.AppearanceChange?.Reverse()
+            AppearanceChange = prior.AppearanceChange?.Reverse(),
+            Group = prior.Group
         });
         return true;
     }

@@ -10,6 +10,7 @@ public sealed record SceneProposal(SceneProposalKind Kind, string? Name = null, 
 }
 public sealed record SceneAnswer(ProjectReadScope Scope, SceneSource? Source, SceneSource? Target, string Sha256, SceneProposal? Proposal)
 {
+    public SceneBuildPlan? Plan { get; init; }
     public SceneSource? AdditionalTarget { get; init; }
     public SceneSource? ProposedTarget { get; init; }
 }
@@ -68,9 +69,12 @@ public sealed class SceneQuestionHost(TimeProvider? clock = null)
             _review = null;
             if (version != SceneEvidenceProfile.Version)
                 return new(QuestionStatus.IncompatibleProfile);
-            if (text is not { Length: <= MaxQuestionLength } || Parse(text) is not { } query)
+            var plan = text is { Length: <= MaxQuestionLength } && grant.Scope.WorkspaceId is not null
+                ? SceneBuildPlan.Parse(text) : null;
+            var query = plan is null && text is { Length: <= MaxQuestionLength } ? Parse(text) : null;
+            if (query is null && plan is null)
                 return new(QuestionStatus.UnsupportedQuestion, Message:
-                    "Try Inspect selection, Check scene, or Move <name> to 0.5, 0.4. Write changes require explicit preview and confirmation.");
+                    "Try Inspect selection, Check scene, Move <name> to 0.5, 0.4, or Build a keyed gate named Dock on the right.");
 
             SceneEvidence evidence;
             string sha;
@@ -78,7 +82,14 @@ public sealed class SceneQuestionHost(TimeProvider? clock = null)
             catch (InvalidDataException error) { return new(QuestionStatus.InvalidSnapshot, Message: error.Message); }
             if (_grant != grant || evidence.Scope != grant.Scope)
                 return new(QuestionStatus.AccessDenied);
-            if (query.Criterion == "scene-health")
+            if (plan is not null)
+            {
+                if (evidence.Objects.Count != 0)
+                    return new(QuestionStatus.UnsupportedQuestion, Message: "The keyed gate plan needs an empty room so it can lay out the approach and the exit.");
+                _latest = new SceneAnswer(grant.Scope, null, null, sha, null) { Plan = plan };
+                return new(QuestionStatus.Answered, _latest);
+            }
+            if (query!.Criterion == "scene-health")
                 return new(QuestionStatus.Answered) { Health = SceneHealthReport.Inspect(evidence, sha) };
             var proposal = query.Proposal;
             if (proposal?.Kind == SceneProposalKind.Add)
@@ -129,7 +140,8 @@ public sealed class SceneQuestionHost(TimeProvider? clock = null)
     {
         lock (_sync)
         {
-            if (_grant != grant || current != grant.Scope || !ReferenceEquals(answer, _latest) || answer.Proposal is null)
+            if (_grant != grant || current != grant.Scope || !ReferenceEquals(answer, _latest) ||
+                (answer.Proposal is null && answer.Plan is null))
                 throw new InvalidOperationException("Ask for an edit in the currently authorized revision first.");
             var review = new SceneWriteReview(Guid.NewGuid(), grant, answer);
             _review = review;

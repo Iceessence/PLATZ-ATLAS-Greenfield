@@ -79,6 +79,9 @@ internal static class ProjectFormat
             projectId, sceneId, baseRevision = edit.Revision - 1, edit.EntityId, edit.Before, edit.After
         }, Settings));
 
+    public static string ScenePlanDigest(Guid projectId, Guid sceneId, IReadOnlyList<SceneEdit> changes) =>
+        Digest(JsonSerializer.SerializeToUtf8Bytes(new { projectId, sceneId, changes }, Settings));
+
     private static MuseumProject Validate(MuseumProject project)
     {
         if (project.ProjectId == Guid.Empty ||

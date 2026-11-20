@@ -95,6 +95,12 @@ public sealed record SceneEdit(long Revision, Guid EntityId, SceneEntity? Before
     public SceneCommitStamp? AtlasCommit { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RoomAppearanceChange? AppearanceChange { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SceneEditGroup? Group { get; init; }
+}
+public sealed record SceneEditGroup(Guid Id, int Index, int Count)
+{
+    public const int MaxOperations = 12;
 }
 public sealed record AssetPresence(bool IsPresent);
 
@@ -181,7 +187,7 @@ internal sealed class SceneJournal
             _ => throw new InvalidDataException("The scene history contains an invalid edit.")
         };
         if (!source.TryPeek(out var prior) || edit.ReversesRevision != prior.Revision ||
-            edit.EntityId != prior.EntityId || edit.Before != prior.After || edit.After != prior.Before ||
+            edit.EntityId != prior.EntityId || edit.Before != prior.After || edit.After != prior.Before || edit.Group != prior.Group ||
             edit.AssetChange != InvertAssetChange(prior.AssetChange) ||
             (prior.AppearanceChange is null ? edit.AppearanceChange is not null :
                 edit.AppearanceChange is null || !prior.AppearanceChange.Inverts(edit.AppearanceChange)))
@@ -204,6 +210,7 @@ internal sealed class SceneJournal
             throw new InvalidDataException("These gameplay fields require project schema 5.");
         if (scene.History.Count > SceneValidation.MaxEdits || revision != scene.History.Count + MuseumProject.InitialRevision)
             throw new InvalidDataException("The saved revision does not match its scene history.");
+        ValidateGroups(scene.History);
 
         var state = new Dictionary<Guid, SceneEntity>();
         var created = new HashSet<Guid>();
@@ -284,5 +291,27 @@ internal sealed class SceneJournal
             ActiveAssetIds = activeAssets.Count == 0 ? null : Array.AsReadOnly(activeAssets.Order().ToArray()),
             Appearance = appearance
         };
+    }
+
+    private static void ValidateGroups(IReadOnlyList<SceneEdit> history)
+    {
+        var ids = new HashSet<Guid>();
+        for (var offset = 0; offset < history.Count; offset++)
+        {
+            if (history[offset] is not { Group: { } group } lead)
+                continue;
+            if (group.Id == Guid.Empty || group.Count is < 2 or > SceneEditGroup.MaxOperations ||
+                offset > history.Count - group.Count || (lead.Kind == LightEditKind.Edit && !ids.Add(group.Id)))
+                throw new InvalidDataException("The saved room contains an invalid edit group.");
+            for (var index = 0; index < group.Count; index++)
+            {
+                var expectedIndex = lead.Kind == LightEditKind.Undo ? group.Count - index - 1 : index;
+                if (history[offset + index] is not { Group: { } member } edit || edit.Kind != lead.Kind ||
+                    member.Id != group.Id || member.Count != group.Count || member.Index != expectedIndex ||
+                    edit.AppearanceChange is not null || edit.AssetChange is not null || edit.AtlasCommit is not null)
+                    throw new InvalidDataException("The saved room contains an incomplete grouped edit.");
+            }
+            offset += group.Count - 1;
+        }
     }
 }

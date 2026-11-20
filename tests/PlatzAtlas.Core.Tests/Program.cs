@@ -111,6 +111,7 @@ try
     WorkingDocumentChecks.Run(scratch.FullName);
     PresetChecks.Run(scratch.FullName);
     AnimationChecks.Run(scratch.FullName);
+    WorkingPlanChecks.Run(scratch.FullName);
 }
 finally
 {

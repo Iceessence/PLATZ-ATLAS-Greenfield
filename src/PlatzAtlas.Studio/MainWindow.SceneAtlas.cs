@@ -60,10 +60,14 @@ public partial class MainWindow
         SceneAtlasTarget.Visibility = (_sceneAtlasAnswer?.ProposedTarget ?? _sceneAtlasAnswer?.Target) is null
             ? Visibility.Collapsed : Visibility.Visible;
         SceneAtlasTarget.Content = _sceneAtlasAnswer?.ProposedTarget is null ? "Show linked target" : "Show proposed target";
-        SceneAtlasPreview.Visibility = _sceneAtlasAnswer?.Proposal is null ? Visibility.Collapsed : Visibility.Visible;
+        SceneAtlasPreview.Visibility = _sceneAtlasAnswer is { } answer && (answer.Proposal is not null || answer.Plan is not null)
+            ? Visibility.Visible : Visibility.Collapsed;
         var receipt = _session.LatestSceneCommit;
-        SceneAtlasReceipt.Visibility = receipt is null ? Visibility.Collapsed : Visibility.Visible;
-        SceneAtlasReceiptText.Text = receipt is null ? "" :
+        var plan = _session.LatestScenePlan;
+        SceneAtlasReceipt.Visibility = receipt is null && plan is null ? Visibility.Collapsed : Visibility.Visible;
+        SceneAtlasReceiptText.Text = plan is not null && (receipt is null || plan.Revision > receipt.Revision)
+            ? $"{(_session.SavedRevision >= plan.Revision ? "Saved" : "Applied to working room")} r{plan.Revision}\n{plan.Changes} grouped edits\n\nOperation {plan.OperationId:D}\n\nSHA-256 {plan.Sha256}"
+            : receipt is null ? "" :
             $"{(_session.SavedRevision >= receipt.Revision ? "Saved" : "Applied to working room")} r{receipt.Revision}\nObject {receipt.EntityId:D}\n\nOperation {receipt.OperationId:D}\n\nSHA-256 {receipt.PayloadSha256}";
     }
 
@@ -156,12 +160,19 @@ public partial class MainWindow
 
     private void SceneAtlasPreviewClicked(object sender, RoutedEventArgs e) => WithSceneAtlas(() =>
     {
-        if (_sceneAtlasGrant is not { } grant || _sceneAtlasAnswer is not { Proposal: { } proposal } answer)
+        if (_sceneAtlasGrant is not { } grant || _sceneAtlasAnswer is not { } answer)
+            return;
+        if (answer.Plan is { } plan)
+        {
+            PreviewAtlasPlan(grant, answer, plan);
+            return;
+        }
+        if (answer.Proposal is not { } proposal)
             return;
         var scope = grant.Scope;
         var preview = _session.PreviewWorkingScene(SceneOperationFor(answer, proposal));
         var review = _sceneAtlasHost.BeginReview(grant, answer, WorkingScope(_session.FreezeWorkingSnapshot()));
-        _sceneAtlasDraft = new SceneAtlasDraft(preview, review);
+        _sceneAtlasDraft = new SceneAtlasDraft(review, Preview: preview);
         var action = preview.Before is null ? $"Create {preview.After.Name} at ({preview.After.Transform.X:G}, {preview.After.Transform.Y:G})"
             : ProposalText(answer);
         SceneAtlasDraftText.Text = $"{action}. Apply to the working room as r{scope.Revision + 1}?";
@@ -213,8 +224,13 @@ public partial class MainWindow
             return;
         if (!string.Equals(_sceneAtlasPath, _session.FilePath, StringComparison.OrdinalIgnoreCase))
             throw new ProjectEditException(EditRejection.StaleRevision, "The project path changed. Reopen the intended project.");
+        if (draft.Plan is { } plan)
+        {
+            ApplyAtlasPlan(draft, plan);
+            return;
+        }
         var receipt = _sceneAtlasHost.Confirm(draft.Review, WorkingScope(_session.FreezeWorkingSnapshot()), (operationId, requireApproval) =>
-            _session.ApplyApprovedWorkingScene(operationId, draft.Preview, requireApproval));
+            _session.ApplyApprovedWorkingScene(operationId, draft.Preview!, requireApproval));
         RevokeSceneAtlas();
         RefreshSceneList(receipt.EntityId);
         UpdateStudio();
@@ -275,6 +291,8 @@ public partial class MainWindow
 
     private static string FormatAnswer(SceneAnswer answer)
     {
+        if (answer.Plan is { } plan)
+            return $"{plan.Summary}\n\nWorking r{answer.Scope.Revision} · Plan v{SceneBuildPlan.Version}";
         if (answer.Source is not { } item)
             return $"Working r{answer.Scope.Revision}\n\nProposed: {ProposalText(answer)}";
         var details = item.Kind switch
@@ -316,5 +334,5 @@ public partial class MainWindow
     private static string FormatObjectState(SceneSourceKind kind, bool active) =>
         kind == SceneSourceKind.Door ? (active ? "open" : "closed") : (active ? "on" : "off");
 
-    private sealed record SceneAtlasDraft(ScenePreview Preview, SceneWriteReview Review);
+    private sealed record SceneAtlasDraft(SceneWriteReview Review, ScenePreview? Preview = null, WorkingScenePlan? Plan = null);
 }
