@@ -120,6 +120,8 @@ public partial class MainWindow
         PlayToggle.Content = playing ? "Stop" : "Play";
         PlayBanner.Visibility = PlayPanel.Visibility = RestartPlay.Visibility = playing ? Visibility.Visible : Visibility.Collapsed;
         SideTabs.Visibility = playing ? Visibility.Collapsed : Visibility.Visible;
+        AssistantTabs.Visibility = AssistantSplitter.Visibility = SideTabs.Visibility;
+        ViewportTools.Visibility = !playing && _session.Current.Scene is not null ? Visibility.Visible : Visibility.Collapsed;
         Objects.IsEnabled = !playing;
         SceneActions.IsEnabled = NewBlank.IsEnabled = SnapToGrid.IsEnabled = !playing;
         PlayBannerText.Text = snapshot is null ? "" : snapshot.Progress is { } progress

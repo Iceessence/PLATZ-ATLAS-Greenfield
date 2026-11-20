@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace PlatzAtlas.Atlas;
 
 public sealed record SceneDiagnostic(string Code, string Message, IReadOnlyList<Guid> ObjectIds);
@@ -33,6 +35,8 @@ public static class SceneSourceResolver
         var name = reference.Trim();
         if (Guid.TryParse(name, out var id))
             return evidence.Objects.Where(item => item.Id == id).Take(2).ToArray();
+        if (name.StartsWith('#') && long.TryParse(name.AsSpan(1), NumberStyles.None, CultureInfo.InvariantCulture, out var number))
+            return evidence.Objects.Where(item => item.Number == number).Take(2).ToArray();
         if (name.Equals("selection", StringComparison.OrdinalIgnoreCase) || name.Equals("this object", StringComparison.OrdinalIgnoreCase))
             return evidence.Objects.Where(item => item.Id == selected).ToArray();
         return evidence.Objects.Where(item => item.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).Take(2).ToArray();

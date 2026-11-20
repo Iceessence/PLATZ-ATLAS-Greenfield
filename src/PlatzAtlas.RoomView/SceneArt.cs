@@ -5,6 +5,21 @@ using PlatzAtlas.Runtime;
 
 namespace PlatzAtlas.RoomView;
 
+public readonly record struct RoomViewTransform(double Zoom, double CenterX, double CenterY)
+{
+    public static RoomViewTransform Fit => new(1, .5, .5);
+    public (double X, double Y) ToWorld(double x, double y) => ((x - .5) / Zoom + CenterX, (y - .5) / Zoom + CenterY);
+    public RenderPoint ToViewport(double x, double y) => new((float)(.5 + (x - CenterX) * Zoom), (float)(.5 + (y - CenterY) * Zoom));
+
+    public RoomViewTransform Around(double x, double y, double factor)
+    {
+        var point = ToWorld(x, y);
+        var zoom = Math.Clamp(Zoom * factor, .65, 12);
+        return new RoomViewTransform(zoom, Math.Clamp(point.X - (x - .5) / zoom, -.4, 1.4),
+            Math.Clamp(point.Y - (y - .5) / zoom, -.4, 1.4));
+    }
+}
+
 public static class SceneArt
 {
     private static readonly RenderColor Background = Rgb(17, 25, 33);
@@ -24,8 +39,9 @@ public static class SceneArt
     public static RenderSnapshot Create(Guid projectId, long revision, IReadOnlyList<SceneEntity> entities,
         Guid? selected, bool grid = false, PlayRoomSnapshot? play = null, Guid? nearbySwitch = null,
         IReadOnlyList<ProjectAsset>? assets = null, uint? backgroundRgb = null, IReadOnlyList<Guid>? paintOrder = null,
-        bool editHandles = false)
+        bool editHandles = false, RoomViewTransform? view = null, double gridSpacing = .05)
     {
+        var projection = view ?? RoomViewTransform.Fit;
         var triangles = new List<RenderTriangle>();
         var foreground = new List<RenderTriangle>();
         var sprites = new List<RenderSprite>();
@@ -35,10 +51,15 @@ public static class SceneArt
             background.R * .85f + .10f, background.G * .85f + .10f, background.B * .85f + .10f) : Grid;
         if (grid)
         {
-            for (var index = 1; index < 20; index++)
-                Quad(new Transform2D(index / 20.0, .5, .001, 1, 0), chart);
-            for (var index = 1; index < 12; index++)
-                Quad(new Transform2D(.5, index / 12.0, 1, .0015, 0), chart);
+            var (left, top) = projection.ToWorld(0, 0);
+            var (right, bottom) = projection.ToWorld(1, 1);
+            Quad(new Transform2D(.5, .5, 1, 1, 0), background);
+            var interval = Math.Clamp(gridSpacing, .025, .1);
+            var major = new RenderColor(chart.R + .045f, chart.G + .05f, chart.B + .055f);
+            for (var column = (int)Math.Ceiling(left / interval); column <= Math.Floor(right / interval); column++)
+                Quad(new Transform2D(column * interval, projection.CenterY, .001 / projection.Zoom, bottom - top, 0), column % 4 == 0 ? major : chart);
+            for (var row = (int)Math.Ceiling(top / interval); row <= Math.Floor(bottom / interval); row++)
+                Quad(new Transform2D(projection.CenterX, row * interval, right - left, .0017 / projection.Zoom, 0), row % 4 == 0 ? major : chart);
         }
 
         foreach (var item in SceneAppearance.Ordered(entities, paintOrder))
@@ -146,7 +167,7 @@ public static class SceneArt
             Quad(new Transform2D(actor.X, actor.Y, .032, .054, 45), Rgb(47, 100, 148));
             Quad(new Transform2D(actor.X, actor.Y, .022, .037, 45), Rgb(125, 205, 243));
         }
-        return new RenderSnapshot(projectId, revision, background, triangles,
+        return new RenderSnapshot(projectId, revision, grid ? Rgb(12, 19, 25) : background, triangles,
             playSessionId: play?.SessionId, playStep: play?.Step, sprites: sprites, foreground: foreground);
 
         void AtLocal(Transform2D t, double x, double y, double width, double height, RenderColor color)
@@ -165,7 +186,7 @@ public static class SceneArt
             RenderVertex Vertex(RenderPoint p) => new(p.X, p.Y, color);
         }
 
-        static (RenderPoint, RenderPoint, RenderPoint, RenderPoint) Corners(Transform2D t)
+        (RenderPoint, RenderPoint, RenderPoint, RenderPoint) Corners(Transform2D t)
         {
             var angle = t.Rotation * Math.PI / 180;
             var cos = Math.Cos(angle);
@@ -175,8 +196,8 @@ public static class SceneArt
             var c = Vertex(t.Width / 2, t.Height / 2);
             var d = Vertex(-t.Width / 2, t.Height / 2);
             return (a, b, c, d);
-            RenderPoint Vertex(double x, double y) => new((float)(t.X + x * cos - y * sin),
-                (float)(t.Y + x * sin + y * cos));
+            RenderPoint Vertex(double x, double y) => projection.ToViewport(t.X + x * cos - y * sin,
+                t.Y + x * sin + y * cos);
         }
     }
 

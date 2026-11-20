@@ -18,6 +18,8 @@ public sealed record RuntimeRoom(Guid ProjectId, Guid SceneId, long SourceRevisi
     public uint? BackgroundRgb { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<Guid>? PaintOrder { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<SceneNumber>? Numbers { get; init; }
     [JsonIgnore]
     public int Version => Entities is null ? 1 :
         BackgroundRgb is not null || PaintOrder is not null || Entities.Any(SceneValidation.RequiresSchemaFive) ? 3 : 2;
@@ -28,15 +30,25 @@ public sealed record RuntimeRoom(Guid ProjectId, Guid SceneId, long SourceRevisi
     {
         ArgumentNullException.ThrowIfNull(project);
         var scene = project.Scene;
+        var assets = scene is not null ? SceneAssets(scene, project.Assets) : null;
         return new RuntimeRoom(project.ProjectId, project.SceneId, project.Revision, project.DisplayName,
             Array.AsReadOnly(project.Objects.ToArray()), Array.AsReadOnly(project.Switches.ToArray()))
         {
             Entities = scene?.Entities,
-            RasterAssets = scene is not null ? SceneAssets(scene, project.Assets) : null,
+            RasterAssets = assets,
+            Numbers = scene is null ? null : ExportNumbers(scene, assets),
             BackgroundRgb = scene?.Appearance?.BackgroundRgb,
             PaintOrder = scene?.Appearance?.PaintOrder is { } order
                 ? Array.AsReadOnly(SceneAppearance.Ordered(scene.Entities, order).Select(entity => entity.Id).ToArray()) : null
         };
+    }
+
+    private static IReadOnlyList<SceneNumber>? ExportNumbers(SceneDocument scene, IReadOnlyList<ProjectAsset>? assets)
+    {
+        var included = scene.Entities.Select(item => item.Id).Concat((assets ?? []).Select(item => item.Id)).ToHashSet();
+        return included.Count == 0 ? null : Array.AsReadOnly(SceneNumbers.FromHistory(scene)
+            .Where(item => included.Contains(item.Key)).OrderBy(item => item.Value)
+            .Select(item => new SceneNumber(item.Key, item.Value)).ToArray());
     }
 
     private static IReadOnlyList<ProjectAsset>? SceneAssets(SceneDocument scene, IReadOnlyList<ProjectAsset> assets)
@@ -116,7 +128,8 @@ public static class RoomPackage
                 Switches = Array.AsReadOnly(room.Switches.ToArray()),
                 Entities = room.Entities is null ? null : Array.AsReadOnly(room.Entities.ToArray()),
                 RasterAssets = room.RasterAssets is null ? null : Array.AsReadOnly(room.RasterAssets.ToArray()),
-                PaintOrder = room.PaintOrder is null ? null : Array.AsReadOnly(room.PaintOrder.ToArray())
+                PaintOrder = room.PaintOrder is null ? null : Array.AsReadOnly(room.PaintOrder.ToArray()),
+                Numbers = room.Numbers is null ? null : Array.AsReadOnly(room.Numbers.ToArray())
             };
         }
         catch (JsonException error)
@@ -183,10 +196,18 @@ public static class RoomPackage
                 (order.Count != entities.Count || !entities.Select(item => item.Id).ToHashSet().SetEquals(order))))
                 throw new InvalidDataException("The room package has an invalid floor color or paint order.");
             PixelAsset.ValidateRuntime(room.RasterAssets ?? [], entities, room.ProjectId, room.SceneId);
+            if (room.Numbers is { } numbers)
+            {
+                var expected = entities.Select(item => item.Id).Concat((room.RasterAssets ?? []).Select(item => item.Id)).ToHashSet();
+                if (numbers.Count != expected.Count ||
+                    numbers.Any(item => item is null || item.Number <= MuseumProject.InitialRevision || item.Number > room.SourceRevision) ||
+                    !expected.SetEquals(numbers.Select(item => item.Id)) || numbers.Select(item => item.Number).Distinct().Count() != numbers.Count)
+                    throw new InvalidDataException("The package contains invalid readable IDs.");
+            }
             MuseumPlaySession.FindSpawn(entities);
             return;
         }
-        if (room.RasterAssets is not null || room.BackgroundRgb is not null || room.PaintOrder is not null)
+        if (room.RasterAssets is not null || room.BackgroundRgb is not null || room.PaintOrder is not null || room.Numbers is not null)
             throw new InvalidDataException("The museum package has unexpected image assets.");
 
         var ids = new HashSet<Guid> { room.ProjectId, room.SceneId };

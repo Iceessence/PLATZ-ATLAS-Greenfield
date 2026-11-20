@@ -243,6 +243,7 @@ public partial class MainWindow
 
     private static ReadOnlyMemory<byte> PublishSceneEvidence(MuseumProject saved, ProjectReadScope scope)
     {
+        var numbers = SceneNumbers.FromHistory(saved.Scene!);
         var sources = saved.Scene!.Entities.Select(item =>
         {
             var t = item.Transform;
@@ -264,6 +265,7 @@ public partial class MainWindow
             {
                 SecondTargetId = (item.Component as SceneSwitch)?.SecondTargetId,
                 RequiredKeys = (item.Component as SceneGoal)?.RequiredKeys,
+                Number = numbers[item.Id],
                 SpawnBlocked = item.Component is SceneSpawn
                     ? MuseumPlaySession.SpawnBlocked(saved.Scene!.Entities, new RoomPosition(t.X, t.Y)) : null
             };

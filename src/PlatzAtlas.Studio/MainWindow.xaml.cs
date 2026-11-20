@@ -50,7 +50,7 @@ public partial class MainWindow : Window
         StateChanged += (_, _) => Viewport.Refresh();
 
         UpdateRendererButtons();
-        SetSession(_session, "Create a room from blank, open a saved project, or choose New museum.");
+        SetSession(_session, "Browse presets to start building, or open a project.");
         if (projectPath is not null)
             OpenProject(projectPath);
 
@@ -96,6 +96,8 @@ public partial class MainWindow : Window
         ResetAtlasSession();
         ResetSceneAtlas();
         _openedRevision = session.Current.Revision;
+        _editorView = RoomViewTransform.Fit;
+        _pan = null;
         _sceneDrag = null;
         RefreshSceneList(null);
         SideTabs.SelectedItem = InspectorTab;
@@ -293,8 +295,9 @@ public partial class MainWindow : Window
         BlankRoomHelp.Visibility = project.Scene is { Entities.Count: 0 } ? Visibility.Visible : Visibility.Collapsed;
         SceneActions.Visibility = SceneAssetsTab.Visibility = SceneAtlasTab.Visibility =
             general ? Visibility.Visible : Visibility.Collapsed;
-        SnapToGrid.Visibility = RoomAppearanceEditor.Visibility = SceneActions.Visibility;
+        RoomAppearanceEditor.Visibility = SceneActions.Visibility;
         MuseumAtlasTab.Visibility = MuseumInspector.Visibility = general ? Visibility.Collapsed : Visibility.Visible;
+        AssistantTabs.SelectedItem = general ? SceneAtlasTab : MuseumAtlasTab;
         if (general)
         {
             UpdateGeneralEditor(editStarted);
@@ -435,8 +438,9 @@ public partial class MainWindow : Window
         button.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
     }
 
-    private sealed record SceneObjectItem(Guid Id, string Name, string Location)
+    private sealed record SceneObjectItem(Guid Id, string Name, string Location, string? Number = null, Geometry? Icon = null)
     {
-        public string AccessibleName => $"{Name}, {Location}";
+        public string Subheading => Number is null ? Location : $"{Number} · {Location}";
+        public string AccessibleName => $"{Name}, {Subheading}";
     }
 }

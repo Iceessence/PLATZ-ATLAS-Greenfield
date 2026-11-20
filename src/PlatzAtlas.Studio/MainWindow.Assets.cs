@@ -121,6 +121,7 @@ public partial class MainWindow
 
     private void RefreshAssetBrowser()
     {
+        var search = AssetSearch.Text.Trim();
         var active = _session.Current.Scene?.ActiveAssetIds;
         Guid? prior = (SceneAssetList.SelectedItem as AssetItem)?.Id;
         var items = _session.Current.Assets.Where(item => active?.Contains(item.Id) == true)
@@ -128,11 +129,17 @@ public partial class MainWindow
             .Select(item =>
             {
                 var dimensions = SceneArt.Image(item);
-                return new AssetItem(item.Id, item.Name, dimensions.Width, dimensions.Height);
-            }).ToArray();
+                return new AssetItem(item.Id, item.Name, ReadableId(item.Id, "A"), dimensions.Width, dimensions.Height);
+            }).Where(item => item.Label.Contains(search, StringComparison.CurrentCultureIgnoreCase)).ToArray();
         SceneAssetList.ItemsSource = items;
         SceneAssetList.SelectedItem = items.FirstOrDefault(item => item.Id == prior) ?? items.FirstOrDefault();
         CloneSprite.IsEnabled = PlaceAsset.IsEnabled = SceneAssetList.SelectedItem is not null;
+    }
+
+    private void AssetSearchChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        if (IsLoaded)
+            RefreshAssetBrowser();
     }
 
     private void SceneAssetSelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -155,8 +162,8 @@ public partial class MainWindow
         SideTabs.SelectedItem = InspectorTab;
     }
 
-    private sealed record AssetItem(Guid Id, string Name, int Width, int Height)
+    private sealed record AssetItem(Guid Id, string Name, string Number, int Width, int Height)
     {
-        public string Label => $"{Name} · {Width} × {Height}";
+        public string Label => $"{Name} · {Number} · {Width} × {Height}";
     }
 }

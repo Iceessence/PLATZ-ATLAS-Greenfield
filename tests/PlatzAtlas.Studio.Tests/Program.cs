@@ -17,7 +17,11 @@ internal static partial class Program
         {
             PixelInput();
             if (args is [var evidenceDirectory])
-                WorkingRoom(Directory.CreateDirectory(evidenceDirectory).FullName);
+            {
+                var folder = Directory.CreateDirectory(evidenceDirectory).FullName;
+                WorkingRoom(folder);
+                PresetsInStudio(folder);
+            }
             return 0;
         }
         catch (Exception error)

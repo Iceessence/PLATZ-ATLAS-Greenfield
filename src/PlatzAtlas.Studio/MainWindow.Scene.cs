@@ -20,15 +20,17 @@ public partial class MainWindow
     private void NewBlankClicked(object sender, RoutedEventArgs e)
     {
         if (_play is null && ConfirmLeave())
-            SetSession(ProjectSession.NewScene(), "Add a wall or lamp to start your room.");
+            SetSession(ProjectSession.NewScene(), "Browse presets to place your first object.");
     }
 
     private void RefreshSceneList(Guid? selectedId)
     {
         var project = _session.Current;
+        _sceneNumbers = project.Scene is { } numbered ? SceneNumbers.FromHistory(numbered) : new Dictionary<Guid, long>();
         var items = project.Scene is { } scene
             ? scene.Entities.OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(item => item.Id)
-                .Select(item => new SceneObjectItem(item.Id, item.Name, ComponentLabel(item.Component))).ToArray()
+                .Select(item => new SceneObjectItem(item.Id, item.Name, ComponentLabel(item.Component), ReadableId(item.Id),
+                    PresetBrowserWindow.ComponentIcon(item.Component))).ToArray()
             : project.Objects.OrderBy(item => item.X)
                 .Select(item => new SceneObjectItem(item.Id, item.Name, item.Location)).ToArray();
         var wasChanging = _changingProject;
@@ -48,9 +50,10 @@ public partial class MainWindow
         var count = project.Scene!.Entities.Count;
         ObjectCount.Text = count == 1 ? "1 object" : $"{count} objects";
         SelectedName.Text = entity?.Name ?? "Select an object";
-        SelectedLocation.Text = entity is null ? "" : ComponentLabel(entity.Component);
+        SelectedLocation.Text = entity is null ? "" : $"{ComponentLabel(entity.Component)} · {ReadableId(entity.Id, "C")}";
         SceneInspector.Visibility = entity is null ? Visibility.Collapsed : Visibility.Visible;
-        ObjectId.Text = entity?.Id.ToString() ?? "—";
+        ObjectId.Text = entity is null ? "—" : ReadableId(entity.Id);
+        ObjectId.ToolTip = entity?.Id.ToString();
         ProjectId.Text = project.ProjectId.ToString();
         RefreshAssetBrowser();
         if (entity is not null)
@@ -72,6 +75,7 @@ public partial class MainWindow
                 ChangeDoor.Content = door.IsOpen ? "Set initially closed" : "Set initially open";
             UpdateSwitchEditor(entity.Component as SceneSwitch, project.Scene.Entities);
             GoalEditor.Visibility = entity.Component is SceneGoal ? Visibility.Visible : Visibility.Collapsed;
+            SaveObjectPreset.Visibility = entity.Component is SceneSprite ? Visibility.Collapsed : Visibility.Visible;
             if (entity.Component is SceneGoal goal)
                 RequiredKeys.Text = goal.RequiredKeys.ToString(CultureInfo.InvariantCulture);
         }
@@ -93,23 +97,15 @@ public partial class MainWindow
         AtlasPreviewBanner.Visibility = WestCard.Visibility = EastCard.Visibility = Visibility.Collapsed;
         UpdatePlayControls();
         SceneAtlasPreviewBanner.Visibility = _sceneAtlasDraft is null ? Visibility.Collapsed : Visibility.Visible;
+        if (play is null)
+            ViewportCoordinates.Text = $"{_editorView.Zoom:P0}  ·  Wheel to zoom  ·  Middle drag to pan";
         AutomationProperties.SetName(Viewport, play is null ? "Room canvas" : "Playable room canvas");
         Viewport.Show(SceneArt.Create(current.ProjectId, current.Revision, entities,
             play is null ? _sceneAtlasDraft?.Preview.After.Id ?? SelectedEntityId : _lastPlaySwitch?.TargetId,
             grid: play is null, play: play, nearbySwitch: _play?.NearbySwitch?.SwitchId, assets: current.Assets,
             backgroundRgb: current.Scene!.Appearance?.BackgroundRgb, paintOrder: current.Scene.Appearance?.PaintOrder,
-            editHandles: play is null && _sceneAtlasDraft is null), editStarted);
-    }
-
-    private void AddSceneClicked(object sender, RoutedEventArgs e)
-    {
-        if (_play is not null || _session.Current.Scene is not { } scene || sender is not Button { Tag: string kind })
-            return;
-        var offset = .035 * (scene.Entities.Count % 5);
-        var position = kind switch { "Spawn" => (.50, .90), "Goal" => (.50, .16), _ => (.45 + offset, .46 + offset) };
-        var entity = SceneObjectFactory.Create(Guid.NewGuid(), Enum.Parse<SceneObjectKind>(kind), kind, position.Item1, position.Item2);
-        ApplyScene(new AddSceneEntity(_session.Current.ProjectId, _session.Current.Revision, entity),
-            $"Added {entity.Name.ToLowerInvariant()}. Drag it on the canvas or edit its transform.");
+            editHandles: play is null && _sceneAtlasDraft is null,
+            view: play is null ? _editorView : null, gridSpacing: _gridSpacing), editStarted);
     }
 
     private void RenameSceneClicked(object sender, RoutedEventArgs e)
@@ -187,11 +183,8 @@ public partial class MainWindow
         if (control is null)
             return;
         var eligible = entities.Where(item => item.Component is SceneDoor or SceneLamp).ToArray();
-        var duplicates = eligible.GroupBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
-            .Where(group => group.Count() > 1).Select(group => group.Key).ToHashSet(StringComparer.CurrentCultureIgnoreCase);
         var targets = eligible.OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(item => item.Id)
-            .Select(item => new SwitchTargetItem(item.Id,
-                duplicates.Contains(item.Name) ? $"{item.Name} · {item.Id.ToString("N")[..8]}" : item.Name))
+            .Select(item => new SwitchTargetItem(item.Id, $"{ReadableId(item.Id)} · {item.Name}"))
             .Prepend(new SwitchTargetItem(null, "Unconnected")).ToArray();
         SwitchEntityTarget.ItemsSource = targets;
         SwitchEntityTarget.SelectedItem = targets.Single(target => target.Id == control.TargetId);
@@ -242,6 +235,11 @@ public partial class MainWindow
                 SelectAt(x, y);
             return;
         }
+        if (HandleNavigation(phase, x, y))
+            return;
+        (x, y) = _editorView.ToWorld(x, y);
+        if (phase == PointerPhase.Move)
+            ViewportCoordinates.Text = $"{_editorView.Zoom:P0}  ·  X {x:0.000}  Y {y:0.000}";
         if (phase == PointerPhase.Down)
         {
             var mode = DragMode.Move;
@@ -307,9 +305,10 @@ public partial class MainWindow
             _ => t with { X = Bound(t.X + dx, 0, 1), Y = Bound(t.Y + dy, 0, 1) }
         };
 
-        double Bound(double value, double minimum, double maximum, double interval = .05) =>
+        double Bound(double value, double minimum, double maximum, double? interval = null) =>
             Math.Round(Math.Clamp(SnapToGrid.IsChecked == true
-                ? Math.Round(value / interval, MidpointRounding.AwayFromZero) * interval : value, minimum, maximum), 6);
+                ? Math.Round(value / (interval ?? _gridSpacing), MidpointRounding.AwayFromZero) * (interval ?? _gridSpacing)
+                : value, minimum, maximum), 6);
     }
 
     private static bool Near(RenderPoint point, double x, double y) =>

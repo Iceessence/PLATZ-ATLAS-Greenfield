@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:PlatzAtlas.Studio"
         xmlns:room="clr-namespace:PlatzAtlas.RoomView;assembly=PlatzAtlas.RoomView"
-        Title="PLATZ ATLAS Studio" Width="1340" Height="820" MinWidth="770" MinHeight="555"
+        Title="PLATZ ATLAS Studio" Width="1490" Height="900" MinWidth="900" MinHeight="605"
         WindowStartupLocation="CenterScreen" Background="{StaticResource Page}"
         Foreground="{StaticResource Text}" FontFamily="Segoe UI" FontSize="14"
         UseLayoutRounding="True" PreviewKeyDown="StudioPlayKeyDown">
@@ -45,43 +45,44 @@
         </StackPanel>
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
           <Button x:Name="NewBlank" Content="_Blank project" Click="NewBlankClicked" Margin="0,0,6,0"/>
-          <Button Content="_New museum" Command="ApplicationCommands.New" Margin="0,0,6,0" ToolTip="New museum (Ctrl+N)" />
+          <Button Content="_Examples" Click="ExamplesClicked" Margin="0,0,6,0">
+            <Button.ContextMenu>
+              <ContextMenu><MenuItem x:Name="MuseumExample" Header="Night Museum" Command="ApplicationCommands.New"/></ContextMenu>
+            </Button.ContextMenu>
+          </Button>
           <Button Content="_Open…" Command="ApplicationCommands.Open" Margin="0,0,6,0" ToolTip="Open a local project (Ctrl+O)"/>
           <Button Content="_Save" Command="ApplicationCommands.Save" Margin="0,0,6,0" ToolTip="Save the project (Ctrl+S)"/>
           <Button Content="Save _as…" Command="ApplicationCommands.SaveAs" ToolTip="Save a local copy (Ctrl+Shift+S)"/>
           <Border Width="1" Margin="12,3" Background="{StaticResource Border}"/>
           <Button Content="_Undo" Command="ApplicationCommands.Undo" Margin="0,0,6,0" ToolTip="Undo (Ctrl+Z)"/>
-          <Button Content="_Redo" Command="ApplicationCommands.Redo" ToolTip="Redo (Ctrl+Y)"/>
+          <Button Content="_Redo" Command="ApplicationCommands.Redo" ToolTip="Redo (Ctrl+Y)" Margin="0,0,8,0"/>
+          <Button Content="_Settings…" Click="WorkspaceSettingsClicked"/>
         </StackPanel>
       </DockPanel>
     </Border>
 
     <Grid Grid.Row="1">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="174"/>
+        <ColumnDefinition Width="205" MinWidth="145"/>
+        <ColumnDefinition Width="5"/>
         <ColumnDefinition Width="*"/>
-        <ColumnDefinition Width="258"/>
+        <ColumnDefinition Width="5"/>
+        <ColumnDefinition Width="320" MinWidth="235"/>
       </Grid.ColumnDefinitions>
 
       <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="0,0,1,0">
         <DockPanel Margin="13,21,13,12">
           <StackPanel DockPanel.Dock="Top" Margin="3,0,0,13">
-            <TextBlock Text="Scene" FontSize="18" FontWeight="SemiBold"/>
+            <TextBlock Text="Outliner" FontSize="18" FontWeight="SemiBold"/>
             <TextBlock x:Name="ObjectCount" Style="{StaticResource Caption}" Margin="0,4,0,0"/>
           </StackPanel>
-          <WrapPanel x:Name="SceneActions" DockPanel.Dock="Top" Visibility="Collapsed" Margin="0,0,0,10">
-            <Button x:Name="AddWall" Content="+ Wall" Tag="Wall" Click="AddSceneClicked" Margin="0,0,4,4" Padding="6,4"/>
-            <Button x:Name="AddLamp" Content="+ Lamp" Tag="Lamp" Click="AddSceneClicked" Margin="0,0,4,4" Padding="6,4"/>
-            <Button x:Name="AddDoor" Content="+ Door" Tag="Door" Click="AddSceneClicked" Margin="0,0,4,4" Padding="6,4"/>
-            <Button x:Name="AddSwitch" Content="+ Switch" Tag="Switch" Click="AddSceneClicked" Margin="0,0,4,4" Padding="6,4"/>
-            <Button x:Name="AddSpawn" Content="+ Spawn" Tag="Spawn" Click="AddSceneClicked" Margin="0,0,4,4" Padding="6,4"/>
-            <Button x:Name="AddKey" Content="+ Key" Tag="Key" Click="AddSceneClicked" Margin="0,0,4,4" Padding="6,4"/>
-            <Button x:Name="AddGoal" Content="+ Goal" Tag="Goal" Click="AddSceneClicked" Margin="0,0,4,4" Padding="6,4"/>
-          </WrapPanel>
-          <CheckBox x:Name="SnapToGrid" Content="Snap to grid" Foreground="{StaticResource Text}"
-                    DockPanel.Dock="Top" Visibility="Collapsed" Margin="2,0,0,10"/>
+          <Button x:Name="SceneActions" Content="Browse presets…" DockPanel.Dock="Bottom" Visibility="Collapsed"
+                  Click="BrowsePresetsClicked" Margin="0,9,0,0"/>
           <ListBox x:Name="Objects" SelectionChanged="SelectionChanged" Background="Transparent" BorderThickness="0"
                    AutomationProperties.Name="Scene objects" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ContextMenu>
+              <ContextMenu Opened="OutlinerMenuOpened"><MenuItem Header="Browse presets…" Click="BrowsePresetsClicked"/></ContextMenu>
+            </ListBox.ContextMenu>
             <ListBox.Template>
               <ControlTemplate TargetType="ListBox">
                 <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
@@ -102,23 +103,25 @@
             </ListBox.ItemContainerStyle>
             <ListBox.ItemTemplate>
               <DataTemplate>
-                <StackPanel Orientation="Horizontal">
-                  <Path Width="12" Height="16" Margin="0,3,9,0" VerticalAlignment="Top"
-                        Stretch="Uniform" Stroke="{StaticResource Accent}" StrokeThickness="1.2"
-                        Data="M 2,4 L 10,4 L 11,13 L 1,13 Z M 4,4 L 4,1 L 8,1 L 8,4 M 6,7 L 6,10"/>
-                  <StackPanel>
+                <DockPanel>
+                  <Path Width="17" Height="18" Margin="0,4,8,0" VerticalAlignment="Top" DockPanel.Dock="Left"
+                        Stretch="Uniform" Stroke="{StaticResource Accent}" StrokeThickness="1.2" Data="{Binding Icon}"/>
+                  <StackPanel HorizontalAlignment="Stretch">
                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" ToolTip="{Binding Name}"
-                               TextTrimming="CharacterEllipsis" MaxWidth="115"/>
-                    <TextBlock Text="{Binding Location}" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0"/>
+                               TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding Subheading}" Foreground="{StaticResource Muted}" FontSize="11"
+                               TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
                   </StackPanel>
-                </StackPanel>
+                </DockPanel>
               </DataTemplate>
             </ListBox.ItemTemplate>
           </ListBox>
         </DockPanel>
       </Border>
 
-      <Grid Grid.Column="1" Margin="19,18,19,17">
+      <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="{StaticResource Border}"
+                    ResizeBehavior="PreviousAndNext" AutomationProperties.Name="Resize outliner"/>
+      <Grid Grid.Column="2" Margin="16,17,16,13" MinWidth="260">
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto"/>
           <RowDefinition Height="*"/>
@@ -142,9 +145,18 @@
             <TextBlock x:Name="RevisionLabel" Foreground="{StaticResource Muted}" FontSize="13"
                        TextWrapping="Wrap" VerticalAlignment="Center"/>
           </DockPanel>
+          <WrapPanel x:Name="ViewportTools" Margin="0,9,0,0">
+            <Button Content="−" Tag="out" Click="ZoomClicked" Margin="0,0,3,0" AutomationProperties.Name="Zoom out"/>
+            <Button Content="+" Tag="in" Click="ZoomClicked" Margin="0,0,6,0" AutomationProperties.Name="Zoom in"/>
+            <Button x:Name="FitRoom" Content="Fit" Tag="fit" Click="ZoomClicked" Margin="0,0,3,0" ToolTip="Fit the room"/>
+            <Button x:Name="FrameSelection" Content="Frame selected" Tag="selection" Click="ZoomClicked" Margin="0,0,10,0"/>
+            <CheckBox x:Name="SnapToGrid" Content="Snap" Foreground="{StaticResource Text}" VerticalAlignment="Center"
+                      Margin="0,0,9,0" ToolTip="Snap edits to world grid units"/>
+            <TextBlock x:Name="ViewportCoordinates" Style="{StaticResource Caption}" VerticalAlignment="Center"/>
+          </WrapPanel>
           <TextBlock x:Name="BlankRoomHelp" Visibility="Collapsed" Margin="0,9,0,0" TextWrapping="Wrap"
                      Foreground="{StaticResource Muted}"
-                     Text="Add an object from the Scene panel, or import an image from Assets. Try New museum for a ready-made room."/>
+                     Text="Browse presets to place your first object, or draw a sprite in Assets."/>
           <Border x:Name="PlayBanner" Visibility="Collapsed" Margin="0,10,0,0" Padding="10,8"
                   Background="{StaticResource PlaySurface}" BorderBrush="{StaticResource PlayAccent}"
                   BorderThickness="1" CornerRadius="5">
@@ -220,9 +232,12 @@
         </Grid>
       </Grid>
 
-      <Border Grid.Column="2" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1,0,0,0">
+      <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Stretch" Background="{StaticResource Border}"
+                    ResizeBehavior="PreviousAndNext" AutomationProperties.Name="Resize inspector and ATLAS"/>
+      <Border Grid.Column="4" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1,0,0,0">
         <Grid>
-        <TabControl x:Name="SideTabs" BorderThickness="0" AutomationProperties.Name="Workspace panels">
+        <Grid.RowDefinitions><RowDefinition Height="51*" MinHeight="145"/><RowDefinition Height="5"/><RowDefinition Height="49*" MinHeight="150"/></Grid.RowDefinitions>
+        <TabControl x:Name="SideTabs" BorderThickness="0" AutomationProperties.Name="Editing panels">
           <TabControl.Template>
             <ControlTemplate TargetType="TabControl">
               <DockPanel KeyboardNavigation.TabNavigation="Local">
@@ -352,10 +367,40 @@
                 <Button x:Name="BringForward" Content="Bring forward" Tag="forward" Click="ShiftLayerClicked" Padding="3" Margin="0,0,4,0"/>
                 <Button x:Name="SendBackward" Content="Send backward" Tag="backward" Click="ShiftLayerClicked" Padding="3"/>
               </UniformGrid>
+              <Button x:Name="SaveObjectPreset" Content="Save as preset…" Click="SaveObjectPresetClicked" Margin="2,8,2,0"/>
               <Button x:Name="DeleteObject" Content="Delete object" Click="DeleteSceneClicked" Margin="2,9,2,0"/>
             </StackPanel>
-            <Expander x:Name="RoomAppearanceEditor" Header="Room appearance" Visibility="Collapsed"
-                      Foreground="{StaticResource Text}" Margin="0,15,0,1">
+            <TextBlock Text="Object ID" Style="{StaticResource Caption}" Margin="0,22,0,4"/>
+            <TextBlock x:Name="ObjectId" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>
+          </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+          <TabItem x:Name="SceneAssetsTab" Header="Assets" Visibility="Collapsed">
+            <DockPanel Margin="15,17,15,14">
+              <StackPanel DockPanel.Dock="Top">
+                <Button x:Name="NewSprite" Content="Draw sprite…" Click="NewSpriteClicked" Margin="0,0,0,5"/>
+                <Button x:Name="CloneSprite" Content="Edit image copy…" Click="CloneSpriteClicked" Margin="0,0,0,5"/>
+                <Button x:Name="ImportPng" Content="Import PNG…" Click="ImportPngClicked"/>
+                <TextBox x:Name="AssetSearch" TextChanged="AssetSearchChanged" Padding="5,4" Margin="0,4,0,9"
+                         AutomationProperties.Name="Search assets" ToolTip="Search this project's images by name or readable ID."/>
+              </StackPanel>
+              <Button x:Name="PlaceAsset" DockPanel.Dock="Bottom" Content="Place selected image" Click="PlaceAssetClicked" Margin="0,10,0,0"/>
+              <ListBox x:Name="SceneAssetList" DisplayMemberPath="Label" AutomationProperties.Name="Imported images"
+                       Background="{StaticResource Page}" Foreground="{StaticResource Text}" BorderBrush="{StaticResource Border}"
+                       SelectionChanged="SceneAssetSelectionChanged">
+                <ListBox.ItemContainerStyle>
+                  <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                    <Setter Property="AutomationProperties.Name" Value="{Binding Label}"/>
+                  </Style>
+                </ListBox.ItemContainerStyle>
+              </ListBox>
+            </DockPanel>
+          </TabItem>
+          <TabItem x:Name="WorkspaceSettingsTab" Header="Settings">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <StackPanel Margin="15,14,15,12">
+            <Expander x:Name="RoomAppearanceEditor" Header="Room settings" IsExpanded="True" Visibility="Collapsed"
+                      Foreground="{StaticResource Text}" Margin="0,0,0,18">
               <StackPanel Margin="2,6,2,0">
                 <TextBlock Text="Room name" Style="{StaticResource Caption}"/>
                 <TextBox x:Name="RoomNameEdit" AutomationProperties.Name="Room name" MaxLength="96"
@@ -366,8 +411,13 @@
                 <Button x:Name="ApplyRoomAppearance" Content="Apply room appearance" Click="ApplyRoomAppearanceClicked"/>
               </StackPanel>
             </Expander>
-            <TextBlock Text="Object ID" Style="{StaticResource Caption}" Margin="0,22,0,4"/>
-            <TextBlock x:Name="ObjectId" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>
+                <TextBlock Text="Editor preferences" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                <TextBlock Text="World grid spacing" Style="{StaticResource Caption}"/>
+                <ComboBox x:Name="GridSpacing" SelectedIndex="1" SelectionChanged="GridSpacingChanged" Margin="0,5,0,8"
+                          AutomationProperties.Name="World grid spacing">
+                  <ComboBoxItem Content="0.025" Tag="0.025"/><ComboBoxItem Content="0.05" Tag="0.05"/><ComboBoxItem Content="0.1" Tag="0.1"/>
+                </ComboBox>
+                <TextBlock Text="Graphics settings" FontWeight="SemiBold" Margin="0,10,0,0"/>
             <TextBlock Text="Project ID" Style="{StaticResource Caption}" Margin="0,15,0,4"/>
             <TextBlock x:Name="ProjectId" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>
             <TextBlock Text="Renderer" Style="{StaticResource Caption}" Margin="0,15,0,6"/>
@@ -385,27 +435,16 @@
                       Padding="6,5" MinHeight="30" FontSize="12" AutomationProperties.Name="Renderer: CPU Reference"
                       ToolTip="Use CPU software reference renderer"/>
             </UniformGrid>
-          </StackPanel>
+              </StackPanel>
             </ScrollViewer>
           </TabItem>
-          <TabItem x:Name="SceneAssetsTab" Header="Assets" Visibility="Collapsed">
-            <DockPanel Margin="15,17,15,14">
-              <StackPanel DockPanel.Dock="Top">
-                <Button x:Name="NewSprite" Content="Draw sprite…" Click="NewSpriteClicked" Margin="0,0,0,5"/>
-                <Button x:Name="CloneSprite" Content="Edit image copy…" Click="CloneSpriteClicked" Margin="0,0,0,5"/>
-                <Button x:Name="ImportPng" Content="Import PNG…" Click="ImportPngClicked"/>
-                <TextBlock Text="PNG · Up to 256 × 256 pixels" Style="{StaticResource Caption}" Margin="0,7,0,12" TextWrapping="Wrap"/>
-              </StackPanel>
-              <Button x:Name="PlaceAsset" DockPanel.Dock="Bottom" Content="Place selected image" Click="PlaceAssetClicked" Margin="0,10,0,0"/>
-              <ListBox x:Name="SceneAssetList" DisplayMemberPath="Label" AutomationProperties.Name="Imported images"
-                       Background="{StaticResource Page}" Foreground="{StaticResource Text}" BorderBrush="{StaticResource Border}"
-                       SelectionChanged="SceneAssetSelectionChanged" />
-            </DockPanel>
-          </TabItem>
+        </TabControl>
+        <GridSplitter x:Name="AssistantSplitter" Grid.Row="1" Height="5" HorizontalAlignment="Stretch"
+                      Background="{StaticResource Border}" ResizeBehavior="PreviousAndNext" AutomationProperties.Name="Resize ATLAS panel"/>
+        <TabControl x:Name="AssistantTabs" Grid.Row="2" BorderThickness="0" AutomationProperties.Name="ATLAS workspace">
           <TabItem x:Name="SceneAtlasTab" Header="ATLAS" Visibility="Collapsed">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <StackPanel Margin="15,17,15,14">
-                <TextBlock Text="Local deterministic scene lookup" FontWeight="SemiBold" TextWrapping="Wrap"/>
                 <TextBlock x:Name="SceneAtlasScope" TextWrapping="Wrap" Style="{StaticResource Caption}" Margin="0,5,0,8"/>
                 <Button x:Name="SceneAtlasAccess" Click="SceneAtlasAccessClicked" Content="Allow scene read"/>
                 <TextBlock Text="Question or proposed change" Style="{StaticResource Caption}" Margin="0,15,0,5"/>
@@ -479,7 +518,7 @@
             </ScrollViewer>
           </TabItem>
         </TabControl>
-        <ScrollViewer x:Name="PlayPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"
+        <ScrollViewer x:Name="PlayPanel" Grid.RowSpan="3" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Play controls">
           <StackPanel Margin="15,17,15,14">
             <TextBlock Text="Switches" Foreground="{StaticResource PlayAccent}" FontSize="20" FontWeight="SemiBold"/>

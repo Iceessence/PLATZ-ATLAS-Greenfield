@@ -109,6 +109,7 @@ try
     SceneAtlasChecks.Run(scratch.FullName);
     SceneActionChecks.Run(scratch.FullName);
     WorkingDocumentChecks.Run(scratch.FullName);
+    PresetChecks.Run(scratch.FullName);
 }
 finally
 {

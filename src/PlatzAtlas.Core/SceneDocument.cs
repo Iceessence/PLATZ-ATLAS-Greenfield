@@ -9,7 +9,11 @@ public sealed record SceneDocument(IReadOnlyList<SceneEntity> Entities, IReadOnl
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SceneAppearance? Appearance { get; init; }
 }
-public sealed record SceneEntity(Guid Id, string Name, Transform2D Transform, SceneComponent Component);
+public sealed record SceneEntity(Guid Id, string Name, Transform2D Transform, SceneComponent Component)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? PresetId { get; init; }
+}
 
 // Coordinates and size are fractions of the room. Positions identify the center.
 public readonly record struct Transform2D(double X, double Y, double Width, double Height, double Rotation)
@@ -115,7 +119,7 @@ public static class SceneValidation
 
     public static void ValidateEntity(SceneEntity? entity)
     {
-        if (entity is null || entity.Id == Guid.Empty || string.IsNullOrWhiteSpace(entity.Name) ||
+        if (entity is null || entity.Id == Guid.Empty || entity.PresetId == Guid.Empty || string.IsNullOrWhiteSpace(entity.Name) ||
             entity.Name.Length > 96 || entity.Name.Any(char.IsControl))
             throw new InvalidDataException("Enter an object name of up to 96 printable characters.");
         if (entity.Transform is not { X: >= 0 and <= 1, Y: >= 0 and <= 1, Width: >= .025 and <= 1,

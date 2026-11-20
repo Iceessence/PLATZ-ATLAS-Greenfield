@@ -20,7 +20,7 @@ public sealed record ViewportFrame(
 public sealed record VulkanValidationSummary(
     bool ValidationEnabled, int ErrorCount, int WarningCount, IReadOnlyList<string> Messages);
 
-public enum PointerPhase { Down, Move, Up, Cancel }
+public enum PointerPhase { Down, Move, Up, Cancel, PanDown, PanMove, PanUp, ZoomIn, ZoomOut }
 
 public sealed class RoomViewport : Grid
 {
@@ -220,11 +220,12 @@ public sealed class RoomViewport : Grid
             if (PresentationSource.FromVisual(this) is HwndSource source)
                 source.CompositionTarget.RenderMode = RenderMode.SoftwareOnly;
 
-            _cpu = new CpuPreview(OnCpuDrawn);
+            _cpu = new CpuPreview(OnCpuDrawn) { ClipToBounds = true };
             Fit(_cpu);
             RenderOptions.SetEdgeMode(_cpu, EdgeMode.Aliased);
             RenderOptions.SetBitmapScalingMode(_cpu, BitmapScalingMode.NearestNeighbor);
             var surface = _cpu;
+            bool panning = false;
             surface.MouseLeftButtonDown += (_, e) =>
             {
                 if (PointerInput is null)
@@ -234,17 +235,44 @@ public sealed class RoomViewport : Grid
             };
             surface.MouseMove += (_, e) =>
             {
-                if (surface.IsMouseCaptured)
-                    Send(PointerPhase.Move, e);
+                Send(panning ? PointerPhase.PanMove : PointerPhase.Move, e);
             };
             surface.MouseLeftButtonUp += (_, e) =>
             {
-                if (!surface.IsMouseCaptured)
+                if (panning || !surface.IsMouseCaptured)
                     return;
                 Send(PointerPhase.Up, e);
                 surface.ReleaseMouseCapture();
             };
-            surface.LostMouseCapture += (_, _) => PointerInput?.Invoke(PointerPhase.Cancel, 0, 0);
+            surface.MouseDown += (_, e) =>
+            {
+                if (e.ChangedButton != MouseButton.Middle || PointerInput is null || surface.IsMouseCaptured)
+                    return;
+                panning = surface.CaptureMouse();
+                if (panning)
+                    Send(PointerPhase.PanDown, e);
+            };
+            surface.MouseUp += (_, e) =>
+            {
+                if (e.ChangedButton != MouseButton.Middle || !panning)
+                    return;
+                Send(PointerPhase.PanUp, e);
+                panning = false;
+                surface.ReleaseMouseCapture();
+            };
+            surface.MouseWheel += (_, e) =>
+            {
+                if (PointerInput is not null)
+                {
+                    Send(e.Delta > 0 ? PointerPhase.ZoomIn : PointerPhase.ZoomOut, e);
+                    e.Handled = true;
+                }
+            };
+            surface.LostMouseCapture += (_, _) =>
+            {
+                panning = false;
+                PointerInput?.Invoke(PointerPhase.Cancel, 0, 0);
+            };
             Children.Add(surface);
 
             void Send(PointerPhase phase, MouseEventArgs e)
@@ -424,6 +452,7 @@ public sealed class RoomViewport : Grid
     private sealed class NativeSurface(Action changed, Action closing, Action<PointerPhase, double, double> input) : HwndHost
     {
         private bool _dragging;
+        private bool _panning;
         public (int Width, int Height) PixelSize => Handle != 0 && GetClientRect(Handle, out var rect)
             ? (Math.Max(0, rect.Right - rect.Left), Math.Max(0, rect.Bottom - rect.Top))
             : (0, 0);
@@ -450,29 +479,45 @@ public sealed class RoomViewport : Grid
 
         protected override nint WndProc(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
         {
-            const int down = 0x0201, up = 0x0202, move = 0x0200, captureChanged = 0x0215;
-            if (_dragging && message == captureChanged)
+            const int down = 0x0201, up = 0x0202, move = 0x0200, wheel = 0x020A, middleDown = 0x0207,
+                middleUp = 0x0208, captureChanged = 0x0215;
+            if ((_dragging || _panning) && message == captureChanged)
             {
-                _dragging = false;
+                _dragging = _panning = false;
                 input(PointerPhase.Cancel, 0, 0);
             }
-            if ((message == down || (_dragging && message is move or up)) && PixelSize is (> 0, > 0) size)
+            if (message is down or up or move or wheel or middleDown or middleUp && PixelSize is (> 0, > 0) size)
             {
-                var x = unchecked((short)((long)lParam & 0xffff));
-                var y = unchecked((short)(((long)lParam >> 16) & 0xffff));
-                var phase = message == down ? PointerPhase.Down : message == up ? PointerPhase.Up : PointerPhase.Move;
-                if (message == down)
+                var point = new NativePoint
                 {
-                    _dragging = true;
+                    X = unchecked((short)((long)lParam & 0xffff)),
+                    Y = unchecked((short)(((long)lParam >> 16) & 0xffff))
+                };
+                var phase = message switch
+                {
+                    down when !_panning && !_dragging => PointerPhase.Down,
+                    up when _dragging => PointerPhase.Up,
+                    middleDown when !_panning && !_dragging => PointerPhase.PanDown,
+                    middleUp when _panning => PointerPhase.PanUp,
+                    move => _panning ? PointerPhase.PanMove : PointerPhase.Move,
+                    wheel when ScreenToClient(hwnd, ref point) => unchecked((short)((long)wParam >> 16)) > 0
+                        ? PointerPhase.ZoomIn : PointerPhase.ZoomOut,
+                    _ => (PointerPhase?)null
+                };
+                if (phase is PointerPhase.Down or PointerPhase.PanDown)
+                {
+                    _dragging = phase == PointerPhase.Down;
+                    _panning = phase == PointerPhase.PanDown;
                     SetCapture(hwnd);
                 }
-                input(phase, (double)x / size.Width, (double)y / size.Height);
-                if (message == up)
+                if (phase is { } gesture)
+                    input(gesture, (double)point.X / size.Width, (double)point.Y / size.Height);
+                if (phase is PointerPhase.Up or PointerPhase.PanUp)
                 {
-                    _dragging = false;
+                    _dragging = _panning = false;
                     ReleaseCapture();
                 }
-                handled = true;
+                handled = phase is not null;
             }
             return base.WndProc(hwnd, message, wParam, lParam, ref handled);
         }
@@ -488,6 +533,13 @@ public sealed class RoomViewport : Grid
         {
             public int Left, Top, Right, Bottom;
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativePoint { public int X, Y; }
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool ScreenToClient(nint hwnd, ref NativePoint point);
 
         [DllImport("user32.dll", EntryPoint = "CreateWindowExW", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern nint CreateWindowEx(uint extraStyle, string className, string windowName, uint style,

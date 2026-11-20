@@ -15,6 +15,8 @@ public sealed record SceneSource(Guid Id, string Name, SceneSourceKind Kind, dou
     public int? RequiredKeys { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? SpawnBlocked { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Number { get; init; }
 }
 public sealed record SceneEvidence(ProjectReadScope Scope, IReadOnlyList<SceneSource> Objects);
 
@@ -83,10 +85,13 @@ public static class SceneEvidenceProfile
         if (!evidence.Scope.IsValid || evidence.Objects.Count > 256)
             throw new InvalidDataException("Scene evidence has invalid identity or too many records.");
         var ids = new HashSet<Guid> { evidence.Scope.ProjectId, evidence.Scope.SceneId };
+        var numbers = new HashSet<long>();
         var targets = new HashSet<Guid>();
         foreach (var item in evidence.Objects)
         {
-            if (item is null || item.Id == Guid.Empty || !ids.Add(item.Id) || string.IsNullOrWhiteSpace(item.Name) ||
+            if (item is null || item.Id == Guid.Empty || !ids.Add(item.Id) ||
+                (item.Number is long number && (number <= 0 || number > evidence.Scope.Revision || !numbers.Add(number))) ||
+                string.IsNullOrWhiteSpace(item.Name) ||
                 item.Name.Length > 96 || item.Name.Any(char.IsControl) || !Enum.IsDefined(item.Kind) ||
                 item is not { X: >= 0 and <= 1, Y: >= 0 and <= 1, Width: >= .025 and <= 1,
                     Height: >= .025 and <= 1, Rotation: >= -360 and <= 360 })

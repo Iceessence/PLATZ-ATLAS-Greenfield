@@ -21,16 +21,14 @@ internal static partial class Program
         {
             Idle(window);
             Check(Label("RevisionLabel").Contains("Unsaved"), "Studio starts with a blank unsaved room");
-            Click(window, "AddWall");
+            Add("Bulkhead");
             Place(".12", ".4");
-            Click(window, "AddDoor");
+            Add("Shutter");
             Place(".5", ".6");
-            Click(window, "AddSwitch");
+            Add("Relay switch");
             Place(".5", ".85");
             Find<ComboBox>(window, "SwitchEntityTarget").SelectedIndex = 1;
             Click(window, "ApplySwitchLink");
-            var tabs = Find<TabControl>(window, "SideTabs");
-            tabs.SelectedItem = Find<TabItem>(window, "SceneAtlasTab");
             Click(window, "SceneAtlasAccess");
             Ask("What does Switch control?");
             Check(Label("SceneAtlasResult").Contains("Controls Door"), "ATLAS reads the unsaved switch link");
@@ -38,7 +36,6 @@ internal static partial class Program
             Click(window, "SceneAtlasPreview");
             Check(Find<Border>(window, "SceneAtlasPreviewBanner").IsVisible, "Detached preview opens before a save");
             Capture(window, Path.Combine(directory, "live-atlas-preview.png"));
-            tabs.SelectedItem = Find<TabItem>(window, "InspectorTab");
             Field("SceneName", "Dock console");
             Click(window, "RenameObject");
             Check(!Find<Border>(window, "SceneAtlasPreviewBanner").IsVisible &&
@@ -46,7 +43,6 @@ internal static partial class Program
             Click(window, "SceneAtlasConfirm");
             Check(!File.Exists(path), "An invalidated confirmation does not write a file");
 
-            tabs.SelectedItem = Find<TabItem>(window, "SceneAtlasTab");
             Click(window, "SceneAtlasAccess");
             Ask("Rename Door to Dock shutter");
             Click(window, "SceneAtlasPreview");
@@ -98,6 +94,17 @@ internal static partial class Program
             Field("SceneX", x);
             Field("SceneY", y);
             Click(window, "ApplyTransform");
+        }
+        void Add(string search)
+        {
+            var dialog = new PresetBrowserWindow(StarterPresets.Items.ToList(), new SceneDocument([], [])) { Owner = window };
+            dialog.Show();
+            try
+            {
+                Find<TextBox>(dialog, "PresetSearch").Text = search;
+                window.PlacePresets(dialog.ConfigurePlacement());
+            }
+            finally { dialog.Close(); }
         }
     }
 
