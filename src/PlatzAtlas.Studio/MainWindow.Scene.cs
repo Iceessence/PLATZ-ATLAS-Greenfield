@@ -63,6 +63,9 @@ public partial class MainWindow
             if (entity.Component is SceneDoor door)
                 ChangeDoor.Content = door.IsOpen ? "Set initially closed" : "Set initially open";
             UpdateSwitchEditor(entity.Component as SceneSwitch, project.Scene.Entities);
+            GoalEditor.Visibility = entity.Component is SceneGoal ? Visibility.Visible : Visibility.Collapsed;
+            if (entity.Component is SceneGoal goal)
+                RequiredKeys.Text = goal.RequiredKeys.ToString(CultureInfo.InvariantCulture);
         }
         UpdateRevision();
         UpdateGeneralPresentation(editStarted);
@@ -96,11 +99,15 @@ public partial class MainWindow
             "Lamp" => ((SceneComponent)new SceneLamp(true), .10, .16, 0),
             "Door" => (new SceneDoor(false), .18, .09, 0),
             "Switch" => (new SceneSwitch(null, SwitchBehavior.Toggle), .045, .077, 45),
+            "Spawn" => (new SceneSpawn(), .065, .105, 0),
+            "Key" => (new SceneKey(), .056, .096, 0),
+            "Goal" => (new SceneGoal(0), .15, .15, 0),
             _ => (new WallPanel(PanelColor.Slate), .36, .105, 0)
         };
         var offset = .035 * (scene.Entities.Count % 5);
+        var position = kind switch { "Spawn" => (.50, .90), "Goal" => (.50, .16), _ => (.45 + offset, .46 + offset) };
         var entity = new SceneEntity(Guid.NewGuid(), kind,
-            new Transform2D(.45 + offset, .46 + offset, width, height, rotation), component);
+            new Transform2D(position.Item1, position.Item2, width, height, rotation), component);
         ApplyScene(new AddSceneEntity(_session.Current.ProjectId, _session.Current.Revision, entity),
             $"Added {entity.Name.ToLowerInvariant()}. Drag it on the canvas or edit its transform.");
     }
@@ -165,10 +172,13 @@ public partial class MainWindow
     {
         if (SelectedEntity is not { Component: SceneSwitch } entity ||
             SwitchEntityTarget.SelectedItem is not SwitchTargetItem target ||
+            SwitchSecondTarget.SelectedItem is not SwitchTargetItem second ||
             SwitchEntityMode.SelectedValue is not string mode || !Enum.TryParse<SwitchBehavior>(mode, out var behavior))
             return;
         ApplyScene(new ConfigureSceneSwitch(_session.Current.ProjectId, _session.Current.Revision,
-            entity.Id, target.Id, behavior), target.Id is null ? "Switch disconnected." : $"Switch connected to {target.Label}.");
+            entity.Id, target.Id, behavior) { SecondTargetId = target.Id is null ? null : second.Id },
+            target.Id is null ? "Switch disconnected." : second.Id is null
+                ? $"Switch connected to {target.Label}." : $"Switch connected to {target.Label} and {second.Label}.");
     }
 
     private void UpdateSwitchEditor(SceneSwitch? control, IReadOnlyList<SceneEntity> entities)
@@ -185,7 +195,22 @@ public partial class MainWindow
             .Prepend(new SwitchTargetItem(null, "Unconnected")).ToArray();
         SwitchEntityTarget.ItemsSource = targets;
         SwitchEntityTarget.SelectedItem = targets.Single(target => target.Id == control.TargetId);
+        SwitchSecondTarget.ItemsSource = targets;
+        SwitchSecondTarget.SelectedItem = targets.Single(target => target.Id == control.SecondTargetId);
         SwitchEntityMode.SelectedValue = control.Behavior.ToString();
+    }
+
+    private void ApplyGoalClicked(object sender, RoutedEventArgs e)
+    {
+        if (SelectedEntity is not { Component: SceneGoal } entity)
+            return;
+        if (!int.TryParse(RequiredKeys.Text, NumberStyles.None, CultureInfo.InvariantCulture, out var count) || count is < 0 or > 64)
+        {
+            ShowStatus("Enter a key requirement from 0 to 64.", error: true);
+            return;
+        }
+        ApplyScene(new SetSceneGoal(_session.Current.ProjectId, _session.Current.Revision, entity.Id, count),
+            $"The goal requires {count} {(count == 1 ? "key" : "keys")}.");
     }
 
     private void ApplyScene(SceneOperation operation, string status)
@@ -269,6 +294,9 @@ public partial class MainWindow
         SceneDoor => "Door",
         SceneSwitch => "Switch",
         SceneSprite => "Image",
+        SceneSpawn => "Player spawn",
+        SceneKey => "Collectible key",
+        SceneGoal => "Goal",
         _ => "Lamp"
     };
     private sealed record SwitchTargetItem(Guid? Id, string Label);

@@ -39,6 +39,8 @@ public static class SceneArt
 
         foreach (var item in PaintOrder(entities))
         {
+            if (play is not null && (item.Component is SceneSpawn || play.Progress?.Collected.Contains(item.Id) == true))
+                continue;
             var t = item.Transform;
             if (item.Id == selected)
             {
@@ -93,6 +95,28 @@ public static class SceneArt
             {
                 var (a, b, c, d) = Corners(t);
                 sprites.Add(new RenderSprite(Image(asset), a, b, c, d));
+            }
+            else if (item.Component is SceneSpawn)
+            {
+                Quad(t, Rgb(20, 56, 77));
+                AtLocal(t, 0, 0, .25, .83, Rgb(117, 195, 242));
+                AtLocal(t, 0, 0, .83, .25, Rgb(117, 195, 242));
+            }
+            else if (item.Component is SceneKey)
+            {
+                Quad(t, Rgb(129, 87, 29));
+                AtLocal(t, -.18, 0, .33, .64, Rgb(255, 227, 140));
+                AtLocal(t, .16, .12, .54, .23, Rgb(255, 227, 140));
+            }
+            else if (item.Component is SceneGoal goal)
+            {
+                var ready = play?.Progress is not { } progress || progress.Collected.Count >= goal.RequiredKeys;
+                var edge = ready ? Rgb(103, 224, 174) : Rgb(156, 110, 172);
+                Quad(t, ready ? Rgb(30, 81, 66) : Rgb(70, 46, 77));
+                AtLocal(t, -.34, 0, .15, .72, edge);
+                AtLocal(t, .34, 0, .15, .72, edge);
+                AtLocal(t, 0, -.31, .83, .14, edge);
+                AtLocal(t, 0, .31, .83, .14, edge);
             }
         }
         if (play?.Visitor is { } actor)

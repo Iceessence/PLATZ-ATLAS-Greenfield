@@ -32,13 +32,25 @@ public readonly record struct Transform2D(double X, double Y, double Width, doub
 [JsonDerivedType(typeof(SceneDoor), "door")]
 [JsonDerivedType(typeof(SceneSwitch), "switch")]
 [JsonDerivedType(typeof(SceneSprite), "sprite")]
+[JsonDerivedType(typeof(SceneSpawn), "spawn")]
+[JsonDerivedType(typeof(SceneKey), "key")]
+[JsonDerivedType(typeof(SceneGoal), "goal")]
 public abstract record SceneComponent;
 
 public sealed record WallPanel(PanelColor Color) : SceneComponent;
 public sealed record SceneLamp(bool IsOn) : SceneComponent;
 public sealed record SceneDoor(bool IsOpen) : SceneComponent;
-public sealed record SceneSwitch(Guid? TargetId, SwitchBehavior Behavior) : SceneComponent;
+public sealed record SceneSwitch(Guid? TargetId, SwitchBehavior Behavior) : SceneComponent
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? SecondTargetId { get; init; }
+
+    public bool Targets(Guid id) => id == TargetId || id == SecondTargetId;
+}
 public sealed record SceneSprite(Guid AssetId) : SceneComponent;
+public sealed record SceneSpawn : SceneComponent;
+public sealed record SceneKey : SceneComponent;
+public sealed record SceneGoal(int RequiredKeys) : SceneComponent;
 public enum PanelColor { Slate, Teal, Sand, Plum }
 
 public abstract record SceneOperation(Guid ProjectId, long BaseRevision, Guid EntityId);
@@ -57,7 +69,12 @@ public sealed record SetSceneLamp(Guid ProjectId, long BaseRevision, Guid Entity
 public sealed record SetSceneDoor(Guid ProjectId, long BaseRevision, Guid EntityId, bool IsOpen)
     : SceneOperation(ProjectId, BaseRevision, EntityId);
 public sealed record ConfigureSceneSwitch(Guid ProjectId, long BaseRevision, Guid EntityId,
-    Guid? TargetId, SwitchBehavior Behavior) : SceneOperation(ProjectId, BaseRevision, EntityId);
+    Guid? TargetId, SwitchBehavior Behavior) : SceneOperation(ProjectId, BaseRevision, EntityId)
+{
+    public Guid? SecondTargetId { get; init; }
+}
+public sealed record SetSceneGoal(Guid ProjectId, long BaseRevision, Guid EntityId, int RequiredKeys)
+    : SceneOperation(ProjectId, BaseRevision, EntityId);
 public sealed record ImportSceneAsset(Guid ProjectId, long BaseRevision, ProjectAsset Asset)
     : SceneOperation(ProjectId, BaseRevision, Asset.Id);
 
@@ -98,18 +115,27 @@ public static class SceneValidation
         if (entity.Transform is not { X: >= 0 and <= 1, Y: >= 0 and <= 1, Width: >= .025 and <= 1,
             Height: >= .025 and <= 1, Rotation: >= -360 and <= 360 })
             throw new InvalidDataException("Position must be 0–1, size 0.025–1 and rotation −360° to 360°.");
-        if (entity.Component is not (WallPanel or SceneLamp or SceneDoor or SceneSwitch or SceneSprite) ||
+        if (entity.Component is not (WallPanel or SceneLamp or SceneDoor or SceneSwitch or SceneSprite or SceneSpawn or SceneKey or SceneGoal) ||
             (entity.Component is WallPanel panel && !Enum.IsDefined(panel.Color)) ||
-            (entity.Component is SceneSwitch control && !Enum.IsDefined(control.Behavior)) ||
+            (entity.Component is SceneSwitch control && (!Enum.IsDefined(control.Behavior) ||
+                (control.SecondTargetId is not null && (control.TargetId is null || control.TargetId == control.SecondTargetId)))) ||
+            (entity.Component is SceneGoal { RequiredKeys: < 0 or > 64 }) ||
             (entity.Component is SceneSprite sprite && sprite.AssetId == Guid.Empty))
             throw new InvalidDataException("The scene object has an unsupported component or value.");
     }
 
+    public static bool RequiresSchemaFive(SceneEntity? entity) => entity?.Component is
+        SceneSpawn or SceneKey or SceneGoal or SceneSwitch { SecondTargetId: not null };
+
     internal static void ValidateLinks(IEnumerable<SceneEntity> entities)
     {
+        if (entities.Count(entity => entity.Component is SceneSpawn) > 1)
+            throw new InvalidDataException("A room can have one player spawn.");
         var targets = entities.Where(entity => entity.Component is SceneDoor or SceneLamp)
             .Select(entity => entity.Id).ToHashSet();
-        if (entities.Any(entity => entity.Component is SceneSwitch { TargetId: Guid target } && !targets.Contains(target)))
+        if (entities.Any(entity => entity.Component is SceneSwitch control &&
+            ((control.TargetId is Guid first && !targets.Contains(first)) ||
+             (control.SecondTargetId is Guid second && !targets.Contains(second)))))
             throw new InvalidDataException("A switch target is missing or is not a door or lamp. Unlink it before deleting the target.");
     }
 
@@ -156,9 +182,14 @@ internal sealed class SceneJournal
         change is null ? null : new AssetPresence(!change.IsPresent);
 
     public static SceneDocument Validate(SceneDocument scene, IReadOnlyList<ProjectAsset> assets,
-        Guid projectId, Guid sceneId, long revision)
+        Guid projectId, Guid sceneId, long revision, int schema)
     {
         SceneValidation.ValidateEntities(scene.Entities, projectId, sceneId);
+        if (schema < MuseumProject.GameFormatVersion &&
+            (scene.Entities.Any(SceneValidation.RequiresSchemaFive) ||
+             scene.History.Any(edit => edit is not null &&
+                (SceneValidation.RequiresSchemaFive(edit.Before) || SceneValidation.RequiresSchemaFive(edit.After)))))
+            throw new InvalidDataException("These gameplay fields require project schema 5.");
         if (scene.History.Count > SceneValidation.MaxEdits || revision != scene.History.Count + MuseumProject.InitialRevision)
             throw new InvalidDataException("The saved revision does not match its scene history.");
 

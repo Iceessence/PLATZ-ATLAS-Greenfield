@@ -47,6 +47,8 @@
               <Button Content="→" Tag="Right" Click="MoveClicked" Padding="3" AutomationProperties.Name="Walk right"/>
             </UniformGrid>
             <TextBlock Text="Arrow keys or WASD" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,5,0,0"/>
+            <TextBlock x:Name="ProgressLabel" Visibility="Collapsed" Foreground="{StaticResource Accent}"
+                       TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,13,0,0" AutomationProperties.LiveSetting="Polite"/>
             <TextBlock x:Name="NearbyLabel" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,16,0,0"/>
             <Button x:Name="UseButton" Content="Use nearby switch (E)" Click="UseClicked" Margin="0,7,0,0"
                     BorderBrush="{StaticResource Accent}" FontSize="13"/>

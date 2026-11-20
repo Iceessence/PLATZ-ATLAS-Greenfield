@@ -46,7 +46,9 @@ public sealed partial class ProjectSession
             SetSceneDoor door when prior?.Component is SceneDoor =>
                 prior with { Component = new SceneDoor(door.IsOpen) },
             ConfigureSceneSwitch control when prior?.Component is SceneSwitch =>
-                prior with { Component = new SceneSwitch(control.TargetId, control.Behavior) },
+                prior with { Component = new SceneSwitch(control.TargetId, control.Behavior) { SecondTargetId = control.SecondTargetId } },
+            SetSceneGoal goal when prior?.Component is SceneGoal =>
+                prior with { Component = new SceneGoal(goal.RequiredKeys) },
             _ => throw new ProjectEditException(EditRejection.WrongTarget, "This edit does not apply to the object.")
         };
         return prior == next ? null : new SceneEdit(Current.Revision + 1, operation.EntityId, prior, next, LightEditKind.Edit, null);
@@ -102,6 +104,7 @@ public sealed partial class ProjectSession
         {
             ActiveAssetIds = active.Count == 0 ? null : Array.AsReadOnly(active.Order().ToArray())
         };
-        return Current with { Revision = edit.Revision, Scene = next, Assets = catalog ?? Current.Assets };
+        var schema = SceneValidation.RequiresSchemaFive(edit.After) ? MuseumProject.GameFormatVersion : Current.SchemaVersion;
+        return Current with { Revision = edit.Revision, Scene = next, Assets = catalog ?? Current.Assets, SchemaVersion = schema };
     }
 }

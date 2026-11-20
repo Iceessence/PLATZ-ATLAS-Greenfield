@@ -111,22 +111,24 @@ public partial class MainWindow
         SideTabs.Visibility = playing ? Visibility.Collapsed : Visibility.Visible;
         Objects.IsEnabled = !playing;
         SceneActions.IsEnabled = NewBlank.IsEnabled = !playing;
-        PlayBannerText.Text = snapshot is null ? "" :
-            $"Playing saved r{snapshot.SourceRevision} · {snapshot.Step} switch {(snapshot.Step == 1 ? "action" : "actions")}";
+        PlayBannerText.Text = snapshot is null ? "" : snapshot.Progress is { } progress
+            ? $"Playing saved r{snapshot.SourceRevision} · {progress.Summary}"
+            : $"Playing saved r{snapshot.SourceRevision} · {snapshot.Step} switch {(snapshot.Step == 1 ? "action" : "actions")}";
         PlayEmpty.Visibility = !general && _play?.Switches.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         ScenePlayControls.Visibility = general ? Visibility.Visible : Visibility.Collapsed;
         PlaySwitches.Visibility = general ? Visibility.Collapsed : Visibility.Visible;
         if (general)
         {
             var nearby = _play!.NearbySwitch;
-            SceneNearby.Text = nearby is not null ? $"In range · {nearby.Name}" : _play.Markers.Count == 0
+            SceneNearby.Text = snapshot?.Progress?.CompletedGoal is not null ? "Stop to return to editing." :
+                nearby is not null ? $"In range · {nearby.Name}" : _play.Markers.Count == 0
                 ? "This room has no connected switches." : "Walk toward a switch marker.";
             SceneUseSwitch.IsEnabled = nearby is not null;
         }
         PlayResultCard.Visibility = _lastPlaySwitch is not null ? Visibility.Visible : Visibility.Collapsed;
         PlayResultTitle.Text = _lastPlaySwitch?.SwitchName ?? "";
-        PlayResultText.Text = _lastPlaySwitch is { } change ?
-            $"{change.TargetLocation}{(general ? "" : " light")} · {change.StateText}" : "";
+        PlayResultText.Text = _lastPlaySwitch is { } change ? general ? change.Summary :
+            $"{change.TargetLocation} light · {change.StateText}" : "";
     }
 
     private void StudioPlayKeyDown(object sender, KeyEventArgs e)
@@ -155,8 +157,9 @@ public partial class MainWindow
         var moved = session.TryWalk(session.Current.SessionId, direction);
         if (moved)
             UpdateScenePresentation();
-        ShowStatus(moved ? "Walking in Play. Press E near a connected switch." : "Path blocked.");
-        _diagnostics.Log("play-walk", new { direction = direction.ToString(), moved, session.Current.Visitor });
+        ShowStatus(session.Current.Progress?.CompletedGoal is not null ? "Goal complete. Stop to return to editing." :
+            moved ? "Walking in Play. Press E near a connected switch." : "Path blocked.");
+        _diagnostics.Log("play-walk", new { direction = direction.ToString(), moved, session.Current.Visitor, session.Current.Progress });
     }
 
     private void ScenePlayUseClicked(object sender, RoutedEventArgs e) => UseSceneSwitch();

@@ -14,6 +14,10 @@ public sealed record RuntimeRoom(Guid ProjectId, Guid SceneId, long SourceRevisi
     public IReadOnlyList<SceneEntity>? Entities { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<ProjectAsset>? RasterAssets { get; init; }
+    [JsonIgnore]
+    public int Version => Entities is null ? 1 : Entities.Any(SceneValidation.RequiresSchemaFive) ? 3 : 2;
+    [JsonIgnore]
+    public string Profile => Version switch { 1 => RoomPackage.RuntimeProfile, 3 => RoomPackage.GameProfile, _ => RoomPackage.SceneProfile };
 
     public static RuntimeRoom FromProject(MuseumProject project)
     {
@@ -38,6 +42,7 @@ public static class RoomPackage
     public const string Extension = ".platzroom";
     public const string RuntimeProfile = "night-museum/1";
     public const string SceneProfile = "room-scene/2";
+    public const string GameProfile = "room-game/3";
     private const int MuseumMaxBytes = 256 * 1024;
     private const int MaxBytes = 2 * 1024 * 1024;
     private const int MaxRecords = 128;
@@ -64,8 +69,8 @@ public static class RoomPackage
         using (var writer = new Utf8JsonWriter(buffer))
         {
             writer.WriteStartObject();
-            writer.WriteNumber("version", room.Entities is null ? 1 : 2);
-            writer.WriteString("runtimeProfile", room.Entities is null ? RuntimeProfile : SceneProfile);
+            writer.WriteNumber("version", room.Version);
+            writer.WriteString("runtimeProfile", room.Profile);
             writer.WriteString("sha256", Digest(payload));
             writer.WritePropertyName("room");
             writer.WriteRawValue(payload);
@@ -84,7 +89,7 @@ public static class RoomPackage
         {
             var package = JsonSerializer.Deserialize<Envelope>(bytes, Json)
                 ?? throw new InvalidDataException("The room package has no manifest.");
-            if ((package.Version, package.RuntimeProfile) is not ((1, RuntimeProfile) or (2, SceneProfile)))
+            if ((package.Version, package.RuntimeProfile) is not ((1, RuntimeProfile) or (2, SceneProfile) or (3, GameProfile)))
                 throw new InvalidDataException("This room package needs a different player profile.");
             if (package.Version == 1 && bytes.Length > MuseumMaxBytes)
                 throw new InvalidDataException("The museum package exceeds the supported size.");
@@ -93,7 +98,7 @@ public static class RoomPackage
                 throw new InvalidDataException("The room package checksum does not match.");
             var room = JsonSerializer.Deserialize<RuntimeRoom>(payload, Json)
                 ?? throw new InvalidDataException("The room package is missing its scene.");
-            if ((package.Version == 1) != (room.Entities is null))
+            if (package.Version != room.Version)
                 throw new InvalidDataException("The scene does not match the declared player profile.");
             Validate(room);
             return room with

@@ -8,9 +8,15 @@ public sealed record PlayRoomSnapshot(Guid SessionId, Guid ProjectId, Guid Scene
 {
     public RoomPosition Visitor { get; init; } = new(0.5, 0.92);
     public IReadOnlyList<SceneEntity>? Entities { get; init; }
+    public RoomProgress? Progress { get; init; }
 }
 
 public readonly record struct RoomPosition(double X, double Y);
+public sealed record RoomProgress(int TotalKeys, IReadOnlyList<Guid> Collected, int? GoalRequirement, string? CompletedGoal)
+{
+    public string Summary => CompletedGoal is not null ? $"Goal complete · {CompletedGoal}" :
+        $"Keys {Collected.Count}/{TotalKeys}" + (GoalRequirement is > 0 ? $" · Goal needs {GoalRequirement}" : "");
+}
 public sealed record PlaySwitchMarker(Guid SwitchId, string Name, RoomPosition Position);
 public enum WalkDirection { Left, Right, Up, Down }
 
@@ -18,8 +24,16 @@ public sealed record PlaySwitchResult(long Step, Guid SwitchId, string SwitchNam
     string TargetLocation, bool WasOn, bool IsOn)
 {
     public bool IsDoor { get; init; }
+    public PlayTargetChange? AdditionalTarget { get; init; }
     public string StateText => IsDoor ? $"{(WasOn ? "Open" : "Closed")} → {(IsOn ? "Open" : "Closed")}"
         : $"{(WasOn ? "On" : "Off")} → {(IsOn ? "On" : "Off")}";
+    public string Summary => AdditionalTarget is { } extra ? $"{TargetLocation} · {StateText}\n{extra.Name} · {extra.StateText}" :
+        $"{TargetLocation} · {StateText}";
+}
+public sealed record PlayTargetChange(Guid Id, string Name, bool IsDoor, bool WasOn, bool IsOn)
+{
+    public string StateText => $"{State(WasOn)} → {State(IsOn)}";
+    private string State(bool value) => IsDoor ? value ? "Open" : "Closed" : value ? "On" : "Off";
 }
 
 // The runtime owns only detached scene state and has no reference to the authoring session.
@@ -49,7 +63,14 @@ public sealed partial class MuseumPlaySession
         if (snapshot.Entities is { } entities)
         {
             SceneValidation.ValidateEntities(entities, snapshot.ProjectId, snapshot.SceneId);
-            Current = Current with { Entities = Array.AsReadOnly(entities.ToArray()), Visitor = FindSpawn(entities) };
+            var progress = entities.Any(SceneValidation.RequiresSchemaFive)
+                ? new RoomProgress(entities.Count(item => item.Component is SceneKey), [],
+                    entities.Select(item => item.Component).OfType<SceneGoal>().Select(item => (int?)item.RequiredKeys).Min(), null)
+                : null;
+            Current = ReadContacts(Current with
+            {
+                Entities = Array.AsReadOnly(entities.ToArray()), Visitor = FindSpawn(entities), Progress = progress
+            }, entities);
             Markers = Array.AsReadOnly(entities.Where(item => item.Component is SceneSwitch { TargetId: not null })
                 .Select(item => new PlaySwitchMarker(item.Id, item.Name, new(item.Transform.X, item.Transform.Y))).ToArray());
         }
@@ -59,14 +80,14 @@ public sealed partial class MuseumPlaySession
     public IReadOnlyList<PlaySwitchMarker> Markers { get; }
     public PlayRoomSnapshot Current { get; private set; }
 
-    public PlaySwitchMarker? NearbySwitch => _stopped ? null : Markers
+    public PlaySwitchMarker? NearbySwitch => _stopped || Current.Progress?.CompletedGoal is not null ? null : Markers
         .Select(marker => (Marker: marker, Distance: DistanceSquared(Current.Visitor, marker.Position)))
         .Where(item => item.Distance <= 0.095 * 0.095)
         .OrderBy(item => item.Distance).ThenBy(item => item.Marker.SwitchId).Select(item => item.Marker).FirstOrDefault();
 
     public bool TryWalk(Guid sessionId, WalkDirection direction)
     {
-        if (_stopped || sessionId != Current.SessionId)
+        if (_stopped || Current.Progress?.CompletedGoal is not null || sessionId != Current.SessionId)
             return false;
         var (x, y) = direction switch
         {

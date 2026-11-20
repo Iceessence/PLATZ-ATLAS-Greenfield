@@ -5,9 +5,15 @@ using System.Text.Json.Serialization;
 
 namespace PlatzAtlas.Atlas;
 
-public enum SceneSourceKind { Wall, Lamp, Door, Switch, Image }
+public enum SceneSourceKind { Wall, Lamp, Door, Switch, Image, Spawn, Key, Goal }
 public sealed record SceneSource(Guid Id, string Name, SceneSourceKind Kind, double X, double Y, double Width,
-    double Height, double Rotation, bool? Active, Guid? TargetId, string? Behavior, Guid? AssetId, string? AssetName, string? Color);
+    double Height, double Rotation, bool? Active, Guid? TargetId, string? Behavior, Guid? AssetId, string? AssetName, string? Color)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? SecondTargetId { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? RequiredKeys { get; init; }
+}
 public sealed record SceneEvidence(ProjectReadScope Scope, IReadOnlyList<SceneSource> Objects);
 
 public static class SceneEvidenceProfile
@@ -90,18 +96,23 @@ public static class SceneEvidenceProfile
                 SceneSourceKind.Door or SceneSourceKind.Lamp => item.Active is not null && item.Color is null &&
                     item.TargetId is null && item.Behavior is null && item.AssetId is null && item.AssetName is null,
                 SceneSourceKind.Switch => item.Active is null && item.Color is null && item.AssetId is null &&
-                    item.AssetName is null && item.Behavior is "Toggle" or "TurnOn",
+                    item.AssetName is null && item.Behavior is "Toggle" or "TurnOn" &&
+                    (item.SecondTargetId is null || (item.TargetId is not null && item.SecondTargetId != item.TargetId)),
                 SceneSourceKind.Image => item.Active is null && item.Color is null && item.TargetId is null &&
                     item.Behavior is null && item.AssetId is Guid asset && asset != Guid.Empty &&
                     !string.IsNullOrWhiteSpace(item.AssetName) && item.AssetName.Length <= 160,
                 SceneSourceKind.Wall => item.Active is null && item.Color is "Slate" or "Teal" or "Sand" or "Plum" &&
                     item.TargetId is null && item.Behavior is null && item.AssetId is null && item.AssetName is null,
+                SceneSourceKind.Spawn or SceneSourceKind.Key or SceneSourceKind.Goal => item.Active is null && item.Color is null &&
+                    item.TargetId is null && item.Behavior is null && item.AssetId is null && item.AssetName is null,
                 _ => false
             };
-            if (!propertiesMatch)
+            if (!propertiesMatch || (item.Kind != SceneSourceKind.Switch && item.SecondTargetId is not null) ||
+                (item.Kind == SceneSourceKind.Goal ? item.RequiredKeys is not (>= 0 and <= 64) : item.RequiredKeys is not null))
                 throw new InvalidDataException("Scene evidence contains properties outside its declared object type.");
         }
-        if (evidence.Objects.Any(item => item.TargetId is Guid target && !targets.Contains(target)))
+        if (evidence.Objects.Any(item => (item.TargetId is Guid first && !targets.Contains(first)) ||
+            (item.SecondTargetId is Guid second && !targets.Contains(second))))
             throw new InvalidDataException("Scene evidence contains a missing link target.");
     }
 

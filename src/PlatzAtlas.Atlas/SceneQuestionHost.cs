@@ -4,7 +4,10 @@ namespace PlatzAtlas.Atlas;
 
 public enum SceneProposalKind { Rename, Move, SetState }
 public sealed record SceneProposal(SceneProposalKind Kind, string? Name = null, double X = 0, double Y = 0, bool State = false);
-public sealed record SceneAnswer(ProjectReadScope Scope, SceneSource Source, SceneSource? Target, string Sha256, SceneProposal? Proposal);
+public sealed record SceneAnswer(ProjectReadScope Scope, SceneSource Source, SceneSource? Target, string Sha256, SceneProposal? Proposal)
+{
+    public SceneSource? AdditionalTarget { get; init; }
+}
 public sealed record SceneQuestionResult(QuestionStatus Status, SceneAnswer? Answer = null, string? Message = null);
 public sealed record SceneWriteReview(Guid Id, ProjectReadGrant Grant, SceneAnswer Answer);
 
@@ -86,7 +89,10 @@ public sealed class SceneQuestionHost(TimeProvider? clock = null)
             if (query.Criterion == "control" && source.Kind != SceneSourceKind.Switch)
                 return new(QuestionStatus.UnsupportedQuestion, Message: "Choose a switch to inspect its link.");
             var target = source.TargetId is { } linked ? evidence.Objects.Single(item => item.Id == linked) : null;
-            _latest = new SceneAnswer(grant.Scope, source, target, sha, query.Proposal);
+            _latest = new SceneAnswer(grant.Scope, source, target, sha, query.Proposal)
+            {
+                AdditionalTarget = source.SecondTargetId is Guid second ? evidence.Objects.Single(item => item.Id == second) : null
+            };
             return new(QuestionStatus.Answered, _latest);
         }
     }

@@ -95,6 +95,7 @@ public partial class MainWindow
                 $"\nWidth {source.Width:G17} · Height {source.Height:G17} · Rotation {source.Rotation:G17}" +
                 $"\n\nscene.entities[{source.Id:D}].component\n{source.Kind}" +
                 (source.TargetId is { } target ? $"\ntargetId {target:D}" : "") +
+                (source.SecondTargetId is { } second ? $"\nsecondTargetId {second:D}" : "") +
                 (source.AssetId is { } asset ? $"\nassetId {asset:D}" : "") +
                 $"\n\nEvidence SHA-256\n{answer.Sha256}";
         }
@@ -197,10 +198,17 @@ public partial class MainWindow
                 SceneSprite image => (SceneSourceKind.Image, null, null, null, (Guid?)image.AssetId,
                     saved.Assets.Single(asset => asset.Id == image.AssetId).Name, null),
                 WallPanel wall => (SceneSourceKind.Wall, null, null, null, null, null, wall.Color.ToString()),
+                SceneSpawn => (SceneSourceKind.Spawn, null, null, null, null, null, null),
+                SceneKey => (SceneSourceKind.Key, null, null, null, null, null, null),
+                SceneGoal => (SceneSourceKind.Goal, null, null, null, null, null, null),
                 _ => throw new InvalidDataException("An object type is unavailable in the evidence profile.")
             };
             return new SceneSource(item.Id, item.Name, kind, t.X, t.Y, t.Width, t.Height, t.Rotation,
-                active, target, behavior, assetId, assetName, color);
+                active, target, behavior, assetId, assetName, color)
+            {
+                SecondTargetId = (item.Component as SceneSwitch)?.SecondTargetId,
+                RequiredKeys = (item.Component as SceneGoal)?.RequiredKeys
+            };
         }).ToArray();
         return SceneEvidenceProfile.Publish(ScopeOf(saved), sources);
     }
@@ -210,10 +218,14 @@ public partial class MainWindow
         var item = answer.Source;
         var details = item.Kind switch
         {
-            SceneSourceKind.Switch => answer.Target is { } target ? $"Controls {target.Name}. {item.Behavior}."
+            SceneSourceKind.Switch => answer.Target is { } target ? (answer.AdditionalTarget is { } second
+                ? $"Controls {target.Name} and {second.Name}. {item.Behavior}." : $"Controls {target.Name}. {item.Behavior}.")
                 : "The switch is unconnected.",
             SceneSourceKind.Door or SceneSourceKind.Lamp => $"State is {FormatObjectState(item.Kind, item.Active == true)}.",
             SceneSourceKind.Image => $"Uses image {item.AssetName}.",
+            SceneSourceKind.Spawn => "Sets the starting position of the visitor.",
+            SceneSourceKind.Key => "Collected when the visitor touches it.",
+            SceneSourceKind.Goal => $"Win condition requires {item.RequiredKeys} {(item.RequiredKeys == 1 ? "key" : "keys")}.",
             _ => $"Wall color is {item.Color}."
         };
         return $"{item.Name} · {item.Kind}\nX {item.X:G}, Y {item.Y:G} · Saved r{answer.Scope.Revision}\n{details}" +

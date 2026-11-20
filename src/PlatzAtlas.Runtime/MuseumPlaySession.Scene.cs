@@ -9,6 +9,16 @@ public sealed partial class MuseumPlaySession
 
     internal static RoomPosition FindSpawn(IReadOnlyList<SceneEntity> entities)
     {
+        var availableKeys = entities.Count(item => item.Component is SceneKey);
+        if (entities.Any(item => item.Component is SceneGoal goal && goal.RequiredKeys > availableKeys))
+            throw new InvalidDataException("A goal requires more keys than the room contains.");
+        if (entities.SingleOrDefault(item => item.Component is SceneSpawn) is { } spawn)
+        {
+            var authored = new RoomPosition(spawn.Transform.X, spawn.Transform.Y);
+            if (SpawnBlocked(entities, authored))
+                throw new InvalidDataException($"Move {spawn.Name} clear of walls, closed doors and the room edge.");
+            return authored;
+        }
         var preferred = new RoomPosition(.50, .90);
         if (!Blocked(entities, preferred))
             return preferred;
@@ -29,8 +39,21 @@ public sealed partial class MuseumPlaySession
             Math.Clamp(Current.Visitor.Y + y, VisitorRadius, 1 - VisitorRadius));
         if (next == Current.Visitor || Blocked(entities, next))
             return false;
-        Current = Current with { Visitor = next };
+        Current = ReadContacts(Current with { Visitor = next }, entities);
         return true;
+    }
+
+    private static PlayRoomSnapshot ReadContacts(PlayRoomSnapshot snapshot, IReadOnlyList<SceneEntity> entities)
+    {
+        if (snapshot.Progress is not { } progress)
+            return snapshot;
+        var visitor = snapshot.Visitor;
+        var picked = entities.Where(item => item.Component is SceneKey && !progress.Collected.Contains(item.Id) &&
+            item.Transform.IntersectsCircle(visitor.X, visitor.Y, VisitorRadius)).Select(item => item.Id).ToArray();
+        var collected = picked.Length == 0 ? progress.Collected : Array.AsReadOnly(progress.Collected.Concat(picked).ToArray());
+        var goal = entities.FirstOrDefault(item => item.Component is SceneGoal condition &&
+            collected.Count >= condition.RequiredKeys && item.Transform.IntersectsCircle(visitor.X, visitor.Y, VisitorRadius));
+        return snapshot with { Progress = progress with { Collected = collected, CompletedGoal = goal?.Name } };
     }
 
     private bool TryUseSceneSwitch(Guid switchId, IReadOnlyList<SceneEntity> entities,
@@ -42,27 +65,42 @@ public sealed partial class MuseumPlaySession
             entities.FirstOrDefault(item => item.Id == control.TargetId) is not { } target)
             return false;
 
-        var door = target.Component as SceneDoor;
-        var before = door?.IsOpen ?? ((SceneLamp)target.Component).IsOn;
-        var after = control.Behavior == SwitchBehavior.TurnOn || !before;
-        // Keep a door open if closing would trap the visitor inside its collision shape.
-        if (door is not null && !after &&
-            target.Transform.IntersectsCircle(Current.Visitor.X, Current.Visitor.Y, VisitorRadius))
-            after = true;
-        SceneComponent next = door is null ? new SceneLamp(after) : new SceneDoor(after);
+        var first = SwitchChange(target, control.Behavior);
+        var second = control.SecondTargetId is Guid additional
+            ? SwitchChange(entities.Single(item => item.Id == additional), control.Behavior) : null;
         var step = Current.Step + 1;
         Current = Current with
         {
             Step = step,
-            Entities = Array.AsReadOnly(entities.Select(item =>
-                item.Id == target.Id ? item with { Component = next } : item).ToArray())
+            Entities = Array.AsReadOnly(entities.Select(item => item.Id == first.Id ? Apply(item, first)
+                : second is not null && item.Id == second.Id ? Apply(item, second) : item).ToArray())
         };
-        result = new PlaySwitchResult(step, source.Id, source.Name, target.Id, target.Name, before, after)
+        result = new PlaySwitchResult(step, source.Id, source.Name, target.Id, target.Name, first.WasOn, first.IsOn)
         {
-            IsDoor = door is not null
+            IsDoor = first.IsDoor, AdditionalTarget = second
         };
         return true;
+
+        static SceneEntity Apply(SceneEntity item, PlayTargetChange change) => item with
+        {
+            Component = change.IsDoor ? new SceneDoor(change.IsOn) : new SceneLamp(change.IsOn)
+        };
     }
+
+    private PlayTargetChange SwitchChange(SceneEntity target, SwitchBehavior behavior)
+    {
+        var door = target.Component as SceneDoor;
+        var before = door?.IsOpen ?? ((SceneLamp)target.Component).IsOn;
+        var after = behavior == SwitchBehavior.TurnOn || !before;
+        if (door is not null && !after &&
+            target.Transform.IntersectsCircle(Current.Visitor.X, Current.Visitor.Y, VisitorRadius))
+            after = true;
+        return new PlayTargetChange(target.Id, target.Name, door is not null, before, after);
+    }
+
+    public static bool SpawnBlocked(IReadOnlyList<SceneEntity> entities, RoomPosition point) =>
+        point.X < VisitorRadius || point.X > 1 - VisitorRadius || point.Y < VisitorRadius || point.Y > 1 - VisitorRadius ||
+        Blocked(entities, point);
 
     private static bool Blocked(IReadOnlyList<SceneEntity> entities, RoomPosition point) => entities.Any(item =>
         item.Component is WallPanel or SceneDoor { IsOpen: false } &&

@@ -17,6 +17,7 @@ public sealed record MuseumProject(
     public const int ReceiptFormatVersion = 2;
     public const int FormatVersion = 3;
     public const int SceneFormatVersion = 4;
+    public const int GameFormatVersion = 5;
     public const long InitialRevision = 1;
     public const string CoordinateUnits = "room-fraction";
     public const string CoordinateOrigin = "top-left, x-right, y-down";

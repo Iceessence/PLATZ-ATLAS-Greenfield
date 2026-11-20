@@ -72,6 +72,9 @@
             <Button x:Name="AddLamp" Content="+ Lamp" Tag="Lamp" Click="AddSceneClicked" Margin="0,0,4,4" Padding="6,4"/>
             <Button x:Name="AddDoor" Content="+ Door" Tag="Door" Click="AddSceneClicked" Margin="0,0,4,4" Padding="6,4"/>
             <Button x:Name="AddSwitch" Content="+ Switch" Tag="Switch" Click="AddSceneClicked" Margin="0,0,4,4" Padding="6,4"/>
+            <Button x:Name="AddSpawn" Content="+ Spawn" Tag="Spawn" Click="AddSceneClicked" Margin="0,0,4,4" Padding="6,4"/>
+            <Button x:Name="AddKey" Content="+ Key" Tag="Key" Click="AddSceneClicked" Margin="0,0,4,4" Padding="6,4"/>
+            <Button x:Name="AddGoal" Content="+ Goal" Tag="Goal" Click="AddSceneClicked" Margin="0,0,4,4" Padding="6,4"/>
           </WrapPanel>
           <ListBox x:Name="Objects" SelectionChanged="SelectionChanged" Background="Transparent" BorderThickness="0"
                    AutomationProperties.Name="Scene objects" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -320,6 +323,10 @@
                 <ComboBox x:Name="SwitchEntityTarget" AutomationProperties.Name="Switch target" DisplayMemberPath="Label"
                           Foreground="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}"
                           Margin="0,4,0,8" TextSearch.TextPath="Label"/>
+                <TextBlock Text="Second target (optional)" Style="{StaticResource Caption}"/>
+                <ComboBox x:Name="SwitchSecondTarget" AutomationProperties.Name="Second switch target" DisplayMemberPath="Label"
+                          Foreground="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}"
+                          Margin="0,4,0,8" TextSearch.TextPath="Label"/>
                 <TextBlock Text="Switch behavior" Style="{StaticResource Caption}"/>
                 <ComboBox x:Name="SwitchEntityMode" AutomationProperties.Name="Switch behavior" Margin="0,4,0,4"
                           Foreground="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}" SelectedValuePath="Tag">
@@ -327,6 +334,11 @@
                   <ComboBoxItem Content="Turn on / Open" Tag="TurnOn"/>
                 </ComboBox>
                 <Button x:Name="ApplySwitchLink" Content="Apply switch link" Click="ConfigureSceneSwitchClicked"/>
+              </StackPanel>
+              <StackPanel x:Name="GoalEditor" Visibility="Collapsed" Margin="2,7">
+                <TextBlock Text="Keys required to win" Style="{StaticResource Caption}"/>
+                <TextBox x:Name="RequiredKeys" AutomationProperties.Name="Keys required to win" MaxLength="2"/>
+                <Button x:Name="ApplyGoal" Content="Apply goal rule" Click="ApplyGoalClicked"/>
               </StackPanel>
               <Button x:Name="DeleteObject" Content="Delete object" Click="DeleteSceneClicked" Margin="2,9,2,0"/>
             </StackPanel>

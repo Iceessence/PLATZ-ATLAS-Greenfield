@@ -61,8 +61,7 @@ public partial class PlayerWindow : Window
         {
             var room = RoomPackage.Open(path);
             StartRoom(room);
-            var profile = room.Entities is null ? RoomPackage.RuntimeProfile : RoomPackage.SceneProfile;
-            Log("room-opened", new { room.ProjectId, room.SceneId, room.SourceRevision, profile });
+            Log("room-opened", new { room.ProjectId, room.SceneId, room.SourceRevision, profile = room.Profile });
         }
         catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
         {
@@ -119,8 +118,9 @@ public partial class PlayerWindow : Window
         var moved = session.TryWalk(session.Current.SessionId, direction);
         if (session.Current.Entities is not null)
         {
-            SetStatus(moved ? "Walk or press E near a connected switch." : "Path blocked.");
-            Log("walk", new { direction = direction.ToString(), moved, session.Current.Visitor });
+            SetStatus(session.Current.Progress?.CompletedGoal is not null ? "Goal complete. Restart room to play again." :
+                moved ? "Walk or press E near a connected switch." : "Path blocked.");
+            Log("walk", new { direction = direction.ToString(), moved, session.Current.Visitor, session.Current.Progress });
         }
         if (moved)
             UpdateRoom();
@@ -148,11 +148,14 @@ public partial class PlayerWindow : Window
     {
         var session = _session!;
         var nearby = session.NearbySwitch;
-        NearbyLabel.Text = nearby is not null ? $"In range · {nearby.Name}" :
+        NearbyLabel.Text = session.Current.Progress?.CompletedGoal is not null ? "Restart to play again." :
+            nearby is not null ? $"In range · {nearby.Name}" :
             session.Markers.Count == 0 ? "This room has no connected switches." : "Walk toward a switch marker.";
         UseButton.IsEnabled = nearby is not null;
-        ActionLabel.Text = _lastSwitch is { } change ? $"{change.TargetLocation} · {change.StateText}" : "";
+        ActionLabel.Text = _lastSwitch?.Summary ?? "";
         var snapshot = session.Current;
+        ProgressLabel.Visibility = snapshot.Progress is null ? Visibility.Collapsed : Visibility.Visible;
+        ProgressLabel.Text = snapshot.Progress?.Summary ?? "";
         if (snapshot.Entities is { } entities)
         {
             LightLabel.Text = string.Join("\n", entities.OrderBy(item => item.Name)
