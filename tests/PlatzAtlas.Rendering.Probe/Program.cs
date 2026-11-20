@@ -174,8 +174,9 @@ static Bitmap BitmapFromBgra(byte[] bgra, int width, int height)
 static void CheckPixel(Bitmap pixels, double x, double y, Color expected, string backend)
 {
     Color actual = pixels.GetPixel((int)(x * pixels.Width), (int)(y * pixels.Height));
-    Console.WriteLine($"{backend} pixel {x}, {y}: #{actual.R:x2}{actual.G:x2}{actual.B:x2} expected #{expected.R:x2}{expected.G:x2}{expected.B:x2}");
-    if (Math.Abs(actual.R - expected.R) > 2 || Math.Abs(actual.G - expected.G) > 2 || Math.Abs(actual.B - expected.B) > 2)
+    Console.WriteLine($"{backend} pixel {x}, {y}: #{actual.R:x2}{actual.G:x2}{actual.B:x2}{actual.A:x2} expected #{expected.R:x2}{expected.G:x2}{expected.B:x2}{expected.A:x2}");
+    if (Math.Abs(actual.R - expected.R) > 2 || Math.Abs(actual.G - expected.G) > 2 ||
+        Math.Abs(actual.B - expected.B) > 2 || actual.A != expected.A)
         throw new InvalidOperationException($"{backend} pixel {x}, {y} differs from the reference color by more than two channel units.");
 }
 
@@ -188,8 +189,9 @@ static void CompareSampledPixels(byte[] vkBgra, byte[] glBgra, int width, int he
         int db = Math.Abs(vkBgra[offset] - glBgra[offset]);
         int dg = Math.Abs(vkBgra[offset + 1] - glBgra[offset + 1]);
         int dr = Math.Abs(vkBgra[offset + 2] - glBgra[offset + 2]);
-        if (db > 2 || dg > 2 || dr > 2)
-            throw new InvalidOperationException($"Vulkan vs OpenGL mismatch at ({x}, {y}): delta BGR=({db},{dg},{dr}).");
+        int da = Math.Abs(vkBgra[offset + 3] - glBgra[offset + 3]);
+        if (db > 2 || dg > 2 || dr > 2 || da != 0)
+            throw new InvalidOperationException($"Vulkan vs OpenGL mismatch at ({x}, {y}): delta BGRA=({db},{dg},{dr},{da}).");
     }
 }
 

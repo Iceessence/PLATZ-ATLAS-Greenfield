@@ -27,7 +27,9 @@ public sealed unsafe partial class OpenGlViewport
         glBindTexture(TextureBuffer, _imageTexture);
         texBuffer(TextureBuffer, Rgba8, _imageBuffer);
         glEnable(0x0BE2); // GL_BLEND
-        glBlendFunc(0x0302, 0x0303); // source alpha, one minus source alpha
+        const uint sourceAlpha = 0x0302, inverseSourceAlpha = 0x0303, one = 1;
+        var blendSeparate = (delegate* unmanaged[Stdcall]<uint, uint, uint, uint, void>)RequireProc("glBlendFuncSeparate");
+        blendSeparate(sourceAlpha, inverseSourceAlpha, one, inverseSourceAlpha);
     }
 
     private void UploadImageStrip()
@@ -64,6 +66,4 @@ public sealed unsafe partial class OpenGlViewport
     private static extern void glBindTexture(uint target, uint texture);
     [DllImport("opengl32.dll")]
     private static extern void glEnable(uint mode);
-    [DllImport("opengl32.dll")]
-    private static extern void glBlendFunc(uint src, uint dst);
 }
