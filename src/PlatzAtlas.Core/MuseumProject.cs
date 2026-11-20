@@ -25,7 +25,12 @@ public sealed record LightSwitch(Guid Id, string Name, Guid TargetId);
 
 public sealed record ProjectAsset(Guid Id, string Name, string MediaType, string ContentBase64, string Sha256);
 
-public sealed record SetLight(Guid ProjectId, long BaseRevision, Guid ObjectId, bool IsOn, Guid? SwitchId = null);
+public sealed record SetLight(Guid ProjectId, long BaseRevision, Guid ObjectId, bool IsOn, Guid? SwitchId = null)
+{
+    public bool? ExpectedIsOn { get; init; }
+}
+
+public sealed record LightPreview(SetLight Operation, Lantern Before, Lantern After);
 
 public enum LightEditKind
 {
@@ -48,7 +53,8 @@ public enum EditRejection
     WrongProject,
     StaleRevision,
     WrongTarget,
-    MissingObject
+    MissingObject,
+    StaleValue
 }
 
 public sealed class ProjectEditException(EditRejection reason, string message) : InvalidOperationException(message)

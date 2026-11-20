@@ -4,6 +4,8 @@ internal static class ProjectStore
 {
     public static string PreviousPath(string path) => path + ".previous";
 
+    public static bool HasSavedHead(string path, string fingerprint) => Matches(ReadExisting(path), fingerprint);
+
     public static void Publish(string path, byte[] bytes, string? expectedFingerprint, bool overwrite, bool unchanged)
     {
         // All Studio writers on this Windows session use the same short-lived lock for a destination.
@@ -24,8 +26,7 @@ internal static class ProjectStore
         try
         {
             var existing = ReadExisting(path);
-            if (expectedFingerprint is not null &&
-                (existing is null || ProjectFormat.Digest(existing) != expectedFingerprint))
+            if (expectedFingerprint is not null && !Matches(existing, expectedFingerprint))
             {
                 throw new IOException("The saved project changed on disk. Use Save As to keep your edits in another file.");
             }
@@ -81,6 +82,9 @@ internal static class ProjectStore
             owner.ReleaseMutex();
         }
     }
+
+    private static bool Matches(byte[]? existing, string fingerprint) =>
+        existing is not null && ProjectFormat.Digest(existing) == fingerprint;
 
     private static byte[]? ReadExisting(string path)
     {

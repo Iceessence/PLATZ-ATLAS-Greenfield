@@ -63,6 +63,28 @@ public sealed class ProjectSession
 
     public bool Apply(SetLight request)
     {
+        var target = ValidateLightTarget(request);
+        if (target.IsOn == request.IsOn)
+            return false;
+
+        Commit(new LightEdit(Current.Revision + 1, target.Id, target.IsOn, request.IsOn,
+            LightEditKind.Edit, null, request.SwitchId));
+        return true;
+    }
+
+    public LightPreview PreviewSavedLight(SetLight request)
+    {
+        var target = ValidateLightTarget(request);
+        if (IsDirty || FilePath is null || diskFingerprint is null)
+            throw new ProjectEditException(EditRejection.StaleRevision, "Save the current revision before previewing.");
+        if (!ProjectStore.HasSavedHead(FilePath, diskFingerprint))
+            throw new ProjectEditException(EditRejection.StaleRevision, "The saved project changed on disk. Reopen it to preview.");
+
+        return new LightPreview(request, target, target with { IsOn = request.IsOn });
+    }
+
+    private Lantern ValidateLightTarget(SetLight request)
+    {
         ArgumentNullException.ThrowIfNull(request);
 
         if (request.ProjectId != Current.ProjectId)
@@ -84,14 +106,12 @@ public sealed class ProjectSession
 
         var target = Current.Objects.FirstOrDefault(item => item.Id == request.ObjectId)
             ?? throw new ProjectEditException(EditRejection.MissingObject, "The selected lantern is no longer in this room.");
-        if (target.IsOn == request.IsOn)
+        if (request.ExpectedIsOn is bool expected && target.IsOn != expected)
         {
-            return false;
+            throw new ProjectEditException(EditRejection.StaleValue, "The lantern’s current light state differs from the proposal.");
         }
 
-        Commit(new LightEdit(Current.Revision + 1, target.Id, target.IsOn, request.IsOn,
-            LightEditKind.Edit, null, request.SwitchId));
-        return true;
+        return target;
     }
 
     public bool Undo() => Reverse(history.NextUndo, LightEditKind.Undo);

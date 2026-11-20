@@ -96,6 +96,7 @@ try
     Console.WriteLine("PASS checksum, version and typed-property validation");
 
     AtlasReadChecks.Run(scratch.FullName);
+    LightPreviewChecks.Run(scratch.FullName);
 }
 finally
 {

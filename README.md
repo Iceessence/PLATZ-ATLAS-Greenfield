@@ -1,6 +1,6 @@
 # PLATZ ATLAS Studio
 
-PLATZ ATLAS Studio is a local Windows editor for the Night Museum scene. Studio identifies its two identically named lanterns by gallery and stable object ID. GF-003 adds a read-only ATLAS answer grounded in the saved museum.
+PLATZ ATLAS Studio is a local Windows editor for the Night Museum scene. Studio identifies its two identically named lanterns by gallery and stable object ID. ATLAS can answer a question about the saved museum and show a temporary preview of a proposed light change.
 
 ## Build and launch
 
@@ -41,6 +41,12 @@ Vulkan presentation uses the machine's Vulkan loader and compatible display driv
 4. Return to **ATLAS** and choose **Revoke access**. The answer and source details clear. After a manual edit, save the new revision and allow a new read to ask again.
 
 This first version uses a deterministic local lookup for the supplied question. Studio grants access to one saved project, scene and revision, then sends a bounded checksummed JSON snapshot inside the app. The lookup receives switch links, lantern identities, locations and light state. Edit history and asset contents stay in Core.
+
+## Preview the proposed light change
+
+1. With the saved museum answer visible, check **Proposed light change** and choose **Preview light change**. The viewport highlights the cited lantern in teal and shows its proposed state. The label below the scene shows both the preview state and the saved state.
+2. Choose **Exit preview** to restore the saved view. You can also revoke access in **ATLAS**, or make an edit with the normal Inspector controls. An edit clears the preview and retires the grant.
+3. If another Studio instance saved a newer revision, reopen the project before staging a new preview. The preview belongs to the saved revision cited in the answer. **Save** always writes the actual project state.
 
 [WORKING.md](WORKING.md) records which paths were exercised, the evidence and the next milestone.
 

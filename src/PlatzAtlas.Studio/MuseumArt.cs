@@ -7,15 +7,26 @@ internal static class MuseumArt
 {
     private static readonly RenderColor Background = Ink(14, 25, 29);
     private static readonly RenderColor Highlight = Ink(240, 196, 134);
+    private static readonly RenderColor PreviewHighlight = Ink(133, 217, 198);
 
-    public static RenderSnapshot Create(MuseumProject project, Guid? selectedId)
+    public static RenderSnapshot Create(MuseumProject project, Guid? selectedId, LightPreview? preview = null)
     {
         var scene = new Drawing();
         DrawRoom(scene);
         foreach (var lantern in project.Objects)
-            DrawLantern(scene, lantern, lantern.Id == selectedId);
+        {
+            if (preview is not null)
+            {
+                if (lantern.Id == preview.After.Id)
+                    DrawLantern(scene, preview.After, PreviewHighlight);
+                else
+                    DrawLantern(scene, lantern, null);
+            }
+            else
+                DrawLantern(scene, lantern, lantern.Id == selectedId ? Highlight : null);
+        }
 
-        return new RenderSnapshot(project.ProjectId, project.Revision, Background, scene.Triangles);
+        return new RenderSnapshot(project.ProjectId, project.Revision, Background, scene.Triangles, preview?.After.Id);
     }
 
     private static void DrawRoom(Drawing scene)
@@ -62,7 +73,7 @@ internal static class MuseumArt
         scene.Rectangle(0.47, 0.635, 0.53, 0.655, Ink(76, 88, 77));
     }
 
-    private static void DrawLantern(Drawing scene, Lantern lantern, bool selected)
+    private static void DrawLantern(Drawing scene, Lantern lantern, RenderColor? highlight)
     {
         var x = lantern.X;
         var y = lantern.Y;
@@ -100,18 +111,18 @@ internal static class MuseumArt
         scene.Rectangle(x - 0.002, y - 0.075, x + 0.002, y + 0.043, metal);
         scene.Rectangle(x - 0.041, y + 0.044, x + 0.041, y + 0.065, metal);
 
-        if (!selected)
+        if (highlight is not { } marker)
             return;
 
         foreach (var edge in new[] { x - 0.065, x + 0.062 })
         {
             var markerLeft = edge < x ? edge : edge - 0.015;
-            scene.Rectangle(edge, y - 0.169, edge + 0.003, y - 0.131, Highlight);
-            scene.Rectangle(edge, y + 0.062, edge + 0.003, y + 0.100, Highlight);
-            scene.Rectangle(markerLeft, y - 0.169, markerLeft + 0.018, y - 0.164, Highlight);
-            scene.Rectangle(markerLeft, y + 0.095, markerLeft + 0.018, y + 0.100, Highlight);
+            scene.Rectangle(edge, y - 0.169, edge + 0.003, y - 0.131, marker);
+            scene.Rectangle(edge, y + 0.062, edge + 0.003, y + 0.100, marker);
+            scene.Rectangle(markerLeft, y - 0.169, markerLeft + 0.018, y - 0.164, marker);
+            scene.Rectangle(markerLeft, y + 0.095, markerLeft + 0.018, y + 0.100, marker);
         }
-        scene.Ellipse(x, y + 0.264, 0.009, 0.015, Highlight, 4);
+        scene.Ellipse(x, y + 0.264, 0.009, 0.015, marker, 4);
     }
 
     private static RenderColor Ink(byte r, byte g, byte b) => RenderColor.FromRgb(r, g, b);

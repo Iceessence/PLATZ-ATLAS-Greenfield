@@ -95,6 +95,18 @@
         <StackPanel Margin="1,0,0,14">
           <TextBlock x:Name="RoomTitle" FontSize="28" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
           <TextBlock x:Name="RevisionLabel" Foreground="{StaticResource Muted}" FontSize="13" Margin="0,3,0,0"/>
+          <Border x:Name="AtlasPreviewBanner" Visibility="Collapsed" Margin="0,10,0,0" Padding="9,6"
+                  Background="{StaticResource PreviewSurface}" BorderBrush="{StaticResource PreviewAccent}"
+                  BorderThickness="1" CornerRadius="5">
+            <DockPanel>
+              <Button x:Name="AtlasPreviewExit" DockPanel.Dock="Right" Content="Exit preview"
+                      Click="AtlasPreviewExitClicked" Margin="9,0,0,0" Padding="7,4" MinHeight="30"
+                      VerticalAlignment="Center"/>
+              <TextBlock x:Name="AtlasPreviewLabel" Foreground="{StaticResource PreviewAccent}"
+                         FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center"
+                         AutomationProperties.LiveSetting="Polite"/>
+            </DockPanel>
+          </Border>
         </StackPanel>
         <Border Grid.Row="1" BorderBrush="{StaticResource Border}" BorderThickness="1"
                 Background="#101A20">
@@ -230,6 +242,10 @@
                     <TextBlock x:Name="AtlasLightState" Foreground="{StaticResource Muted}" Margin="0,4,0,0"/>
                     <Button Content="Show in scene" Click="AtlasSourceClicked" Margin="0,10,0,0"
                             AutomationProperties.Name="Show cited lantern in scene"/>
+                    <TextBlock x:Name="AtlasProposalText" Margin="0,12,0,0" TextWrapping="Wrap"
+                               Foreground="{StaticResource PreviewAccent}" FontSize="12"/>
+                    <Button x:Name="AtlasPreviewStart" Content="Preview light change" Click="AtlasPreviewClicked"
+                            Margin="0,5,0,0"/>
                     <Expander x:Name="AtlasSourceDetails" Header="Source details" Foreground="{StaticResource Text}"
                               Margin="0,9,0,0">
                       <TextBlock x:Name="AtlasSourceText" TextWrapping="Wrap" FontSize="11" FontFamily="Consolas"

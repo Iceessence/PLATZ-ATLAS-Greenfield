@@ -274,12 +274,24 @@ public partial class MainWindow : Window
             : $"Turn {selected.Location} light {(selected.IsOn ? "off" : "on")}");
         ToggleLight.IsEnabled = selected is not null;
         UpdateRevision();
-
-        var ordered = project.Objects.OrderBy(lantern => lantern.X).ToArray();
-        UpdatePreviewCard(WestCard, WestLabel, WestState, ordered.FirstOrDefault(), selected?.Id);
-        UpdatePreviewCard(EastCard, EastLabel, EastState, ordered.Skip(1).FirstOrDefault(), selected?.Id);
-        Viewport.Show(MuseumArt.Create(project, selected?.Id), editStarted);
+        UpdateScenePresentation(editStarted);
         CommandManager.InvalidateRequerySuggested();
+    }
+
+    private void UpdateScenePresentation(long? editStarted = null)
+    {
+        var project = _session.Current;
+        var selection = Selection?.Id;
+        var preview = _atlasPreview;
+        AtlasPreviewBanner.Visibility = preview is null ? Visibility.Collapsed : Visibility.Visible;
+        AtlasPreviewLabel.Text = preview is null ? "" :
+            $"Preview · {preview.Before.Location} · {LightState(preview.Before.IsOn)} → {LightState(preview.After.IsOn)} · Saved r{preview.Operation.BaseRevision}";
+        AtlasPreviewStart.IsEnabled = preview is null;
+        AutomationProperties.SetName(Viewport, preview is null ? "Museum room preview" : AtlasPreviewLabel.Text);
+        var ordered = project.Objects.OrderBy(lantern => lantern.X).ToArray();
+        UpdatePreviewCard(WestCard, WestLabel, WestState, ordered.FirstOrDefault(), selection);
+        UpdatePreviewCard(EastCard, EastLabel, EastState, ordered.Skip(1).FirstOrDefault(), selection);
+        Viewport.Show(MuseumArt.Create(project, selection, preview), editStarted);
     }
 
     private void UpdateRevision()
@@ -297,6 +309,13 @@ public partial class MainWindow : Window
         if (lantern is null)
             return;
         location.Text = lantern.Location;
+        if (_atlasPreview is { } preview && preview.After.Id == lantern.Id)
+        {
+            state.Text = $"Preview {LightState(preview.After.IsOn).ToLowerInvariant()} · Saved {LightState(lantern.IsOn).ToLowerInvariant()}";
+            state.Foreground = (Brush)FindResource("PreviewAccent");
+            card.BorderBrush = state.Foreground;
+            return;
+        }
         var selected = lantern.Id == selection;
         state.Text = $"Light {(lantern.IsOn ? "on" : "off")}{(selected ? " · Selected" : "")}";
         state.Foreground = (Brush)FindResource(lantern.IsOn ? "Accent" : "Muted");

@@ -12,7 +12,7 @@ namespace PlatzAtlas.Studio;
 internal sealed record ViewportFrame(
     string Label, string Detail, Guid ProjectId, long Revision, int Width, int Height,
     double DrawMilliseconds, double? GpuMilliseconds, double? EditToDrawMilliseconds,
-    long PeakWorkingSetBytes, int? FixedCameraSample);
+    long PeakWorkingSetBytes, int? FixedCameraSample, Guid? PreviewObjectId);
 
 internal sealed record VulkanValidationSummary(
     bool ValidationEnabled, int ErrorCount, int WarningCount, IReadOnlyList<string> Messages);
@@ -262,7 +262,7 @@ public sealed class RoomViewport : Grid
         // First ten frames warm the fixed camera workload. Keep each draw on the ordinary UI dispatcher.
         int? sample = MeasureFrames && _sampleCount < 130 ? ++_sampleCount : null;
         FrameCompleted?.Invoke(new ViewportFrame(label, detail, snapshot.ProjectId, snapshot.Revision,
-            width, height, elapsed, gpuElapsed, editTime, process.PeakWorkingSet64, sample));
+            width, height, elapsed, gpuElapsed, editTime, process.PeakWorkingSet64, sample, snapshot.PreviewObjectId));
         if (sample is < 130)
             Dispatcher.InvokeAsync(QueueDraw, DispatcherPriority.Background);
     }

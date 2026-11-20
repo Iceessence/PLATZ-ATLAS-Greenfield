@@ -9,6 +9,8 @@
     <SolidColorBrush x:Key="Text" Color="#EFF4F2"/>
     <SolidColorBrush x:Key="Muted" Color="#A7B9B8"/>
     <SolidColorBrush x:Key="Accent" Color="#F0C486"/>
+    <SolidColorBrush x:Key="PreviewAccent" Color="#85D9C6"/>
+    <SolidColorBrush x:Key="PreviewSurface" Color="#183331"/>
     <SolidColorBrush x:Key="Selection" Color="#2C3E3E"/>
     <SolidColorBrush x:Key="Error" Color="#FFAD99"/>
 

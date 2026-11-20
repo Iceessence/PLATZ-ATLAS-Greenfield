@@ -14,6 +14,7 @@ public partial class MainWindow
     private readonly ProjectQuestionHost _atlasHost = new();
     private ProjectReadGrant? _atlasGrant;
     private SwitchAnswer? _atlasAnswer;
+    private LightPreview? _atlasPreview;
 
     private void InitializeAtlas()
     {
@@ -118,6 +119,7 @@ public partial class MainWindow
             AtlasAnswerOrigin.Text = $"Local lookup · Saved r{answer.Scope.Revision}";
             AtlasAnswerText.Text = $"{answer.Switch.Name} controls the {answer.Lantern.Name} in {answer.Lantern.Location}.";
             AtlasLightState.Text = $"Light is {(answer.Lantern.IsOn ? "on" : "off")}.";
+            AtlasProposalText.Text = $"Proposed light change · {LightState(answer.Lantern.IsOn)} → {LightState(!answer.Lantern.IsOn)}";
             AtlasSourceText.Text =
                 $"{answer.Switch.TargetField}\n{answer.Switch.TargetId:D}" +
                 $"\n\n{answer.Lantern.LocationField}\n{answer.Lantern.Location}" +
@@ -160,6 +162,7 @@ public partial class MainWindow
         if (item is null)
             return;
 
+        ExitAtlasPreview();
         Objects.SelectedItem = item;
         Objects.ScrollIntoView(item);
         SideTabs.SelectedItem = InspectorTab;
@@ -168,8 +171,75 @@ public partial class MainWindow
         _diagnostics.Log("atlas-source-selected", new { revision = answer.Scope.Revision });
     }
 
+    private void AtlasPreviewClicked(object sender, RoutedEventArgs e)
+    {
+        if (_atlasPreview is not null || _atlasGrant is not { } grant || _atlasAnswer is not { } answer)
+            return;
+
+        var started = Stopwatch.GetTimestamp();
+        try
+        {
+            var (status, draft) = _atlasHost.StagePreview(grant, ScopeOf(_session.Current), answer, proposal =>
+                _session.PreviewSavedLight(new SetLight(proposal.Scope.ProjectId, proposal.Scope.Revision,
+                    proposal.ObjectId, proposal.IsOn, proposal.SwitchId) { ExpectedIsOn = proposal.ExpectedIsOn }));
+
+            if (draft is null)
+            {
+                RejectAtlasPreview(status.ToString(), status == PreviewStatus.StaleBase
+                    ? "The revision changed. Save and ask ATLAS again."
+                    : "This proposal is no longer available. Ask ATLAS again.");
+                return;
+            }
+
+            _atlasPreview = draft;
+            UpdateScenePresentation();
+            UIElementAutomationPeer.FromElement(AtlasPreviewLabel)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+            AtlasPreviewExit.Focus();
+            _diagnostics.Log("atlas-preview", new
+            {
+                status = "staged",
+                revision = draft.Operation.BaseRevision,
+                durationMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds
+            });
+        }
+        catch (ProjectEditException error)
+        {
+            RejectAtlasPreview(error.Reason.ToString(), error.Message);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            RejectAtlasPreview("SourceUnavailable", "Could not verify the saved revision. Reopen the project and try again.");
+        }
+    }
+
+    private void RejectAtlasPreview(string reason, string message)
+    {
+        ShowStatus($"Preview unavailable. {message}", error: true);
+        _diagnostics.Log("atlas-preview", new { status = "rejected", reason });
+    }
+
+    private void AtlasPreviewExitClicked(object sender, RoutedEventArgs e)
+    {
+        ExitAtlasPreview();
+        if (AtlasPreviewStart.IsVisible)
+            AtlasPreviewStart.Focus();
+    }
+
+    private void ExitAtlasPreview()
+    {
+        if (_atlasPreview is null)
+            return;
+
+        _atlasPreview = null;
+        UpdateScenePresentation();
+        _diagnostics.Log("atlas-preview", new { status = "closed" });
+    }
+
+    private static string LightState(bool isOn) => isOn ? "On" : "Off";
+
     private void ClearAtlasAnswer()
     {
+        ExitAtlasPreview();
         _atlasAnswer = null;
         AtlasReadStatus.Visibility = Visibility.Collapsed;
         AtlasReadStatus.Text = "";
@@ -177,6 +247,7 @@ public partial class MainWindow
         AtlasAnswerOrigin.Text = "";
         AtlasAnswerText.Text = "";
         AtlasLightState.Text = "";
+        AtlasProposalText.Text = "";
         AtlasSourceText.Text = "";
         AtlasSourceDetails.IsExpanded = false;
     }
