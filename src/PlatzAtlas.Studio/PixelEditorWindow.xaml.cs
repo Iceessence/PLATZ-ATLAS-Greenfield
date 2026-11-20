@@ -48,17 +48,27 @@ public partial class PixelEditorWindow : Window
     private void PixelDown(object sender, MouseButtonEventArgs e)
     {
         PixelSurface.Focus();
-        var cell = Cell(e.GetPosition(PixelSurface));
-        if (cell is not { } position || !StartAt((int)position.X, (int)position.Y))
-            return;
-        _last = position;
-        PixelSurface.CaptureMouse();
-        e.Handled = true;
+        e.Handled = BeginPointerStroke(e.GetPosition(PixelSurface));
     }
 
-    private void PixelMove(object sender, MouseEventArgs e)
+    internal bool BeginPointerStroke(Point point)
     {
-        if (_last is not { } prior || Cell(e.GetPosition(PixelSurface)) is not { } next || next == prior)
+        if (_last is not null || Cell(point) is not { } cell || !StartAt((int)cell.X, (int)cell.Y))
+            return false;
+        _last = cell;
+        if (!PixelSurface.CaptureMouse())
+        {
+            FinishStroke();
+            RefreshPixels();
+        }
+        return true;
+    }
+
+    private void PixelMove(object sender, MouseEventArgs e) => ContinuePointerStroke(e.GetPosition(PixelSurface));
+
+    internal void ContinuePointerStroke(Point point)
+    {
+        if (_last is not { } prior || Cell(point) is not { } next || next == prior)
             return;
         _draft.PaintLine((int)prior.X, (int)prior.Y, (int)next.X, (int)next.Y, _strokeColor);
         _last = next;
@@ -70,10 +80,16 @@ public partial class PixelEditorWindow : Window
     {
         PixelMove(sender, e);
         FinishStroke();
-        PixelSurface.ReleaseMouseCapture();
+        RefreshPixels();
     }
 
-    private void PixelCaptureLost(object sender, MouseEventArgs e) => FinishStroke();
+    private void PixelCaptureLost(object sender, MouseEventArgs e)
+    {
+        if (_last is null)
+            return;
+        FinishStroke();
+        RefreshPixels();
+    }
 
     private bool StartAt(int x, int y)
     {
@@ -103,13 +119,15 @@ public partial class PixelEditorWindow : Window
 
     private void FinishStroke()
     {
-        _draft.EndStroke();
         _last = null;
-        RefreshPixels();
+        _draft.EndStroke();
+        if (PixelSurface.IsMouseCaptured)
+            PixelSurface.ReleaseMouseCapture();
     }
 
     private void SizeClicked(object sender, RoutedEventArgs e)
     {
+        FinishStroke();
         if (sender is Button { Tag: string value } && int.TryParse(value, out var size))
             _draft.Resize(size);
         RefreshPixels();
@@ -117,13 +135,25 @@ public partial class PixelEditorWindow : Window
 
     private void ToolClicked(object sender, RoutedEventArgs e)
     {
+        FinishStroke();
         if (sender is Button { Tag: string value } && Enum.TryParse<Tool>(value, out var tool))
             SetTool(tool);
         RefreshPixels();
     }
 
-    private void UndoClicked(object sender, RoutedEventArgs e) { _draft.Undo(); RefreshPixels(); }
-    private void RedoClicked(object sender, RoutedEventArgs e) { _draft.Redo(); RefreshPixels(); }
+    private void UndoClicked(object sender, RoutedEventArgs e)
+    {
+        FinishStroke();
+        _draft.Undo();
+        RefreshPixels();
+    }
+
+    private void RedoClicked(object sender, RoutedEventArgs e)
+    {
+        FinishStroke();
+        _draft.Redo();
+        RefreshPixels();
+    }
 
     private void EditorKeyDown(object sender, KeyEventArgs e)
     {
@@ -134,22 +164,29 @@ public partial class PixelEditorWindow : Window
             e.Handled = true;
             return;
         }
-        if (!PixelSurface.IsKeyboardFocusWithin)
-            return;
-        switch (e.Key)
+        if (PixelSurface.IsKeyboardFocusWithin)
+            e.Handled = HandleCanvasKey(e.Key);
+    }
+
+    internal bool HandleCanvasKey(Key key)
+    {
+        switch (key)
         {
             case Key.Left: _x--; break;
             case Key.Right: _x++; break;
             case Key.Up: _y--; break;
             case Key.Down: _y++; break;
             case Key.Space:
-                if (StartAt(_x, _y))
+                if (_last is null && StartAt(_x, _y))
+                {
                     FinishStroke();
-                break;
-            default: return;
+                    RefreshPixels();
+                }
+                return true;
+            default: return false;
         }
         RefreshPixels();
-        e.Handled = true;
+        return true;
     }
 
     private void KeepClicked(object sender, RoutedEventArgs e)
@@ -168,6 +205,8 @@ public partial class PixelEditorWindow : Window
 
     private void ExportClicked(object sender, RoutedEventArgs e)
     {
+        FinishStroke();
+        RefreshPixels();
         var name = AssetName.Text.Trim();
         if (name.Length == 0 || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
             name = "Sprite";
