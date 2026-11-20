@@ -1,6 +1,6 @@
 # PLATZ ATLAS Studio
 
-GF-001 is a local Windows editor for the Night Museum scene. The two lanterns share a display name. Studio identifies each by its gallery and stable object ID.
+PLATZ ATLAS Studio is a local Windows editor for the Night Museum scene. Studio identifies its two identically named lanterns by gallery and stable object ID. GF-003 adds a read-only ATLAS answer grounded in the saved museum.
 
 ## Build and launch
 
@@ -32,6 +32,15 @@ Vulkan presentation uses the machine's Vulkan loader and compatible display driv
 4. Choose **Undo**, then **Redo**, or use **Ctrl+Z** and **Ctrl+Y**. Watch the west light and the current revision. The original revision remains visible beside it.
 5. Save with **Ctrl+S**, close Studio, then launch it again and open your working copy. The west light should be on, the east light should still be on, and the saved revision and object IDs should match.
 6. After replacing a saved revision, use the **Recover previous** file filter in **Open…** to open the adjacent `.platz.previous` backup. Save the recovered scene to a new file.
+
+## Ask about the saved museum
+
+1. Open a saved museum or save a new one. Select the east lantern first if you want to see citation navigation change the selection.
+2. Open the **ATLAS** tab beside **Inspector**. Choose **Allow project read** and **Ask ATLAS** with the supplied question, “Which lantern does the west switch control?”
+3. The answer identifies the West Gallery lantern and its saved light state. Expand **Source details** for the switch target, object field references, project and scene IDs, and snapshot checksum. Choose **Show in scene** to select the cited lantern and open its Inspector.
+4. Return to **ATLAS** and choose **Revoke access**. The answer and source details clear. After a manual edit, save the new revision and allow a new read to ask again.
+
+This first version uses a deterministic local lookup for the supplied question. Studio grants access to one saved project, scene and revision, then sends a bounded checksummed JSON snapshot inside the app. The lookup receives switch links, lantern identities, locations and light state. Edit history and asset contents stay in Core.
 
 [WORKING.md](WORKING.md) records which paths were exercised, the evidence and the next milestone.
 

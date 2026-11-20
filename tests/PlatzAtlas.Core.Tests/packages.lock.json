@@ -2,6 +2,9 @@
   "version": 1,
   "dependencies": {
     "net10.0": {
+      "platzatlas.atlas": {
+        "type": "Project"
+      },
       "platzatlas.core": {
         "type": "Project"
       }

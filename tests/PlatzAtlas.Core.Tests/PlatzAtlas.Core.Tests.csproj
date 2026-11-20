@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/PlatzAtlas.Atlas/PlatzAtlas.Atlas.csproj" />
     <ProjectReference Include="../../src/PlatzAtlas.Core/PlatzAtlas.Core.csproj" />
   </ItemGroup>
 </Project>

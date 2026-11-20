@@ -94,6 +94,8 @@ try
     WriteWithDigest(altered, payload.Replace("\"isOn\": true", "\"isOn\": null", StringComparison.Ordinal));
     ExpectInvalid(() => ProjectSession.Open(altered));
     Console.WriteLine("PASS checksum, version and typed-property validation");
+
+    AtlasReadChecks.Run(scratch.FullName);
 }
 finally
 {

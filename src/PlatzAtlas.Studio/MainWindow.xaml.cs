@@ -28,6 +28,7 @@ public partial class MainWindow : Window
         _saveTargetPath = saveTargetPath;
         _session = ProjectSession.NewMuseum();
         InitializeComponent();
+        InitializeAtlas();
         Viewport.SetPreference(rendererPreference);
         Viewport.SimulateDeviceLoss = simulateDeviceLoss;
         Viewport.MeasureFrames = measureFrames;
@@ -65,6 +66,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _atlasHost.Revoke();
         Viewport.Shutdown();
         base.OnClosed(e);
     }
@@ -77,6 +79,7 @@ public partial class MainWindow : Window
     {
         _changingProject = true;
         _session = session;
+        ResetAtlasSession();
         _openedRevision = session.Current.Revision;
         Objects.ItemsSource = session.Current.Objects.OrderBy(lantern => lantern.X)
             .Select(lantern => new SceneObjectItem(lantern.Id, lantern.Name, lantern.Location)).ToArray();
@@ -285,6 +288,7 @@ public partial class MainWindow : Window
         var dirty = _session.IsDirty && _session.SavedRevision.HasValue ? " · Unsaved changes" : "";
         RevisionLabel.Text = $"Revision {_session.Current.Revision} · Original r{MuseumProject.InitialRevision} · {saved}{dirty}";
         RevisionLabel.ToolTip = _session.FilePath ?? "Choose a file with Save";
+        UpdateAtlasAccess();
     }
 
     private void UpdatePreviewCard(Border card, TextBlock location, TextBlock state, Lantern? lantern, Guid? selection)
