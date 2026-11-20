@@ -66,6 +66,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        StopPlay("window-closed");
         _atlasHost.Revoke();
         Viewport.Shutdown();
         base.OnClosed(e);
@@ -91,13 +92,13 @@ public partial class MainWindow : Window
 
     private void NewExecuted(object sender, ExecutedRoutedEventArgs e)
     {
-        if (ConfirmLeave())
+        if (_play is null && ConfirmLeave())
             SetSession(ProjectSession.NewMuseum(), "New museum created. Save to choose a project file.");
     }
 
     private void OpenExecuted(object sender, ExecutedRoutedEventArgs e)
     {
-        if (!ConfirmLeave())
+        if (_play is not null || !ConfirmLeave())
             return;
 
         var dialog = new OpenFileDialog
@@ -140,6 +141,9 @@ public partial class MainWindow : Window
 
     private bool SaveProject(bool saveAs = false)
     {
+        if (_play is not null)
+            return false;
+
         var path = _session.FilePath;
         var chosePath = saveAs || path is null;
         if (chosePath)
@@ -172,6 +176,7 @@ public partial class MainWindow : Window
             var duration = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
             ShowStatus($"Saved revision {_session.Current.Revision} to {Path.GetFileName(path)}.");
             UpdateRevision();
+            CommandManager.InvalidateRequerySuggested();
             _diagnostics.Log("project-save", new { revision = _session.Current.Revision, durationMs = duration });
             return true;
         }
@@ -202,6 +207,9 @@ public partial class MainWindow : Window
 
     private void SelectAt(double x, double y)
     {
+        if (_play is not null)
+            return;
+
         var lantern = _session.Current.Objects.Reverse().FirstOrDefault(candidate =>
             Math.Abs(candidate.X - x) <= 0.07 && y >= candidate.Y - 0.17 && y <= candidate.Y + 0.13);
         if (lantern is not null)
@@ -210,6 +218,9 @@ public partial class MainWindow : Window
 
     private void ToggleLightClicked(object sender, RoutedEventArgs e)
     {
+        if (_play is not null)
+            return;
+
         var started = Stopwatch.GetTimestamp();
         var project = _session.Current;
         if (Selection is not { } lantern)
@@ -231,14 +242,16 @@ public partial class MainWindow : Window
         }
     }
 
-    private void CanUndo(object sender, CanExecuteRoutedEventArgs e) => e.CanExecute = _session.CanUndo;
+    private void CanAuthor(object sender, CanExecuteRoutedEventArgs e) => e.CanExecute = _play is null;
 
-    private void CanRedo(object sender, CanExecuteRoutedEventArgs e) => e.CanExecute = _session.CanRedo;
+    private void CanUndo(object sender, CanExecuteRoutedEventArgs e) => e.CanExecute = _play is null && _session.CanUndo;
+
+    private void CanRedo(object sender, CanExecuteRoutedEventArgs e) => e.CanExecute = _play is null && _session.CanRedo;
 
     private void UndoExecuted(object sender, ExecutedRoutedEventArgs e)
     {
         var started = Stopwatch.GetTimestamp();
-        if (_session.Undo())
+        if (_play is null && _session.Undo())
         {
             ShowStatus("Undid the last light change.");
             UpdateStudio(started);
@@ -248,7 +261,7 @@ public partial class MainWindow : Window
     private void RedoExecuted(object sender, ExecutedRoutedEventArgs e)
     {
         var started = Stopwatch.GetTimestamp();
-        if (_session.Redo())
+        if (_play is null && _session.Redo())
         {
             ShowStatus("Redid the light change.");
             UpdateStudio(started);
@@ -272,7 +285,7 @@ public partial class MainWindow : Window
         ToggleLabel.Text = selected?.IsOn == true ? "Turn light off" : "Turn light on";
         AutomationProperties.SetName(ToggleLight, selected is null ? "Turn light on"
             : $"Turn {selected.Location} light {(selected.IsOn ? "off" : "on")}");
-        ToggleLight.IsEnabled = selected is not null;
+        ToggleLight.IsEnabled = _play is null && selected is not null;
         UpdateRevision();
         UpdateScenePresentation(editStarted);
         CommandManager.InvalidateRequerySuggested();
@@ -281,7 +294,8 @@ public partial class MainWindow : Window
     private void UpdateScenePresentation(long? editStarted = null)
     {
         var project = _session.Current;
-        var selection = Selection?.Id;
+        var play = _play?.Current;
+        var selection = play is null ? Selection?.Id : _lastPlaySwitch?.TargetId;
         var preview = _atlasPreview;
         AtlasPreviewBanner.Visibility = preview is null ? Visibility.Collapsed : Visibility.Visible;
         AtlasPreviewLabel.Text = preview is null ? "" :
@@ -289,11 +303,13 @@ public partial class MainWindow : Window
         AtlasPreviewStart.IsEnabled = preview is null;
         AtlasPreviewStart.Visibility = preview is null ? Visibility.Visible : Visibility.Collapsed;
         UpdateAtlasCommitControls();
-        AutomationProperties.SetName(Viewport, preview is null ? "Museum room preview" : AtlasPreviewLabel.Text);
-        var ordered = project.Objects.OrderBy(lantern => lantern.X).ToArray();
+        UpdatePlayControls();
+        AutomationProperties.SetName(Viewport, play is not null ? PlayBannerText.Text
+            : preview is null ? "Museum room preview" : AtlasPreviewLabel.Text);
+        var ordered = (play?.Objects ?? project.Objects).OrderBy(lantern => lantern.X).ToArray();
         UpdatePreviewCard(WestCard, WestLabel, WestState, ordered.FirstOrDefault(), selection);
         UpdatePreviewCard(EastCard, EastLabel, EastState, ordered.Skip(1).FirstOrDefault(), selection);
-        Viewport.Show(MuseumArt.Create(project, selection, preview), editStarted);
+        Viewport.Show(MuseumArt.Create(project, selection, preview, play), editStarted);
     }
 
     private void UpdateRevision()
@@ -303,6 +319,8 @@ public partial class MainWindow : Window
         RevisionLabel.Text = $"Revision {_session.Current.Revision} · Original r{MuseumProject.InitialRevision} · {saved}{dirty}";
         RevisionLabel.ToolTip = _session.FilePath ?? "Choose a file with Save";
         UpdateAtlasAccess();
+        PlayToggle.ToolTip = _play is not null ? "Stop Play (F5)"
+            : CanStartPlay ? "Play the saved revision (F5)" : "Save the current revision to start Play.";
     }
 
     private void UpdatePreviewCard(Border card, TextBlock location, TextBlock state, Lantern? lantern, Guid? selection)
@@ -319,9 +337,11 @@ public partial class MainWindow : Window
             return;
         }
         var selected = lantern.Id == selection;
-        state.Text = $"Light {(lantern.IsOn ? "on" : "off")}{(selected ? " · Selected" : "")}";
+        var marker = _play is null ? "Selected" : "Last used";
+        var highlightBrush = _play is null ? "Accent" : "PlayAccent";
+        state.Text = $"Light {(lantern.IsOn ? "on" : "off")}{(selected ? $" · {marker}" : "")}";
         state.Foreground = (Brush)FindResource(lantern.IsOn ? "Accent" : "Muted");
-        card.BorderBrush = (Brush)FindResource(selected ? "Accent" : "Border");
+        card.BorderBrush = (Brush)FindResource(selected ? highlightBrush : "Border");
     }
 
     private void ShowStatus(string message, bool error = false)

@@ -7,6 +7,12 @@
       },
       "platzatlas.core": {
         "type": "Project"
+      },
+      "platzatlas.runtime": {
+        "type": "Project",
+        "dependencies": {
+          "PlatzAtlas.Core": "[1.0.0, )"
+        }
       }
     }
   }

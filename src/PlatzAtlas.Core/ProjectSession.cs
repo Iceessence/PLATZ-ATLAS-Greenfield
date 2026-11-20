@@ -84,12 +84,17 @@ public sealed class ProjectSession
     public LightPreview PreviewSavedLight(SetLight request)
     {
         var target = ValidateLightTarget(request);
-        if (IsDirty || FilePath is null || diskFingerprint is null)
-            throw new ProjectEditException(EditRejection.StaleRevision, "Save the current revision before previewing.");
-        if (!ProjectStore.HasSavedHead(FilePath, diskFingerprint))
-            throw new ProjectEditException(EditRejection.StaleRevision, "The saved project changed on disk. Reopen it to preview.");
-
+        ReadSavedSnapshot();
         return new LightPreview(request, target, target with { IsOn = request.IsOn });
+    }
+
+    public MuseumProject ReadSavedSnapshot()
+    {
+        if (IsDirty || FilePath is null || diskFingerprint is null)
+            throw new ProjectEditException(EditRejection.StaleRevision, "Save the current revision first.");
+        if (!ProjectStore.HasSavedHead(FilePath, diskFingerprint))
+            throw new ProjectEditException(EditRejection.StaleRevision, "The saved project changed on disk. Reopen it.");
+        return Current;
     }
 
     // Only the trusted Studio host supplies the approval check. It runs again immediately before replacement.

@@ -23,11 +23,13 @@ public readonly record struct RenderTriangle(RenderVertex A, RenderVertex B, Ren
 /// <summary>Immutable draw data derived from one project revision. Draw triangles in list order.</summary>
 public sealed class RenderSnapshot(
     Guid projectId, long revision, RenderColor background, IEnumerable<RenderTriangle> triangles,
-    Guid? previewObjectId = null)
+    Guid? previewObjectId = null, Guid? playSessionId = null, long? playStep = null)
 {
     public Guid ProjectId { get; } = projectId;
     public long Revision { get; } = revision;
     public Guid? PreviewObjectId { get; } = previewObjectId;
+    public Guid? PlaySessionId { get; } = playSessionId;
+    public long? PlayStep { get; } = playStep;
     public RenderColor Background { get; } = background;
     public IReadOnlyList<RenderTriangle> Triangles { get; } = Array.AsReadOnly(triangles.ToArray());
 }

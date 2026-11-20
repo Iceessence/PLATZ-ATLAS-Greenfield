@@ -1,5 +1,6 @@
 using PlatzAtlas.Core;
 using PlatzAtlas.Rendering;
+using PlatzAtlas.Runtime;
 
 namespace PlatzAtlas.Studio;
 
@@ -8,12 +9,14 @@ internal static class MuseumArt
     private static readonly RenderColor Background = Ink(14, 25, 29);
     private static readonly RenderColor Highlight = Ink(240, 196, 134);
     private static readonly RenderColor PreviewHighlight = Ink(133, 217, 198);
+    private static readonly RenderColor PlayHighlight = Ink(169, 213, 255);
 
-    public static RenderSnapshot Create(MuseumProject project, Guid? selectedId, LightPreview? preview = null)
+    public static RenderSnapshot Create(MuseumProject project, Guid? selectedId, LightPreview? preview, PlayRoomSnapshot? play)
     {
         var scene = new Drawing();
+        var selectionHighlight = play is null ? Highlight : PlayHighlight;
         DrawRoom(scene);
-        foreach (var lantern in project.Objects)
+        foreach (var lantern in play?.Objects ?? project.Objects)
         {
             if (preview is not null)
             {
@@ -23,10 +26,11 @@ internal static class MuseumArt
                     DrawLantern(scene, lantern, null);
             }
             else
-                DrawLantern(scene, lantern, lantern.Id == selectedId ? Highlight : null);
+                DrawLantern(scene, lantern, lantern.Id == selectedId ? selectionHighlight : null);
         }
 
-        return new RenderSnapshot(project.ProjectId, project.Revision, Background, scene.Triangles, preview?.After.Id);
+        return new RenderSnapshot(play?.ProjectId ?? project.ProjectId, play?.SourceRevision ?? project.Revision,
+            Background, scene.Triangles, preview?.After.Id, play?.SessionId, play?.Step);
     }
 
     private static void DrawRoom(Drawing scene)

@@ -98,6 +98,7 @@ try
     AtlasReadChecks.Run(scratch.FullName);
     LightPreviewChecks.Run(scratch.FullName);
     ApprovedCommitChecks.Run(scratch.FullName);
+    PlaySessionChecks.Run(scratch.FullName);
 }
 finally
 {

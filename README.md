@@ -1,6 +1,6 @@
 # PLATZ ATLAS Studio
 
-PLATZ ATLAS Studio is a local Windows editor for the Night Museum scene. Studio identifies its two identically named lanterns by gallery and stable object ID. ATLAS can answer a question about the saved museum, preview a proposed light change and save it after you approve it.
+PLATZ ATLAS Studio is a local Windows editor for the Night Museum scene. Studio identifies its two identically named lanterns by gallery and stable object ID. You can test the west switch in Play, or ask ATLAS about the saved museum and review a proposed light change.
 
 ## Build and launch
 
@@ -32,6 +32,14 @@ Vulkan presentation uses the machine's Vulkan loader and compatible display driv
 4. Choose **Undo**, then **Redo**, or use **Ctrl+Z** and **Ctrl+Y**. Watch the west light and the current revision. The original revision remains visible beside it.
 5. Save with **Ctrl+S**, close Studio, then launch it again and open your working copy. The west light should be on, the east light should still be on, and the saved revision and object IDs should match.
 6. After replacing a saved revision, use the **Recover previous** file filter in **Open…** to open the adjacent `.platz.previous` backup. Save the recovered scene to a new file.
+
+## Play the saved museum
+
+1. Open a saved museum, or save the current revision first. Choose **Play** above the viewport or press **F5**.
+2. Under **Switches**, choose **Use West Switch** twice. Each action toggles the west lantern, and the panel reports the gallery and old and new light states. East stays as it was in the saved room.
+3. Choose **Stop** or press **F5** again to return to the saved view. For an easy comparison, use the switch a third time before stopping. Closing Studio during Play also ends that session.
+
+Play starts from the exact saved revision and keeps its switch state in memory. If another window saved a newer revision before you started, reopen the file to Play that revision.
 
 ## Ask about the saved museum
 

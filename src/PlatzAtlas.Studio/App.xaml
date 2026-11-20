@@ -11,6 +11,8 @@
     <SolidColorBrush x:Key="Accent" Color="#F0C486"/>
     <SolidColorBrush x:Key="PreviewAccent" Color="#85D9C6"/>
     <SolidColorBrush x:Key="PreviewSurface" Color="#183331"/>
+    <SolidColorBrush x:Key="PlayAccent" Color="#A9D5FF"/>
+    <SolidColorBrush x:Key="PlaySurface" Color="#1D2C3A"/>
     <SolidColorBrush x:Key="Selection" Color="#2C3E3E"/>
     <SolidColorBrush x:Key="Error" Color="#FFAD99"/>
 
@@ -87,6 +89,11 @@
               </Trigger>
               <Trigger Property="IsKeyboardFocused" Value="True">
                 <Setter TargetName="Cell" Property="BorderBrush" Value="{StaticResource Accent}"/>
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Cell" Property="Background" Value="Transparent"/>
+                <Setter TargetName="Cell" Property="BorderBrush" Value="Transparent"/>
+                <Setter TargetName="Cell" Property="Opacity" Value="0.75"/>
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
