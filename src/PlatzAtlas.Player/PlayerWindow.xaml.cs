@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.Win32;
+using PlatzAtlas.Core;
 using PlatzAtlas.Rendering;
 using PlatzAtlas.RoomView;
 using PlatzAtlas.Runtime;
@@ -58,10 +59,10 @@ public partial class PlayerWindow : Window
     {
         try
         {
-            _room = RoomPackage.Open(path);
-            StartRoom(_room);
-            var profile = _room.Entities is null ? RoomPackage.RuntimeProfile : RoomPackage.SceneProfile;
-            Log("room-opened", new { _room.ProjectId, _room.SceneId, _room.SourceRevision, profile });
+            var room = RoomPackage.Open(path);
+            StartRoom(room);
+            var profile = room.Entities is null ? RoomPackage.RuntimeProfile : RoomPackage.SceneProfile;
+            Log("room-opened", new { room.ProjectId, room.SceneId, room.SourceRevision, profile });
         }
         catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
         {
@@ -72,13 +73,16 @@ public partial class PlayerWindow : Window
 
     private void StartRoom(RuntimeRoom room)
     {
+        var session = new MuseumPlaySession(room);
         _session?.Stop();
-        _session = new MuseumPlaySession(room);
+        _session = session;
+        _room = room;
         _lastSwitch = null;
         RoomTitle.Text = room.Name;
         SourceLabel.Text = $"Exported revision {room.SourceRevision}";
         RestartButton.IsEnabled = Controls.IsEnabled = true;
-        SetStatus("Walk the floor and use a switch when its marker turns gold.");
+        SetStatus(session.Markers.Count == 0 ? "Explore the room with the arrow keys or WASD." :
+            "Walk toward a switch and use it when its marker turns gold.");
         UpdateRoom();
     }
 
@@ -98,14 +102,7 @@ public partial class PlayerWindow : Window
     {
         if (_session is null || Keyboard.Modifiers != ModifierKeys.None)
             return;
-        WalkDirection? direction = e.Key switch
-        {
-            Key.Left or Key.A => WalkDirection.Left,
-            Key.Right or Key.D => WalkDirection.Right,
-            Key.Up or Key.W => WalkDirection.Up,
-            Key.Down or Key.S => WalkDirection.Down,
-            _ => null
-        };
+        var direction = WalkInput.Direction(e.Key);
         if (direction is { } movement)
             Walk(movement);
         else if (e.Key == Key.E && !e.IsRepeat)
@@ -117,9 +114,16 @@ public partial class PlayerWindow : Window
 
     private void Walk(WalkDirection direction)
     {
-        if (_session is not { } session || !session.TryWalk(session.Current.SessionId, direction))
+        if (_session is not { } session)
             return;
-        UpdateRoom();
+        var moved = session.TryWalk(session.Current.SessionId, direction);
+        if (session.Current.Entities is not null)
+        {
+            SetStatus(moved ? "Walk or press E near a connected switch." : "Path blocked.");
+            Log("walk", new { direction = direction.ToString(), moved, session.Current.Visitor });
+        }
+        if (moved)
+            UpdateRoom();
     }
 
     private void UseClicked(object sender, RoutedEventArgs e) => UseSwitch();
@@ -145,14 +149,28 @@ public partial class PlayerWindow : Window
         var session = _session!;
         var nearby = session.NearbySwitch;
         NearbyLabel.Text = nearby is not null ? $"In range · {nearby.Name}" :
-            session.Markers.Count == 0 ? "This room has no switches." : "Walk toward a diamond.";
+            session.Markers.Count == 0 ? "This room has no connected switches." : "Walk toward a switch marker.";
         UseButton.IsEnabled = nearby is not null;
-        ActionLabel.Text = _lastSwitch is { } change ? $"{change.TargetLocation} · {State(change.WasOn)} → {State(change.IsOn)}" : "";
-        LightLabel.Text = string.Join("\n", session.Current.Objects.OrderBy(item => item.X)
-            .Select(item => $"{item.Location} · {State(item.IsOn)}"));
-        Viewport.Show(_room?.Entities is { } entities
-            ? SceneArt.Create(_room.ProjectId, _room.SourceRevision, entities, null, visitor: session.Current.Visitor)
-            : MuseumArt.CreatePlayer(session, _lastSwitch?.TargetId));
+        ActionLabel.Text = _lastSwitch is { } change ? $"{change.TargetLocation} · {change.StateText}" : "";
+        var snapshot = session.Current;
+        if (snapshot.Entities is { } entities)
+        {
+            LightLabel.Text = string.Join("\n", entities.OrderBy(item => item.Name)
+                .Select(item => item.Component switch
+                {
+                    SceneDoor door => $"{item.Name} · {(door.IsOpen ? "Open" : "Closed")}",
+                    SceneLamp lamp => $"{item.Name} · {State(lamp.IsOn)}",
+                    _ => null
+                }).OfType<string>());
+            Viewport.Show(SceneArt.Create(snapshot.ProjectId, snapshot.SourceRevision, entities,
+                _lastSwitch?.TargetId, play: snapshot, nearbySwitch: nearby?.SwitchId));
+        }
+        else
+        {
+            LightLabel.Text = string.Join("\n", snapshot.Objects.OrderBy(item => item.X)
+                .Select(item => $"{item.Location} · {State(item.IsOn)}"));
+            Viewport.Show(MuseumArt.CreatePlayer(session, _lastSwitch?.TargetId));
+        }
     }
 
     private void SetStatus(string message, bool error = false)

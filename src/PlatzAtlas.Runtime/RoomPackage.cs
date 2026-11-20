@@ -151,6 +151,7 @@ public static class RoomPackage
             if (room.Objects.Count != 0 || room.Switches.Count != 0)
                 throw new InvalidDataException("The scene contains incompatible museum records.");
             SceneValidation.ValidateEntities(entities, room.ProjectId, room.SceneId);
+            MuseumPlaySession.FindSpawn(entities);
             return;
         }
 

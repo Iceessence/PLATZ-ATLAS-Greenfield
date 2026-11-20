@@ -7,6 +7,7 @@ public sealed record PlayRoomSnapshot(Guid SessionId, Guid ProjectId, Guid Scene
     IReadOnlyList<Lantern> Objects, long Step = 0)
 {
     public RoomPosition Visitor { get; init; } = new(0.5, 0.92);
+    public IReadOnlyList<SceneEntity>? Entities { get; init; }
 }
 
 public readonly record struct RoomPosition(double X, double Y);
@@ -14,10 +15,15 @@ public sealed record PlaySwitchMarker(Guid SwitchId, string Name, RoomPosition P
 public enum WalkDirection { Left, Right, Up, Down }
 
 public sealed record PlaySwitchResult(long Step, Guid SwitchId, string SwitchName, Guid TargetId,
-    string TargetLocation, bool WasOn, bool IsOn);
+    string TargetLocation, bool WasOn, bool IsOn)
+{
+    public bool IsDoor { get; init; }
+    public string StateText => IsDoor ? $"{(WasOn ? "Open" : "Closed")} → {(IsOn ? "Open" : "Closed")}"
+        : $"{(WasOn ? "On" : "Off")} → {(IsOn ? "On" : "Off")}";
+}
 
 // The runtime owns only detached scene state and has no reference to the authoring session.
-public sealed class MuseumPlaySession
+public sealed partial class MuseumPlaySession
 {
     private readonly Dictionary<Guid, int> _objectIndices;
     private readonly Dictionary<Guid, LightSwitch> _switches;
@@ -40,6 +46,13 @@ public sealed class MuseumPlaySession
             new RoomPosition(Math.Clamp(lanterns[_objectIndices[item.TargetId]].X, 0.14, 0.86), 0.80))).ToArray());
         Current = new PlayRoomSnapshot(Guid.NewGuid(), snapshot.ProjectId, snapshot.SceneId,
             snapshot.SourceRevision, Array.AsReadOnly(lanterns));
+        if (snapshot.Entities is { } entities)
+        {
+            SceneValidation.ValidateEntities(entities, snapshot.ProjectId, snapshot.SceneId);
+            Current = Current with { Entities = Array.AsReadOnly(entities.ToArray()), Visitor = FindSpawn(entities) };
+            Markers = Array.AsReadOnly(entities.Where(item => item.Component is SceneSwitch { TargetId: not null })
+                .Select(item => new PlaySwitchMarker(item.Id, item.Name, new(item.Transform.X, item.Transform.Y))).ToArray());
+        }
     }
 
     public IReadOnlyList<LightSwitch> Switches { get; }
@@ -63,6 +76,8 @@ public sealed class MuseumPlaySession
             WalkDirection.Down => (0d, 0.04),
             _ => (0d, 0d)
         };
+        if (Current.Entities is { } entities)
+            return TryWalkScene(x, y, entities);
         var next = new RoomPosition(Math.Clamp(Current.Visitor.X + x, 0.12, 0.88),
             Math.Clamp(Current.Visitor.Y + y, 0.78, 0.96));
         if (next == Current.Visitor)
@@ -80,7 +95,11 @@ public sealed class MuseumPlaySession
     public bool TryUseSwitch(Guid sessionId, Guid switchId, [NotNullWhen(true)] out PlaySwitchResult? result)
     {
         result = null;
-        if (_stopped || sessionId != Current.SessionId || !_switches.TryGetValue(switchId, out var item))
+        if (_stopped || sessionId != Current.SessionId)
+            return false;
+        if (Current.Entities is { } entities)
+            return TryUseSceneSwitch(switchId, entities, out result);
+        if (!_switches.TryGetValue(switchId, out var item))
             return false;
 
         var index = _objectIndices[item.TargetId];

@@ -101,6 +101,7 @@ try
     PlaySessionChecks.Run(scratch.FullName);
     RoomPackageChecks.Run(scratch.FullName);
     SceneChecks.Run(scratch.FullName);
+    PlayableSceneChecks.Run(scratch.FullName);
 }
 finally
 {

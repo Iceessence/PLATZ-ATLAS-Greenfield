@@ -47,7 +47,6 @@ public partial class MainWindow
         SceneInspector.Visibility = entity is null ? Visibility.Collapsed : Visibility.Visible;
         ObjectId.Text = entity?.Id.ToString() ?? "—";
         ProjectId.Text = project.ProjectId.ToString();
-        PlayToggle.Visibility = Visibility.Collapsed;
         if (entity is not null)
         {
             SceneName.Text = entity.Name;
@@ -58,6 +57,10 @@ public partial class MainWindow
             ChangeLight.Visibility = entity.Component is SceneLamp ? Visibility.Visible : Visibility.Collapsed;
             if (entity.Component is SceneLamp lamp)
                 ChangeLight.Content = lamp.IsOn ? "Turn lamp off" : "Turn lamp on";
+            ChangeDoor.Visibility = entity.Component is SceneDoor ? Visibility.Visible : Visibility.Collapsed;
+            if (entity.Component is SceneDoor door)
+                ChangeDoor.Content = door.IsOpen ? "Set initially closed" : "Set initially open";
+            UpdateSwitchEditor(entity.Component as SceneSwitch, project.Scene.Entities);
         }
         UpdateRevision();
         UpdateGeneralPresentation(editStarted);
@@ -67,26 +70,32 @@ public partial class MainWindow
     private void UpdateGeneralPresentation(long? editStarted = null)
     {
         var current = _session.Current;
-        var entities = current.Scene!.Entities;
-        if (_sceneDrag is { } drag)
+        var play = _play?.Current;
+        var entities = play?.Entities ?? current.Scene!.Entities;
+        if (play is null && _sceneDrag is { } drag)
             entities = entities.Select(entity => entity.Id == drag.Id ? entity with { Transform = drag.Preview } : entity).ToArray();
-        AtlasPreviewBanner.Visibility = PlayBanner.Visibility = PlayPanel.Visibility =
-            WestCard.Visibility = EastCard.Visibility = Visibility.Collapsed;
-        SideTabs.Visibility = Visibility.Visible;
-        Objects.IsEnabled = true;
-        AutomationProperties.SetName(Viewport, "Room canvas");
-        Viewport.Show(SceneArt.Create(current.ProjectId, current.Revision, entities, SelectedEntityId, grid: true), editStarted);
+        AtlasPreviewBanner.Visibility = WestCard.Visibility = EastCard.Visibility = Visibility.Collapsed;
+        UpdatePlayControls();
+        AutomationProperties.SetName(Viewport, play is null ? "Room canvas" : "Playable room canvas");
+        Viewport.Show(SceneArt.Create(current.ProjectId, current.Revision, entities,
+            play is null ? SelectedEntityId : _lastPlaySwitch?.TargetId,
+            grid: play is null, play: play, nearbySwitch: _play?.NearbySwitch?.SwitchId), editStarted);
     }
 
     private void AddSceneClicked(object sender, RoutedEventArgs e)
     {
-        if (_session.Current.Scene is not { } scene || sender is not Button { Tag: string kind })
+        if (_play is not null || _session.Current.Scene is not { } scene || sender is not Button { Tag: string kind })
             return;
-        var lamp = kind == "Lamp";
+        var (component, width, height, rotation) = kind switch
+        {
+            "Lamp" => ((SceneComponent)new SceneLamp(true), .10, .16, 0),
+            "Door" => (new SceneDoor(false), .18, .09, 0),
+            "Switch" => (new SceneSwitch(null, SwitchBehavior.Toggle), .045, .077, 45),
+            _ => (new WallPanel(PanelColor.Slate), .36, .105, 0)
+        };
         var offset = .035 * (scene.Entities.Count % 5);
-        var entity = new SceneEntity(Guid.NewGuid(), lamp ? "Lamp" : "Wall",
-            new Transform2D(.45 + offset, .46 + offset, lamp ? .1 : .36, lamp ? .16 : .105, 0),
-            lamp ? new SceneLamp(true) : new WallPanel(PanelColor.Slate));
+        var entity = new SceneEntity(Guid.NewGuid(), kind,
+            new Transform2D(.45 + offset, .46 + offset, width, height, rotation), component);
         ApplyScene(new AddSceneEntity(_session.Current.ProjectId, _session.Current.Revision, entity),
             $"Added {entity.Name.ToLowerInvariant()}. Drag it on the canvas or edit its transform.");
     }
@@ -140,8 +149,44 @@ public partial class MainWindow
                 $"Deleted {entity.Name}. Use Undo to restore it.");
     }
 
+    private void ChangeSceneDoorClicked(object sender, RoutedEventArgs e)
+    {
+        if (SelectedEntity is { Component: SceneDoor door } entity)
+            ApplyScene(new SetSceneDoor(_session.Current.ProjectId, _session.Current.Revision, entity.Id, !door.IsOpen),
+                door.IsOpen ? "Door starts closed." : "Door starts open.");
+    }
+
+    private void ConfigureSceneSwitchClicked(object sender, RoutedEventArgs e)
+    {
+        if (SelectedEntity is not { Component: SceneSwitch } entity ||
+            SwitchEntityTarget.SelectedItem is not SwitchTargetItem target ||
+            SwitchEntityMode.SelectedValue is not string mode || !Enum.TryParse<SwitchBehavior>(mode, out var behavior))
+            return;
+        ApplyScene(new ConfigureSceneSwitch(_session.Current.ProjectId, _session.Current.Revision,
+            entity.Id, target.Id, behavior), target.Id is null ? "Switch disconnected." : $"Switch connected to {target.Label}.");
+    }
+
+    private void UpdateSwitchEditor(SceneSwitch? control, IReadOnlyList<SceneEntity> entities)
+    {
+        SceneSwitchEditor.Visibility = control is null ? Visibility.Collapsed : Visibility.Visible;
+        if (control is null)
+            return;
+        var eligible = entities.Where(item => item.Component is SceneDoor or SceneLamp).ToArray();
+        var duplicates = eligible.GroupBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+            .Where(group => group.Count() > 1).Select(group => group.Key).ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+        var targets = eligible.OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(item => item.Id)
+            .Select(item => new SwitchTargetItem(item.Id,
+                duplicates.Contains(item.Name) ? $"{item.Name} · {item.Id.ToString("N")[..8]}" : item.Name))
+            .Prepend(new SwitchTargetItem(null, "Unconnected")).ToArray();
+        SwitchEntityTarget.ItemsSource = targets;
+        SwitchEntityTarget.SelectedItem = targets.Single(target => target.Id == control.TargetId);
+        SwitchEntityMode.SelectedValue = control.Behavior.ToString();
+    }
+
     private void ApplyScene(SceneOperation operation, string status)
     {
+        if (_play is not null)
+            return;
         try
         {
             if (!_session.Apply(operation))
@@ -213,6 +258,13 @@ public partial class MainWindow
         SceneRotation.Text = t.Rotation.ToString("G", CultureInfo.CurrentCulture);
     }
 
-    private static string ComponentLabel(SceneComponent component) => component is WallPanel ? "Wall" : "Lamp";
+    private static string ComponentLabel(SceneComponent component) => component switch
+    {
+        WallPanel => "Wall",
+        SceneDoor => "Door",
+        SceneSwitch => "Switch",
+        _ => "Lamp"
+    };
+    private sealed record SwitchTargetItem(Guid? Id, string Label);
     private sealed record SceneDrag(Guid Id, long Revision, double X, double Y, Transform2D Original, Transform2D Preview);
 }

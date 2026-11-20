@@ -14,7 +14,7 @@ public static class SceneArt
         entities.OrderBy(item => item.Component is WallPanel ? 0 : 1).ThenBy(item => item.Id);
 
     public static RenderSnapshot Create(Guid projectId, long revision, IReadOnlyList<SceneEntity> entities,
-        Guid? selected, bool grid = false, RoomPosition? visitor = null)
+        Guid? selected, bool grid = false, PlayRoomSnapshot? play = null, Guid? nearbySwitch = null)
     {
         var triangles = new List<RenderTriangle>();
         if (grid)
@@ -29,7 +29,12 @@ public static class SceneArt
         {
             var t = item.Transform;
             if (item.Id == selected)
-                Quad(t with { Width = t.Width + .009, Height = t.Height + .015 }, Selection);
+            {
+                AtLocal(t, -.508, 0, .025, 1.026, Selection);
+                AtLocal(t, .508, 0, .025, 1.026, Selection);
+                AtLocal(t, 0, -.508, 1.026, .025, Selection);
+                AtLocal(t, 0, .508, 1.026, .025, Selection);
+            }
             if (item.Component is WallPanel panel)
             {
                 Quad(t, Rgb(39, 52, 64));
@@ -49,13 +54,42 @@ public static class SceneArt
                 Quad(t with { Width = t.Width * .47, Height = t.Height * .47 }, light.IsOn
                     ? Rgb(255, 217, 128) : Rgb(108, 127, 111));
             }
+            else if (item.Component is SceneDoor door)
+            {
+                if (door.IsOpen)
+                {
+                    AtLocal(t, -.43, 0, .14, 1, Rgb(79, 154, 132));
+                    AtLocal(t, .43, 0, .14, 1, Rgb(79, 154, 132));
+                }
+                else
+                {
+                    Quad(t, Rgb(57, 44, 42));
+                    Quad(t with { Width = t.Width * .9, Height = t.Height * .72 }, Rgb(174, 104, 77));
+                    AtLocal(t, .29, 0, .10, .25, Rgb(248, 214, 150));
+                }
+            }
+            else if (item.Component is SceneSwitch control)
+            {
+                Quad(t, Rgb(33, 47, 56));
+                Quad(t with { Width = t.Width * .58, Height = t.Height * .58 }, item.Id == nearbySwitch
+                    ? Selection : control.TargetId is null ? Rgb(118, 121, 128) : Rgb(122, 192, 213));
+            }
         }
-        if (visitor is { } actor)
+        if (play?.Visitor is { } actor)
         {
             Quad(new Transform2D(actor.X, actor.Y, .032, .054, 45), Rgb(47, 100, 148));
             Quad(new Transform2D(actor.X, actor.Y, .022, .037, 45), Rgb(125, 205, 243));
         }
-        return new RenderSnapshot(projectId, revision, Background, triangles);
+        return new RenderSnapshot(projectId, revision, Background, triangles,
+            playSessionId: play?.SessionId, playStep: play?.Step);
+
+        void AtLocal(Transform2D t, double x, double y, double width, double height, RenderColor color)
+        {
+            var angle = t.Rotation * Math.PI / 180;
+            Quad(new Transform2D(t.X + x * t.Width * Math.Cos(angle) - y * t.Height * Math.Sin(angle),
+                t.Y + x * t.Width * Math.Sin(angle) + y * t.Height * Math.Cos(angle),
+                t.Width * width, t.Height * height, t.Rotation), color);
+        }
 
         void Quad(Transform2D t, RenderColor color)
         {

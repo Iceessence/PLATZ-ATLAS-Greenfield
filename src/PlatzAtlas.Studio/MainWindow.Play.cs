@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using PlatzAtlas.Core;
 using PlatzAtlas.Runtime;
+using PlatzAtlas.RoomView;
 
 namespace PlatzAtlas.Studio;
 
@@ -17,7 +18,7 @@ public partial class MainWindow
     private PlaySwitchResult? _lastPlaySwitch;
 
     private bool HasSavedRevision => !_session.IsDirty && _session.FilePath is not null;
-    private bool CanStartPlay => _session.Current.Scene is null && HasSavedRevision;
+    private bool CanStartPlay => HasSavedRevision;
 
     private void CanTogglePlay(object sender, CanExecuteRoutedEventArgs e) =>
         e.CanExecute = _play is not null || CanStartPlay;
@@ -40,6 +41,7 @@ public partial class MainWindow
         {
             var session = new MuseumPlaySession(_session.ReadSavedSnapshot());
             ClearAtlasAccess();
+            _sceneDrag = null;
             _play = session;
             var snapshot = session.Current;
             PlaySwitches.ItemsSource = session.Switches.Select(item =>
@@ -82,13 +84,18 @@ public partial class MainWindow
         if (!session.TryUseSwitch(input.SessionId, input.SwitchId, out var result))
             return;
 
+        RecordSwitchUse(session, result, started);
+    }
+
+    private void RecordSwitchUse(MuseumPlaySession session, PlaySwitchResult result, long started)
+    {
         _lastPlaySwitch = result;
         UpdateScenePresentation();
         UIElementAutomationPeer.FromElement(PlayResultText)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
         _diagnostics.Log("play-switch", new
         {
             session.Current.SessionId, session.Current.SourceRevision,
-            result.Step, result.SwitchId, result.TargetId, result.WasOn, result.IsOn,
+            result.Step, result.SwitchId, result.TargetId, result.WasOn, result.IsOn, result.IsDoor,
             durationMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds
         });
     }
@@ -97,17 +104,74 @@ public partial class MainWindow
     {
         var snapshot = _play?.Current;
         var playing = snapshot is not null;
+        var general = snapshot?.Entities is not null;
         PlayToggle.Content = playing ? "Stop" : "Play";
         PlayBanner.Visibility = PlayPanel.Visibility = playing ? Visibility.Visible : Visibility.Collapsed;
         SideTabs.Visibility = playing ? Visibility.Collapsed : Visibility.Visible;
         Objects.IsEnabled = !playing;
+        SceneActions.IsEnabled = NewBlank.IsEnabled = !playing;
         PlayBannerText.Text = snapshot is null ? "" :
             $"Playing saved r{snapshot.SourceRevision} · {snapshot.Step} switch {(snapshot.Step == 1 ? "action" : "actions")}";
-        PlayEmpty.Visibility = _play?.Switches.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        PlayEmpty.Visibility = !general && _play?.Switches.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        ScenePlayControls.Visibility = general ? Visibility.Visible : Visibility.Collapsed;
+        PlaySwitches.Visibility = general ? Visibility.Collapsed : Visibility.Visible;
+        if (general)
+        {
+            var nearby = _play!.NearbySwitch;
+            SceneNearby.Text = nearby is not null ? $"In range · {nearby.Name}" : _play.Markers.Count == 0
+                ? "This room has no connected switches." : "Walk toward a switch marker.";
+            SceneUseSwitch.IsEnabled = nearby is not null;
+        }
         PlayResultCard.Visibility = _lastPlaySwitch is not null ? Visibility.Visible : Visibility.Collapsed;
         PlayResultTitle.Text = _lastPlaySwitch?.SwitchName ?? "";
         PlayResultText.Text = _lastPlaySwitch is { } change ?
-            $"{change.TargetLocation} light · {LightState(change.WasOn)} → {LightState(change.IsOn)}" : "";
+            $"{change.TargetLocation}{(general ? "" : " light")} · {change.StateText}" : "";
+    }
+
+    private void StudioPlayKeyDown(object sender, KeyEventArgs e)
+    {
+        if (_play?.Current.Entities is null || Keyboard.Modifiers != ModifierKeys.None)
+            return;
+        if (WalkInput.Direction(e.Key) is { } direction)
+            WalkScene(direction);
+        else if (e.Key == Key.E && !e.IsRepeat)
+            UseSceneSwitch();
+        else
+            return;
+        e.Handled = true;
+    }
+
+    private void SceneWalkClicked(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string tag } && Enum.TryParse<WalkDirection>(tag, out var direction))
+            WalkScene(direction);
+    }
+
+    private void WalkScene(WalkDirection direction)
+    {
+        if (_play is not { } session || session.Current.Entities is null)
+            return;
+        var moved = session.TryWalk(session.Current.SessionId, direction);
+        if (moved)
+            UpdateScenePresentation();
+        ShowStatus(moved ? "Walking in Play. Press E near a connected switch." : "Path blocked.");
+        _diagnostics.Log("play-walk", new { direction = direction.ToString(), moved, session.Current.Visitor });
+    }
+
+    private void ScenePlayUseClicked(object sender, RoutedEventArgs e) => UseSceneSwitch();
+
+    private void UseSceneSwitch()
+    {
+        if (_play is not { } session || session.Current.Entities is null)
+            return;
+        var started = Stopwatch.GetTimestamp();
+        if (!session.TryUseNearbySwitch(session.Current.SessionId, out var result))
+        {
+            ShowStatus("Walk closer to a connected switch first.");
+            return;
+        }
+        RecordSwitchUse(session, result, started);
+        ShowStatus($"{result.SwitchName} activated.");
     }
 
     private sealed record PlaySwitchItem(Guid SessionId, Guid SwitchId, string Label);

@@ -9,22 +9,30 @@ public sealed record SceneEntity(Guid Id, string Name, Transform2D Transform, Sc
 public readonly record struct Transform2D(double X, double Y, double Width, double Height, double Rotation)
 {
     public bool Contains(double x, double y)
+        => IntersectsCircle(x, y, 0);
+
+    public bool IntersectsCircle(double x, double y, double radius)
     {
         var angle = Rotation * Math.PI / 180;
         var dx = x - X;
         var dy = y - Y;
-        return Math.Abs(dx * Math.Cos(angle) + dy * Math.Sin(angle)) <= Width / 2 &&
-            Math.Abs(dy * Math.Cos(angle) - dx * Math.Sin(angle)) <= Height / 2;
+        var outsideX = Math.Max(0, Math.Abs(dx * Math.Cos(angle) + dy * Math.Sin(angle)) - Width / 2);
+        var outsideY = Math.Max(0, Math.Abs(dy * Math.Cos(angle) - dx * Math.Sin(angle)) - Height / 2);
+        return outsideX * outsideX + outsideY * outsideY <= radius * radius;
     }
 }
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(WallPanel), "wall")]
 [JsonDerivedType(typeof(SceneLamp), "lamp")]
+[JsonDerivedType(typeof(SceneDoor), "door")]
+[JsonDerivedType(typeof(SceneSwitch), "switch")]
 public abstract record SceneComponent;
 
 public sealed record WallPanel(PanelColor Color) : SceneComponent;
 public sealed record SceneLamp(bool IsOn) : SceneComponent;
+public sealed record SceneDoor(bool IsOpen) : SceneComponent;
+public sealed record SceneSwitch(Guid? TargetId, SwitchBehavior Behavior) : SceneComponent;
 public enum PanelColor { Slate, Teal, Sand, Plum }
 
 public abstract record SceneOperation(Guid ProjectId, long BaseRevision, Guid EntityId);
@@ -40,6 +48,10 @@ public sealed record SetScenePanelColor(Guid ProjectId, long BaseRevision, Guid 
     : SceneOperation(ProjectId, BaseRevision, EntityId);
 public sealed record SetSceneLamp(Guid ProjectId, long BaseRevision, Guid EntityId, bool IsOn)
     : SceneOperation(ProjectId, BaseRevision, EntityId);
+public sealed record SetSceneDoor(Guid ProjectId, long BaseRevision, Guid EntityId, bool IsOpen)
+    : SceneOperation(ProjectId, BaseRevision, EntityId);
+public sealed record ConfigureSceneSwitch(Guid ProjectId, long BaseRevision, Guid EntityId,
+    Guid? TargetId, SwitchBehavior Behavior) : SceneOperation(ProjectId, BaseRevision, EntityId);
 
 public sealed record SceneEdit(long Revision, Guid EntityId, SceneEntity? Before, SceneEntity? After,
     LightEditKind Kind, long? ReversesRevision);
@@ -60,6 +72,7 @@ public static class SceneValidation
             if (!ids.Add(entity.Id))
                 throw new InvalidDataException("Every scene object needs a unique ID.");
         }
+        ValidateLinks(entities);
     }
 
     public static void ValidateEntity(SceneEntity? entity)
@@ -70,9 +83,18 @@ public static class SceneValidation
         if (entity.Transform is not { X: >= 0 and <= 1, Y: >= 0 and <= 1, Width: >= .025 and <= 1,
             Height: >= .025 and <= 1, Rotation: >= -360 and <= 360 })
             throw new InvalidDataException("Position must be 0–1, size 0.025–1 and rotation −360° to 360°.");
-        if (entity.Component is not (WallPanel or SceneLamp) ||
-            (entity.Component is WallPanel panel && !Enum.IsDefined(panel.Color)))
+        if (entity.Component is not (WallPanel or SceneLamp or SceneDoor or SceneSwitch) ||
+            (entity.Component is WallPanel panel && !Enum.IsDefined(panel.Color)) ||
+            (entity.Component is SceneSwitch control && !Enum.IsDefined(control.Behavior)))
             throw new InvalidDataException("The scene object has an unsupported component or value.");
+    }
+
+    internal static void ValidateLinks(IEnumerable<SceneEntity> entities)
+    {
+        var targets = entities.Where(entity => entity.Component is SceneDoor or SceneLamp)
+            .Select(entity => entity.Id).ToHashSet();
+        if (entities.Any(entity => entity.Component is SceneSwitch { TargetId: Guid target } && !targets.Contains(target)))
+            throw new InvalidDataException("A switch target is missing or is not a door or lamp. Unlink it before deleting the target.");
     }
 }
 
@@ -134,6 +156,7 @@ internal sealed class SceneJournal
             }
             if (state.Count > SceneValidation.MaxEntities)
                 throw new InvalidDataException("The scene history exceeds the object limit.");
+            SceneValidation.ValidateLinks(state.Values);
         }
 
         if (state.Count != scene.Entities.Count ||

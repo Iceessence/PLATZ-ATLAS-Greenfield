@@ -33,6 +33,10 @@ public sealed partial class ProjectSession
                 prior with { Component = new WallPanel(color.Color) },
             SetSceneLamp lamp when prior?.Component is SceneLamp =>
                 prior with { Component = new SceneLamp(lamp.IsOn) },
+            SetSceneDoor door when prior?.Component is SceneDoor =>
+                prior with { Component = new SceneDoor(door.IsOpen) },
+            ConfigureSceneSwitch control when prior?.Component is SceneSwitch =>
+                prior with { Component = new SceneSwitch(control.TargetId, control.Behavior) },
             _ => throw new ProjectEditException(EditRejection.WrongTarget, "This edit does not apply to the object.")
         };
         if (prior == next)
