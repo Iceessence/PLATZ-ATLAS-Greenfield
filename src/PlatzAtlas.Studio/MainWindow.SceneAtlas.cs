@@ -36,7 +36,12 @@ public partial class MainWindow
         var saved = current.Scene is not null && _play is null && HasSavedRevision;
         if (_sceneAtlasGrant is { } grant &&
             (!saved || grant.Scope != ScopeOf(current) || !string.Equals(_sceneAtlasPath, _session.FilePath, StringComparison.OrdinalIgnoreCase)))
+        {
+            var wasPreviewing = _sceneAtlasDraft is not null;
             RevokeSceneAtlas();
+            if (wasPreviewing)
+                UpdateScenePresentation();
+        }
 
         SceneAtlasAccess.IsEnabled = saved;
         SceneAtlasAccess.Content = _sceneAtlasGrant is null ? "Allow scene read" : "Revoke scene read";
