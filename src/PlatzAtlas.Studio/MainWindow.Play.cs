@@ -123,8 +123,10 @@ public partial class MainWindow
         SideTabs.Visibility = playing ? Visibility.Collapsed : Visibility.Visible;
         AssistantTabs.Visibility = AssistantSplitter.Visibility = SideTabs.Visibility;
         ViewportTools.Visibility = !playing && _session.Current.Scene is not null ? Visibility.Visible : Visibility.Collapsed;
+        BlankRoomHelp.Visibility = !playing && _session.Current.Scene is { Entities.Count: 0 } ? Visibility.Visible : Visibility.Collapsed;
         Objects.IsEnabled = !playing;
-        SceneActions.IsEnabled = NewBlank.IsEnabled = SnapToGrid.IsEnabled = !playing;
+        SceneActions.IsEnabled = NewBlank.IsEnabled = SnapToGrid.IsEnabled = QuickAddStrip.IsEnabled = OutlinerSearch.IsEnabled = !playing;
+        FilterAll.IsEnabled = FilterProps.IsEnabled = FilterLogic.IsEnabled = !playing;
         PlayBannerText.Text = snapshot is null ? "" : snapshot.Progress is { } progress
             ? progress.TotalKeys == 0 && progress.GoalRequirement is null
                 ? $"Playtest · Working r{snapshot.SourceRevision}"
@@ -149,6 +151,31 @@ public partial class MainWindow
 
     private void StudioPlayKeyDown(object sender, KeyEventArgs e)
     {
+        if (_play is null && _session.Current.Scene is not null)
+        {
+            if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.F)
+            {
+                OutlinerSearch.Focus();
+                OutlinerSearch.SelectAll();
+                e.Handled = true;
+                return;
+            }
+            if (Keyboard.Modifiers == ModifierKeys.None && e.OriginalSource is not System.Windows.Controls.Primitives.TextBoxBase)
+            {
+                if (e.Key == Key.Delete && DeleteObject.IsEnabled)
+                {
+                    DeleteSceneClicked(sender, e);
+                    e.Handled = true;
+                    return;
+                }
+                if (e.Key == Key.F && FrameSelection.IsEnabled && SelectedEntity is not null)
+                {
+                    ZoomClicked(FrameSelection, e);
+                    e.Handled = true;
+                    return;
+                }
+            }
+        }
         if (_play?.Current.Entities is null || Keyboard.Modifiers != ModifierKeys.None)
             return;
         if (WalkInput.Direction(e.Key) is { } direction)

@@ -9,10 +9,11 @@
         UseLayoutRounding="True" PreviewKeyDown="StudioPlayKeyDown">
   <Window.Resources>
     <Style x:Key="WorkspaceTabs" TargetType="TabControl">
+      <Setter Property="Foreground" Value="{StaticResource Text}"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="TabControl">
-            <DockPanel KeyboardNavigation.TabNavigation="Local">
+            <DockPanel KeyboardNavigation.TabNavigation="Local" TextElement.Foreground="{StaticResource Text}">
               <Border DockPanel.Dock="Top" BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1">
                 <TabPanel IsItemsHost="True" Margin="11,6,11,0" KeyboardNavigation.TabIndex="0"/>
               </Border>
@@ -25,20 +26,24 @@
       <Setter Property="ItemContainerStyle">
         <Setter.Value>
           <Style TargetType="TabItem">
+            <Setter Property="Foreground" Value="{StaticResource Muted}"/>
             <Setter Property="Template">
               <Setter.Value>
                 <ControlTemplate TargetType="TabItem">
                   <Border x:Name="TabFace" Background="Transparent" BorderBrush="Transparent"
-                          BorderThickness="0,0,0,2" Padding="12,9" Margin="0,0,3,0">
+                          BorderThickness="0,0,0,2" Padding="12,9" Margin="0,0,3,0"
+                          TextElement.Foreground="{TemplateBinding Foreground}">
                     <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"/>
                   </Border>
                   <ControlTemplate.Triggers>
                     <Trigger Property="IsMouseOver" Value="True">
                       <Setter TargetName="TabFace" Property="Background" Value="{StaticResource Surface}"/>
+                      <Setter Property="Foreground" Value="{StaticResource Text}"/>
                     </Trigger>
                     <Trigger Property="IsSelected" Value="True">
                       <Setter TargetName="TabFace" Property="BorderBrush" Value="{StaticResource Accent}"/>
                       <Setter TargetName="TabFace" Property="Background" Value="{StaticResource Selection}"/>
+                      <Setter Property="Foreground" Value="{StaticResource Text}"/>
                       <Setter Property="FontWeight" Value="SemiBold"/>
                     </Trigger>
                     <Trigger Property="IsKeyboardFocused" Value="True">
@@ -73,55 +78,99 @@
   </Window.InputBindings>
   <Grid>
     <Grid.RowDefinitions>
-      <RowDefinition Height="64"/>
+      <RowDefinition Height="50"/>
       <RowDefinition Height="*"/>
       <RowDefinition Height="Auto"/>
     </Grid.RowDefinitions>
 
     <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1">
-      <DockPanel Margin="19,0">
-        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,25,0">
-          <Border Width="32" Height="32" CornerRadius="7" Background="{StaticResource Accent}" Margin="0,0,10,0">
-            <Path Width="17" Height="17" Stretch="Uniform" Fill="#221B16"
+      <DockPanel Margin="14,0">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,18,0">
+          <Border Width="28" Height="28" CornerRadius="6" Background="{StaticResource Accent}" Margin="0,0,9,0">
+            <Path Width="14" Height="14" Stretch="Uniform" Fill="#221B16"
                   Data="M 8,0 L 16,8 L 8,16 L 0,8 Z M 8,4 L 4,8 L 8,12 L 12,8 Z"/>
           </Border>
           <StackPanel VerticalAlignment="Center">
-            <TextBlock Text="PLATZ ATLAS" FontWeight="Bold" FontSize="15"/>
-            <TextBlock Text="Studio" Foreground="{StaticResource Muted}" FontSize="12"/>
+            <TextBlock Text="PLATZ ATLAS" FontWeight="Bold" FontSize="13"/>
+            <TextBlock Text="Studio" Foreground="{StaticResource Muted}" FontSize="11"/>
           </StackPanel>
         </StackPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+          <Button x:Name="ExportRoomButton" Content="Export room…" Style="{StaticResource ToolbarButton}"
+                  Command="{x:Static local:MainWindow.ExportRoomCommand}" Margin="0,0,6,0"
+                  ToolTip="Save a room package from the current saved revision." ToolTipService.ShowOnDisabled="True"/>
+          <Button x:Name="RestartPlay" Content="Restart" Style="{StaticResource ToolbarButton}" Visibility="Collapsed"
+                  Click="RestartPlayClicked" Margin="0,0,6,0"
+                  ToolTip="Restart from the frozen copy of the working room."/>
+          <Button x:Name="PlayToggle" Style="{StaticResource ToolbarButton}" Command="{x:Static local:MainWindow.TogglePlayCommand}"
+                  Content="Play" Padding="14,4" BorderBrush="{StaticResource PlayAccent}" FontWeight="SemiBold"
+                  ToolTipService.ShowOnDisabled="True"/>
+        </StackPanel>
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-          <Button x:Name="NewBlank" Content="_Blank project" Click="NewBlankClicked" Margin="0,0,6,0"/>
-          <Button Content="_Examples" Click="ExamplesClicked" Margin="0,0,6,0">
+          <Button x:Name="NewBlank" Content="_Blank project" Style="{StaticResource ToolbarButton}" Click="NewBlankClicked" Margin="0,0,5,0"/>
+          <Button Content="_Examples" Style="{StaticResource ToolbarButton}" Click="ExamplesClicked" Margin="0,0,5,0">
             <Button.ContextMenu>
               <ContextMenu><MenuItem x:Name="MuseumExample" Header="Night Museum" Command="ApplicationCommands.New"/></ContextMenu>
             </Button.ContextMenu>
           </Button>
-          <Button Content="_Open…" Command="ApplicationCommands.Open" Margin="0,0,6,0" ToolTip="Open a local project (Ctrl+O)"/>
-          <Button Content="_Save" Command="ApplicationCommands.Save" Margin="0,0,6,0" ToolTip="Save the project (Ctrl+S)"/>
-          <Button Content="Save _as…" Command="ApplicationCommands.SaveAs" ToolTip="Save a local copy (Ctrl+Shift+S)"/>
-          <Border Width="1" Margin="12,3" Background="{StaticResource Border}"/>
-          <Button Content="_Undo" Command="ApplicationCommands.Undo" Margin="0,0,6,0" ToolTip="Undo (Ctrl+Z)"/>
-          <Button Content="_Redo" Command="ApplicationCommands.Redo" ToolTip="Redo (Ctrl+Y)" Margin="0,0,8,0"/>
-          <Button Content="_Settings…" Click="WorkspaceSettingsClicked"/>
+          <Button Content="_Open…" Style="{StaticResource ToolbarButton}" Command="ApplicationCommands.Open" Margin="0,0,5,0" ToolTip="Open a local project (Ctrl+O)"/>
+          <Button Content="_Save" Style="{StaticResource ToolbarButton}" Command="ApplicationCommands.Save" Margin="0,0,5,0" ToolTip="Save the project (Ctrl+S)"/>
+          <Button Content="Save _as…" Style="{StaticResource ToolbarButton}" Command="ApplicationCommands.SaveAs" ToolTip="Save a local copy (Ctrl+Shift+S)"/>
+          <Border Width="1" Margin="10,4" Background="{StaticResource Border}"/>
+          <Button Content="_Undo" Style="{StaticResource ToolbarButton}" Command="ApplicationCommands.Undo" Margin="0,0,5,0" ToolTip="Undo (Ctrl+Z)"/>
+          <Button Content="_Redo" Style="{StaticResource ToolbarButton}" Command="ApplicationCommands.Redo" ToolTip="Redo (Ctrl+Y)" Margin="0,0,8,0"/>
+          <Button Content="_Settings…" Style="{StaticResource ToolbarButton}" Click="WorkspaceSettingsClicked"/>
         </StackPanel>
       </DockPanel>
     </Border>
 
     <Grid Grid.Row="1">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="205" MinWidth="145"/>
+        <ColumnDefinition Width="248" MinWidth="185"/>
         <ColumnDefinition Width="5"/>
         <ColumnDefinition Width="*"/>
         <ColumnDefinition Width="5"/>
-        <ColumnDefinition Width="320" MinWidth="235"/>
+        <ColumnDefinition Width="340" MinWidth="250"/>
       </Grid.ColumnDefinitions>
 
       <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="0,0,1,0">
-        <DockPanel Margin="13,21,13,12">
-          <StackPanel DockPanel.Dock="Top" Margin="3,0,0,13">
-            <TextBlock Text="Outliner" FontSize="18" FontWeight="SemiBold"/>
-            <TextBlock x:Name="ObjectCount" Style="{StaticResource Caption}" Margin="0,4,0,0"/>
+        <DockPanel Margin="12,14,12,12">
+          <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <DockPanel Margin="2,0,0,8">
+              <Border DockPanel.Dock="Right" Style="{StaticResource BadgePill}">
+                <TextBlock x:Name="ObjectCount" Style="{StaticResource Caption}" FontSize="11"/>
+              </Border>
+              <TextBlock Text="Outliner" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            </DockPanel>
+            <Grid x:Name="OutlinerFilterBar" Margin="0,0,0,6">
+              <TextBox x:Name="OutlinerSearch" TextChanged="OutlinerSearchChanged" Padding="8,5"
+                       AutomationProperties.Name="Filter scene objects" ToolTip="Filter objects by name, type, or ID (Ctrl+F)"/>
+              <TextBlock Text="Filter objects…" IsHitTestVisible="False" Foreground="{StaticResource Muted}" FontSize="12"
+                         Margin="10,0" VerticalAlignment="Center">
+                <TextBlock.Style>
+                  <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding Text.Length, ElementName=OutlinerSearch}" Value="0">
+                        <Setter Property="Visibility" Value="Visible"/>
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </TextBlock.Style>
+              </TextBlock>
+            </Grid>
+            <UniformGrid x:Name="OutlinerFilterChips" Columns="3" Margin="0,0,0,6">
+              <Button x:Name="FilterAll" Content="All" Tag="All" Style="{StaticResource ChipButton}" Click="OutlinerFilterClicked" Margin="0,0,4,0"/>
+              <Button x:Name="FilterProps" Content="Props" Tag="Props" Style="{StaticResource ChipButton}" Click="OutlinerFilterClicked" Margin="0,0,4,0"/>
+              <Button x:Name="FilterLogic" Content="Logic" Tag="Logic" Style="{StaticResource ChipButton}" Click="OutlinerFilterClicked"/>
+            </UniformGrid>
+            <WrapPanel x:Name="QuickAddStrip" Visibility="Collapsed" Margin="0,2,0,0">
+              <Button Content="+ Wall" Tag="wall" Style="{StaticResource ChipButton}" Click="QuickAddClicked" Margin="0,0,4,4" ToolTip="Add a Wall object"/>
+              <Button Content="+ Door" Tag="door" Style="{StaticResource ChipButton}" Click="QuickAddClicked" Margin="0,0,4,4" ToolTip="Add a Door object"/>
+              <Button Content="+ Lamp" Tag="lamp" Style="{StaticResource ChipButton}" Click="QuickAddClicked" Margin="0,0,4,4" ToolTip="Add a Lamp object"/>
+              <Button Content="+ Switch" Tag="switch" Style="{StaticResource ChipButton}" Click="QuickAddClicked" Margin="0,0,4,4" ToolTip="Add a Switch object"/>
+              <Button Content="+ Key" Tag="key" Style="{StaticResource ChipButton}" Click="QuickAddClicked" Margin="0,0,0,4" ToolTip="Add a Collectible key object"/>
+            </WrapPanel>
           </StackPanel>
           <Button x:Name="SceneActions" Content="Browse presets…" DockPanel.Dock="Bottom" Visibility="Collapsed"
                   Click="BrowsePresetsClicked" Margin="0,9,0,0"/>
@@ -146,18 +195,24 @@
             <ListBox.ItemContainerStyle>
               <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
                 <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}"/>
+                <Setter Property="Padding" Value="8,7"/>
+                <Setter Property="Margin" Value="0,0,0,4"/>
               </Style>
             </ListBox.ItemContainerStyle>
             <ListBox.ItemTemplate>
               <DataTemplate>
                 <DockPanel>
-                  <Path Width="17" Height="18" Margin="0,4,8,0" VerticalAlignment="Top" DockPanel.Dock="Left"
-                        Stretch="Uniform" Stroke="{StaticResource Accent}" StrokeThickness="1.2" Data="{Binding Icon}"/>
-                  <StackPanel HorizontalAlignment="Stretch">
+                  <Border DockPanel.Dock="Right" Style="{StaticResource BadgePill}" Visibility="{Binding BadgeVisibility}"
+                          BorderBrush="{Binding BadgeBorder}" Margin="6,0,0,0">
+                    <TextBlock Text="{Binding Badge}" FontSize="11" Foreground="{Binding BadgeForeground}"/>
+                  </Border>
+                  <Path Width="16" Height="16" Margin="0,2,8,0" VerticalAlignment="Center" DockPanel.Dock="Left"
+                        Stretch="Uniform" Stroke="{StaticResource Accent}" StrokeThickness="1.3" Data="{Binding Icon}"/>
+                  <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" ToolTip="{Binding Name}"
                                TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text="{Binding Subheading}" Foreground="{StaticResource Muted}" FontSize="11"
-                               TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                               TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/>
                   </StackPanel>
                 </DockPanel>
               </DataTemplate>
@@ -168,56 +223,41 @@
 
       <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="{StaticResource Border}"
                     ResizeBehavior="PreviousAndNext" AutomationProperties.Name="Resize outliner"/>
-      <Grid Grid.Column="2" Margin="16,17,16,13" MinWidth="260">
+      <Grid Grid.Column="2" Margin="14,12,14,12" MinWidth="260">
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto"/>
           <RowDefinition Height="*"/>
           <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <StackPanel Margin="1,0,0,14">
-          <DockPanel>
-            <Button x:Name="PlayToggle" DockPanel.Dock="Right" Command="{x:Static local:MainWindow.TogglePlayCommand}"
-                    Content="Play" Margin="8,0,0,0" Padding="13,5" MinHeight="32" VerticalAlignment="Center"
-                    BorderBrush="{StaticResource PlayAccent}" ToolTipService.ShowOnDisabled="True"/>
-            <Button x:Name="RestartPlay" DockPanel.Dock="Right" Content="Restart" Visibility="Collapsed"
-                    Click="RestartPlayClicked" Padding="10,5" MinHeight="32"
-                    ToolTip="Restart from the frozen copy of the working room."/>
-            <TextBlock x:Name="RoomTitle" FontSize="28" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-          </DockPanel>
-          <DockPanel Margin="0,3,0,0">
-            <Button x:Name="ExportRoomButton" DockPanel.Dock="Right" Content="Export room…"
-                    Command="{x:Static local:MainWindow.ExportRoomCommand}" Padding="7,3" MinHeight="25"
-                    Margin="8,0,0,0" ToolTip="Save a room package from the current saved revision."
-                    ToolTipService.ShowOnDisabled="True"/>
-            <TextBlock x:Name="RevisionLabel" Foreground="{StaticResource Muted}" FontSize="13"
-                       TextWrapping="Wrap" VerticalAlignment="Center"/>
-          </DockPanel>
-          <WrapPanel x:Name="ViewportTools" Margin="0,9,0,0">
-            <Button Content="−" Tag="out" Click="ZoomClicked" Margin="0,0,3,0" AutomationProperties.Name="Zoom out"/>
-            <Button Content="+" Tag="in" Click="ZoomClicked" Margin="0,0,6,0" AutomationProperties.Name="Zoom in"/>
-            <Button x:Name="FitRoom" Content="Fit" Tag="fit" Click="ZoomClicked" Margin="0,0,3,0" ToolTip="Fit the room"/>
-            <Button x:Name="FrameSelection" Content="Frame selected" Tag="selection" Click="ZoomClicked" Margin="0,0,10,0"/>
-            <CheckBox x:Name="SnapToGrid" Content="Snap" Foreground="{StaticResource Text}" VerticalAlignment="Center"
-                      Margin="0,0,9,0" ToolTip="Snap edits to world grid units"/>
+        <StackPanel Margin="1,0,0,10">
+          <TextBlock x:Name="RoomTitle" FontSize="24" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+          <TextBlock x:Name="RevisionLabel" Foreground="{StaticResource Muted}" FontSize="12"
+                     TextWrapping="Wrap" Margin="0,2,0,0"/>
+          <WrapPanel x:Name="ViewportTools" Margin="0,8,0,0">
+            <Button Content="−" Tag="out" Style="{StaticResource ToolbarButton}" Click="ZoomClicked" Margin="0,0,3,0" AutomationProperties.Name="Zoom out"/>
+            <Button Content="+" Tag="in" Style="{StaticResource ToolbarButton}" Click="ZoomClicked" Margin="0,0,6,0" AutomationProperties.Name="Zoom in"/>
+            <Button x:Name="FitRoom" Content="Fit" Tag="fit" Style="{StaticResource ToolbarButton}" Click="ZoomClicked" Margin="0,0,4,0" ToolTip="Fit the room"/>
+            <Button x:Name="FrameSelection" Content="Frame selected" Tag="selection" Style="{StaticResource ToolbarButton}" Click="ZoomClicked" Margin="0,0,10,0" ToolTip="Frame selected object (F)"/>
+            <CheckBox x:Name="SnapToGrid" Content="Snap" VerticalAlignment="Center"
+                      Margin="0,0,10,0" ToolTip="Snap edits to world grid units"/>
             <TextBlock x:Name="ViewportCoordinates" Style="{StaticResource Caption}" VerticalAlignment="Center"/>
           </WrapPanel>
-          <TextBlock x:Name="BlankRoomHelp" Visibility="Collapsed" Margin="0,9,0,0" TextWrapping="Wrap"
+          <TextBlock x:Name="BlankRoomHelp" Visibility="Collapsed" Margin="0,8,0,0" TextWrapping="Wrap"
                      Foreground="{StaticResource Muted}"
-                     Text="Browse presets to place your first object, or draw a sprite in Assets."/>
-          <Border x:Name="PlayBanner" Visibility="Collapsed" Margin="0,10,0,0" Padding="10,8"
+                     Text="Browse presets to place your first object, use Quick Add, or draw a sprite in Assets."/>
+          <Border x:Name="PlayBanner" Visibility="Collapsed" Margin="0,8,0,0" Padding="10,8"
                   Background="{StaticResource PlaySurface}" BorderBrush="{StaticResource PlayAccent}"
-                  BorderThickness="1" CornerRadius="5">
+                  BorderThickness="1" CornerRadius="6">
             <TextBlock x:Name="PlayBannerText" Foreground="{StaticResource PlayAccent}" FontWeight="SemiBold"
                        TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
           </Border>
-          <Border x:Name="AtlasPreviewBanner" Visibility="Collapsed" Margin="0,10,0,0" Padding="9,6"
+          <Border x:Name="AtlasPreviewBanner" Visibility="Collapsed" Margin="0,8,0,0" Padding="9,6"
                   Background="{StaticResource PreviewSurface}" BorderBrush="{StaticResource PreviewAccent}"
-                  BorderThickness="1" CornerRadius="5">
+                  BorderThickness="1" CornerRadius="6">
             <StackPanel>
               <DockPanel>
-                <Button x:Name="AtlasPreviewExit" DockPanel.Dock="Right" Content="Exit preview"
-                        Click="AtlasPreviewExitClicked" Margin="9,0,0,0" Padding="7,4" MinHeight="30"
-                        VerticalAlignment="Center"/>
+                <Button x:Name="AtlasPreviewExit" DockPanel.Dock="Right" Content="Exit preview" Style="{StaticResource ToolbarButton}"
+                        Click="AtlasPreviewExitClicked" Margin="9,0,0,0" VerticalAlignment="Center"/>
                 <TextBlock x:Name="AtlasPreviewLabel" Foreground="{StaticResource PreviewAccent}"
                            FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center"
                            AutomationProperties.LiveSetting="Polite"/>
@@ -227,33 +267,31 @@
                 <StackPanel>
                   <TextBlock x:Name="AtlasCommitSummary" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                   <WrapPanel Margin="0,7,0,1">
-                    <Button x:Name="AtlasCommitCancel" Content="Cancel review" Click="AtlasCommitCancelClicked"
-                            Margin="0,0,7,0" MinHeight="32" Padding="8,5"/>
+                    <Button x:Name="AtlasCommitCancel" Content="Cancel review" Style="{StaticResource ToolbarButton}" Click="AtlasCommitCancelClicked"
+                            Margin="0,0,7,0"/>
                     <Button x:Name="AtlasCommitConfirm" Click="AtlasCommitConfirmClicked" Style="{StaticResource PrimaryButton}"
-                            MinHeight="32" Padding="8,5" AutomationProperties.Name="Confirm and save ATLAS light change">
-                      <TextBlock Text="Confirm and save" Foreground="#221B16"/>
-                    </Button>
+                            MinHeight="30" Padding="10,4" AutomationProperties.Name="Confirm and save ATLAS light change" Content="Confirm and save"/>
                   </WrapPanel>
                 </StackPanel>
               </Border>
             </StackPanel>
           </Border>
-          <Border x:Name="SceneAtlasPreviewBanner" Visibility="Collapsed" Margin="0,10,0,0" Padding="9,7"
+          <Border x:Name="SceneAtlasPreviewBanner" Visibility="Collapsed" Margin="0,8,0,0" Padding="10,8"
                   Background="{StaticResource PreviewSurface}" BorderBrush="{StaticResource PreviewAccent}"
-                  BorderThickness="1" CornerRadius="5">
+                  BorderThickness="1" CornerRadius="6">
             <StackPanel>
               <TextBlock x:Name="SceneAtlasDraftText" TextWrapping="Wrap" Foreground="{StaticResource PreviewAccent}"
-                         AutomationProperties.LiveSetting="Polite"/>
-              <WrapPanel Margin="0,6,0,0">
-                <Button x:Name="SceneAtlasCancel" Content="Cancel preview" Click="SceneAtlasCancelClicked" Margin="0,0,6,0"/>
+                         FontWeight="SemiBold" AutomationProperties.LiveSetting="Polite"/>
+              <WrapPanel Margin="0,7,0,0">
+                <Button x:Name="SceneAtlasCancel" Content="Cancel preview" Style="{StaticResource ToolbarButton}" Click="SceneAtlasCancelClicked" Margin="0,0,6,0"/>
                 <Button x:Name="SceneAtlasConfirm" Content="Apply to room" Click="SceneAtlasConfirmClicked"
-                        Style="{StaticResource PrimaryButton}"/>
+                        Style="{StaticResource PrimaryButton}" MinHeight="30" Padding="12,4"/>
               </WrapPanel>
             </StackPanel>
           </Border>
         </StackPanel>
-        <Border Grid.Row="1" BorderBrush="{StaticResource Border}" BorderThickness="1"
-                Background="#101A20">
+        <Border Grid.Row="1" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="7"
+                Background="#0A1014">
           <room:RoomViewport x:Name="Viewport" AutomationProperties.Name="Museum room preview"/>
         </Border>
         <Grid Grid.Row="2" Margin="0,9,0,0">
@@ -283,15 +321,14 @@
                     ResizeBehavior="PreviousAndNext" AutomationProperties.Name="Resize inspector and ATLAS"/>
       <Border Grid.Column="4" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1,0,0,0">
         <Grid>
-        <Grid.RowDefinitions><RowDefinition Height="51*" MinHeight="145"/><RowDefinition Height="5"/><RowDefinition Height="49*" MinHeight="150"/></Grid.RowDefinitions>
+        <Grid.RowDefinitions><RowDefinition Height="52*" MinHeight="145"/><RowDefinition Height="5"/><RowDefinition Height="48*" MinHeight="150"/></Grid.RowDefinitions>
         <TabControl x:Name="SideTabs" Style="{StaticResource WorkspaceTabs}" BorderThickness="0" AutomationProperties.Name="Editing panels">
           <TabItem x:Name="InspectorTab" Header="Inspector">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-          <StackPanel Margin="15,21,15,14">
-            <TextBlock x:Name="SelectedName" FontSize="25" FontWeight="SemiBold" TextWrapping="Wrap"/>
-            <TextBlock x:Name="SelectedLocation" Foreground="{StaticResource Muted}" Margin="0,3,0,0" TextWrapping="Wrap"/>
-            <Border x:Name="MuseumInspector" Background="{StaticResource Surface}" BorderBrush="{StaticResource Border}"
-                    BorderThickness="1" CornerRadius="6" Margin="0,20,0,0" Padding="11">
+          <StackPanel Margin="13,14,13,14">
+            <TextBlock x:Name="SelectedName" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
+            <TextBlock x:Name="SelectedLocation" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap"/>
+            <Border x:Name="MuseumInspector" Style="{StaticResource SectionCard}" Margin="0,14,0,0">
               <StackPanel>
                 <TextBlock x:Name="SwitchHeading" FontWeight="SemiBold"/>
                 <TextBlock x:Name="SwitchTarget" Foreground="{StaticResource Muted}" FontSize="12"
@@ -311,138 +348,208 @@
                 </StackPanel>
               </StackPanel>
             </Border>
-            <StackPanel x:Name="SceneInspector" Visibility="Collapsed" Margin="0,15,0,0">
+            <StackPanel x:Name="SceneInspector" Visibility="Collapsed" Margin="0,12,0,0">
               <StackPanel.Resources>
-                <Style TargetType="TextBox">
-                  <Setter Property="Background" Value="{StaticResource Page}"/>
-                  <Setter Property="Foreground" Value="{StaticResource Text}"/>
-                  <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
-                  <Setter Property="CaretBrush" Value="{StaticResource Accent}"/>
-                  <Setter Property="Padding" Value="5,4"/>
-                  <Setter Property="Margin" Value="2"/>
+                <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
                   <Setter Property="IsUndoEnabled" Value="False"/>
+                  <Setter Property="Margin" Value="0,3,0,6"/>
                 </Style>
               </StackPanel.Resources>
-              <TextBlock Text="Name" Style="{StaticResource Caption}"/>
-              <TextBox x:Name="SceneName" AutomationProperties.Name="Object name" MaxLength="96"/>
-              <Button x:Name="RenameObject" Content="Rename" Click="RenameSceneClicked" Margin="2,5,2,10"/>
-              <TextBlock Text="Transform" Style="{StaticResource Caption}"/>
-              <Grid Margin="0,4,0,0">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <Border Style="{StaticResource SectionCard}">
                 <StackPanel>
-                  <TextBlock Text="X" Style="{StaticResource Caption}"/>
-                  <TextBox x:Name="SceneX" AutomationProperties.Name="Position X"/>
-                  <TextBlock Text="Width" Style="{StaticResource Caption}"/>
-                  <TextBox x:Name="SceneWidth" AutomationProperties.Name="Width"/>
-                  <TextBlock Text="Rotation °" Style="{StaticResource Caption}"/>
-                  <TextBox x:Name="SceneRotation" AutomationProperties.Name="Rotation in degrees"/>
+                  <TextBlock Text="Identity" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,6"/>
+                  <TextBlock Text="Name" Style="{StaticResource Caption}"/>
+                  <TextBox x:Name="SceneName" AutomationProperties.Name="Object name" MaxLength="96" KeyDown="SceneNameKeyDown"/>
+                  <Button x:Name="RenameObject" Content="Rename" Style="{StaticResource ToolbarButton}" Click="RenameSceneClicked" Margin="0,2,0,0"/>
                 </StackPanel>
-                <StackPanel Grid.Column="1">
-                  <TextBlock Text="Y" Style="{StaticResource Caption}"/>
-                  <TextBox x:Name="SceneY" AutomationProperties.Name="Position Y"/>
-                  <TextBlock Text="Height" Style="{StaticResource Caption}"/>
-                  <TextBox x:Name="SceneHeight" AutomationProperties.Name="Height"/>
+              </Border>
+              <Border Style="{StaticResource SectionCard}">
+                <StackPanel>
+                  <TextBlock Text="Transform" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,6"/>
+                  <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <StackPanel>
+                      <TextBlock Text="X" Style="{StaticResource Caption}"/>
+                      <TextBox x:Name="SceneX" AutomationProperties.Name="Position X" KeyDown="TransformFieldKeyDown"/>
+                      <TextBlock Text="Width" Style="{StaticResource Caption}"/>
+                      <TextBox x:Name="SceneWidth" AutomationProperties.Name="Width" KeyDown="TransformFieldKeyDown"/>
+                      <TextBlock Text="Rotation °" Style="{StaticResource Caption}"/>
+                      <TextBox x:Name="SceneRotation" AutomationProperties.Name="Rotation in degrees" KeyDown="TransformFieldKeyDown"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                      <TextBlock Text="Y" Style="{StaticResource Caption}"/>
+                      <TextBox x:Name="SceneY" AutomationProperties.Name="Position Y" KeyDown="TransformFieldKeyDown"/>
+                      <TextBlock Text="Height" Style="{StaticResource Caption}"/>
+                      <TextBox x:Name="SceneHeight" AutomationProperties.Name="Height" KeyDown="TransformFieldKeyDown"/>
+                    </StackPanel>
+                  </Grid>
+                  <Button x:Name="ApplyTransform" Content="Apply transform" Style="{StaticResource ToolbarButton}" Click="ApplyTransformClicked" Margin="0,3,0,0"/>
                 </StackPanel>
-              </Grid>
-              <Button x:Name="ApplyTransform" Content="Apply transform" Click="ApplyTransformClicked" Margin="2,5,2,10"/>
-              <Button x:Name="ChangeColor" Content="Change wall color" Click="ChangeSceneColorClicked" Margin="2,2"/>
-              <Button x:Name="ChangeLight" Click="ChangeSceneLampClicked" Margin="2,2"/>
-              <Button x:Name="ChangeDoor" Click="ChangeSceneDoorClicked" Margin="2,2"/>
-              <StackPanel x:Name="SceneSwitchEditor" Visibility="Collapsed" Margin="2,7">
-                <TextBlock Text="Switch target" Style="{StaticResource Caption}"/>
-                <ComboBox x:Name="SwitchEntityTarget" AutomationProperties.Name="Switch target" DisplayMemberPath="Label"
-                          Foreground="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}"
-                          Margin="0,4,0,8" TextSearch.TextPath="Label"/>
-                <TextBlock Text="Second target (optional)" Style="{StaticResource Caption}"/>
-                <ComboBox x:Name="SwitchSecondTarget" AutomationProperties.Name="Second switch target" DisplayMemberPath="Label"
-                          Foreground="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}"
-                          Margin="0,4,0,8" TextSearch.TextPath="Label"/>
-                <TextBlock Text="Switch behavior" Style="{StaticResource Caption}"/>
-                <ComboBox x:Name="SwitchEntityMode" AutomationProperties.Name="Switch behavior" Margin="0,4,0,4"
-                          Foreground="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}" SelectedValuePath="Tag">
-                  <ComboBoxItem Content="Toggle" Tag="Toggle"/>
-                  <ComboBoxItem Content="Turn on / Open" Tag="TurnOn"/>
-                </ComboBox>
-                <Button x:Name="ApplySwitchLink" Content="Apply switch link" Click="ConfigureSceneSwitchClicked"/>
-              </StackPanel>
-              <StackPanel x:Name="GoalEditor" Visibility="Collapsed" Margin="2,7">
-                <TextBlock Text="Keys required to win" Style="{StaticResource Caption}"/>
-                <TextBox x:Name="RequiredKeys" AutomationProperties.Name="Keys required to win" MaxLength="2"/>
-                <Button x:Name="ApplyGoal" Content="Apply goal rule" Click="ApplyGoalClicked"/>
-              </StackPanel>
-              <Button x:Name="DuplicateObject" Content="Duplicate (Ctrl+D)" Command="{x:Static local:MainWindow.DuplicateSceneCommand}" Margin="2,5,2,0"/>
-              <UniformGrid Columns="2" Margin="2,5,2,0">
-                <Button x:Name="BringForward" Content="Bring forward" Tag="forward" Click="ShiftLayerClicked" Padding="3" Margin="0,0,4,0"/>
-                <Button x:Name="SendBackward" Content="Send backward" Tag="backward" Click="ShiftLayerClicked" Padding="3"/>
-              </UniformGrid>
-              <Button x:Name="SaveObjectPreset" Content="Save as preset…" Click="SaveObjectPresetClicked" Margin="2,8,2,0"/>
-              <Button x:Name="DeleteObject" Content="Delete object" Click="DeleteSceneClicked" Margin="2,9,2,0"/>
+              </Border>
+              <Border x:Name="PropertiesCard" Style="{StaticResource SectionCard}">
+                <StackPanel>
+                  <TextBlock Text="Properties" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,6"/>
+                  <Button x:Name="ChangeColor" Content="Change wall color" Style="{StaticResource ToolbarButton}" Click="ChangeSceneColorClicked" Margin="0,2"/>
+                  <Button x:Name="ChangeLight" Style="{StaticResource ToolbarButton}" Click="ChangeSceneLampClicked" Margin="0,2"/>
+                  <Button x:Name="ChangeDoor" Style="{StaticResource ToolbarButton}" Click="ChangeSceneDoorClicked" Margin="0,2"/>
+                  <StackPanel x:Name="SceneSwitchEditor" Visibility="Collapsed" Margin="0,4,0,0">
+                    <TextBlock Text="Switch target" Style="{StaticResource Caption}"/>
+                    <ComboBox x:Name="SwitchEntityTarget" AutomationProperties.Name="Switch target" DisplayMemberPath="Label"
+                              Margin="0,4,0,8" TextSearch.TextPath="Label"/>
+                    <TextBlock Text="Second target (optional)" Style="{StaticResource Caption}"/>
+                    <ComboBox x:Name="SwitchSecondTarget" AutomationProperties.Name="Second switch target" DisplayMemberPath="Label"
+                              Margin="0,4,0,8" TextSearch.TextPath="Label"/>
+                    <TextBlock Text="Switch behavior" Style="{StaticResource Caption}"/>
+                    <ComboBox x:Name="SwitchEntityMode" AutomationProperties.Name="Switch behavior" Margin="0,4,0,8" SelectedValuePath="Tag">
+                      <ComboBoxItem Content="Toggle" Tag="Toggle"/>
+                      <ComboBoxItem Content="Turn on / Open" Tag="TurnOn"/>
+                    </ComboBox>
+                    <Button x:Name="ApplySwitchLink" Content="Apply switch link" Style="{StaticResource ToolbarButton}" Click="ConfigureSceneSwitchClicked"/>
+                  </StackPanel>
+                  <StackPanel x:Name="GoalEditor" Visibility="Collapsed" Margin="0,4,0,0">
+                    <TextBlock Text="Keys required to win" Style="{StaticResource Caption}"/>
+                    <TextBox x:Name="RequiredKeys" AutomationProperties.Name="Keys required to win" MaxLength="2" KeyDown="RequiredKeysKeyDown"/>
+                    <Button x:Name="ApplyGoal" Content="Apply goal rule" Style="{StaticResource ToolbarButton}" Click="ApplyGoalClicked"/>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource SectionCard}" Margin="0">
+                <StackPanel>
+                  <TextBlock Text="Actions &amp; layer" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,6"/>
+                  <Button x:Name="DuplicateObject" Content="Duplicate (Ctrl+D)" Style="{StaticResource ToolbarButton}" Command="{x:Static local:MainWindow.DuplicateSceneCommand}" Margin="0,0,0,5"/>
+                  <UniformGrid Columns="2" Margin="0,0,0,6">
+                    <Button x:Name="BringForward" Content="Bring forward" Style="{StaticResource ToolbarButton}" Tag="forward" Click="ShiftLayerClicked" Padding="3" Margin="0,0,4,0"/>
+                    <Button x:Name="SendBackward" Content="Send backward" Style="{StaticResource ToolbarButton}" Tag="backward" Click="ShiftLayerClicked" Padding="3"/>
+                  </UniformGrid>
+                  <Button x:Name="SaveObjectPreset" Content="Save as preset…" Style="{StaticResource ToolbarButton}" Click="SaveObjectPresetClicked" Margin="0,0,0,6"/>
+                  <Button x:Name="DeleteObject" Content="Delete object" Style="{StaticResource DangerButton}" MinHeight="30" Padding="10,4" Click="DeleteSceneClicked"/>
+                </StackPanel>
+              </Border>
             </StackPanel>
-            <TextBlock Text="Object ID" Style="{StaticResource Caption}" Margin="0,22,0,4"/>
+            <TextBlock Text="Object ID" Style="{StaticResource Caption}" Margin="0,14,0,3"/>
             <TextBlock x:Name="ObjectId" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>
           </StackPanel>
             </ScrollViewer>
           </TabItem>
           <TabItem x:Name="SceneAssetsTab" Header="Assets" Visibility="Collapsed">
-            <DockPanel Margin="15,17,15,14">
+            <DockPanel Margin="13,14,13,12">
               <StackPanel DockPanel.Dock="Top">
-                <Button x:Name="NewSprite" Content="Draw sprite…" Click="NewSpriteClicked" Margin="0,0,0,5"/>
-                <Button x:Name="CloneSprite" Content="Edit image copy…" Click="CloneSpriteClicked" Margin="0,0,0,5"/>
-                <Button x:Name="ImportPng" Content="Import PNG…" Click="ImportPngClicked"/>
-                <TextBox x:Name="AssetSearch" TextChanged="AssetSearchChanged" Padding="5,4" Margin="0,4,0,9"
-                         AutomationProperties.Name="Search assets" ToolTip="Search this project's images by name or readable ID."/>
+                <UniformGrid Columns="2" Margin="0,0,0,6">
+                  <Button x:Name="NewSprite" Content="Draw sprite…" Style="{StaticResource ToolbarButton}" Click="NewSpriteClicked" Margin="0,0,4,0"/>
+                  <Button x:Name="ImportPng" Content="Import PNG…" Style="{StaticResource ToolbarButton}" Click="ImportPngClicked"/>
+                </UniformGrid>
+                <Button x:Name="CloneSprite" Content="Edit image copy…" Style="{StaticResource ToolbarButton}" Click="CloneSpriteClicked" Margin="0,0,0,6"/>
+                <Grid Margin="0,0,0,8">
+                  <TextBox x:Name="AssetSearch" TextChanged="AssetSearchChanged" Padding="7,5"
+                           AutomationProperties.Name="Search assets" ToolTip="Search this project's images by name or readable ID."/>
+                  <TextBlock Text="Search assets…" IsHitTestVisible="False" Foreground="{StaticResource Muted}" FontSize="12" Margin="9,0" VerticalAlignment="Center">
+                    <TextBlock.Style>
+                      <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding Text.Length, ElementName=AssetSearch}" Value="0">
+                            <Setter Property="Visibility" Value="Visible"/>
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                </Grid>
               </StackPanel>
-              <Button x:Name="PlaceAsset" DockPanel.Dock="Bottom" Content="Place selected image" Click="PlaceAssetClicked" Margin="0,10,0,0"/>
-              <ListBox x:Name="SceneAssetList" DisplayMemberPath="Label" AutomationProperties.Name="Imported images"
+              <Button x:Name="PlaceAsset" DockPanel.Dock="Bottom" Style="{StaticResource PrimaryButton}" Content="Place selected image" Click="PlaceAssetClicked" Margin="0,10,0,0"/>
+              <ListBox x:Name="SceneAssetList" AutomationProperties.Name="Imported images"
                        Background="{StaticResource Page}" Foreground="{StaticResource Text}" BorderBrush="{StaticResource Border}"
-                       SelectionChanged="SceneAssetSelectionChanged">
+                       BorderThickness="1" Padding="4" SelectionChanged="SceneAssetSelectionChanged">
                 <ListBox.ItemContainerStyle>
                   <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
                     <Setter Property="AutomationProperties.Name" Value="{Binding Label}"/>
+                    <Setter Property="Padding" Value="7,6"/>
+                    <Setter Property="Margin" Value="0,0,0,4"/>
                   </Style>
                 </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <DockPanel>
+                      <Border DockPanel.Dock="Left" Width="36" Height="36" CornerRadius="4" Margin="0,0,10,0"
+                              BorderBrush="{StaticResource Border}" BorderThickness="1">
+                        <Border.Background>
+                          <DrawingBrush Viewport="0,0,12,12" ViewportUnits="Absolute" TileMode="Tile">
+                            <DrawingBrush.Drawing>
+                              <DrawingGroup>
+                                <GeometryDrawing Brush="#2B363C" Geometry="M0,0 H12 V12 H0 Z"/>
+                                <GeometryDrawing Brush="#3E4B53" Geometry="M0,0 H6 V6 H0 Z M6,6 H12 V12 H6 Z"/>
+                              </DrawingGroup>
+                            </DrawingBrush.Drawing>
+                          </DrawingBrush>
+                        </Border.Background>
+                        <Image Source="{Binding Thumbnail}" RenderOptions.BitmapScalingMode="NearestNeighbor" Stretch="Uniform" Margin="2"/>
+                      </Border>
+                      <Border DockPanel.Dock="Right" Style="{StaticResource BadgePill}" Visibility="{Binding AnimatedVisibility}"
+                              BorderBrush="{StaticResource PreviewAccent}" Margin="6,0,0,0">
+                        <TextBlock Text="Anim" FontSize="11" Foreground="{StaticResource PreviewAccent}"/>
+                      </Border>
+                      <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding MetaText}" Foreground="{StaticResource Muted}" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/>
+                      </StackPanel>
+                    </DockPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
               </ListBox>
             </DockPanel>
           </TabItem>
           <TabItem x:Name="WorkspaceSettingsTab" Header="Settings">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
-              <StackPanel Margin="15,14,15,12">
-            <Expander x:Name="RoomAppearanceEditor" Header="Room settings" IsExpanded="True" Visibility="Collapsed"
-                      Foreground="{StaticResource Text}" Margin="0,0,0,18">
-              <StackPanel Margin="2,6,2,0">
-                <TextBlock Text="Room name" Style="{StaticResource Caption}"/>
-                <TextBox x:Name="RoomNameEdit" AutomationProperties.Name="Room name" MaxLength="96"
-                         Background="{StaticResource Page}" Foreground="{StaticResource Text}" Padding="4" Margin="0,4,0,6"/>
-                <TextBlock Text="Floor color · RRGGBB" Style="{StaticResource Caption}"/>
-                <TextBox x:Name="FloorColorEdit" AutomationProperties.Name="Floor color as RRGGBB" MaxLength="7"
-                         Background="{StaticResource Page}" Foreground="{StaticResource Text}" Padding="4" Margin="0,4,0,6"/>
-                <Button x:Name="ApplyRoomAppearance" Content="Apply room appearance" Click="ApplyRoomAppearanceClicked"/>
-              </StackPanel>
-            </Expander>
-                <TextBlock Text="Editor preferences" FontWeight="SemiBold" Margin="0,0,0,6"/>
+              <StackPanel Margin="13,14,13,12">
+            <Border x:Name="RoomAppearanceCard" Style="{StaticResource SectionCard}" Visibility="Collapsed">
+              <Expander x:Name="RoomAppearanceEditor" Header="Room settings" IsExpanded="True" Visibility="Collapsed">
+                <StackPanel Margin="0,6,0,0">
+                  <TextBlock Text="Room name" Style="{StaticResource Caption}"/>
+                  <TextBox x:Name="RoomNameEdit" AutomationProperties.Name="Room name" MaxLength="96" Margin="0,4,0,8" KeyDown="RoomAppearanceFieldKeyDown"/>
+                  <TextBlock Text="Floor color · RRGGBB" Style="{StaticResource Caption}"/>
+                  <Grid Margin="0,4,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <TextBox x:Name="FloorColorEdit" AutomationProperties.Name="Floor color as RRGGBB" MaxLength="7"
+                             FontFamily="Consolas" TextChanged="FloorColorEditChanged" KeyDown="RoomAppearanceFieldKeyDown"/>
+                    <Border x:Name="FloorColorSwatch" Grid.Column="1" Width="34" Height="30" CornerRadius="5"
+                            BorderBrush="{StaticResource Border}" BorderThickness="1" Margin="8,0,0,0"/>
+                  </Grid>
+                  <Button x:Name="ApplyRoomAppearance" Content="Apply room appearance" Style="{StaticResource ToolbarButton}" Click="ApplyRoomAppearanceClicked"/>
+                </StackPanel>
+              </Expander>
+            </Border>
+            <Border Style="{StaticResource SectionCard}">
+              <StackPanel>
+                <TextBlock Text="Editor preferences" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,6"/>
                 <TextBlock Text="World grid spacing" Style="{StaticResource Caption}"/>
-                <ComboBox x:Name="GridSpacing" SelectedIndex="1" SelectionChanged="GridSpacingChanged" Margin="0,5,0,8"
+                <ComboBox x:Name="GridSpacing" SelectedIndex="1" SelectionChanged="GridSpacingChanged" Margin="0,5,0,0"
                           AutomationProperties.Name="World grid spacing">
                   <ComboBoxItem Content="0.025" Tag="0.025"/><ComboBoxItem Content="0.05" Tag="0.05"/><ComboBoxItem Content="0.1" Tag="0.1"/>
                 </ComboBox>
-                <TextBlock Text="Graphics settings" FontWeight="SemiBold" Margin="0,10,0,0"/>
-            <TextBlock Text="Project ID" Style="{StaticResource Caption}" Margin="0,15,0,4"/>
-            <TextBlock x:Name="ProjectId" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>
-            <TextBlock Text="Renderer" Style="{StaticResource Caption}" Margin="0,15,0,6"/>
-            <UniformGrid Columns="2">
-              <Button x:Name="RendererAuto" Content="Auto" Tag="Auto" Click="RendererClicked" Margin="0,0,4,4"
-                      Padding="6,5" MinHeight="30" FontSize="12" AutomationProperties.Name="Renderer: Auto"
-                      ToolTip="Prefer Vulkan with OpenGL and CPU Reference fallback"/>
-              <Button x:Name="RendererVulkan" Content="Vulkan" Tag="Vulkan" Click="RendererClicked" Margin="0,0,0,4"
-                      Padding="6,5" MinHeight="30" FontSize="12" AutomationProperties.Name="Renderer: Vulkan"
-                      ToolTip="Use Vulkan GPU renderer"/>
-              <Button x:Name="RendererOpenGl" Content="OpenGL" Tag="OpenGl" Click="RendererClicked" Margin="0,0,4,0"
-                      Padding="6,5" MinHeight="30" FontSize="12" AutomationProperties.Name="Renderer: OpenGL"
-                      ToolTip="Use OpenGL compatibility renderer"/>
-              <Button x:Name="RendererCpu" Content="CPU" Tag="CpuReference" Click="RendererClicked" Margin="0"
-                      Padding="6,5" MinHeight="30" FontSize="12" AutomationProperties.Name="Renderer: CPU Reference"
-                      ToolTip="Use CPU software reference renderer"/>
-            </UniformGrid>
+              </StackPanel>
+            </Border>
+            <Border Style="{StaticResource SectionCard}" Margin="0">
+              <StackPanel>
+                <TextBlock Text="Graphics &amp; project" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,6"/>
+                <TextBlock Text="Renderer" Style="{StaticResource Caption}" Margin="0,2,0,6"/>
+                <UniformGrid Columns="2" Margin="0,0,0,10">
+                  <Button x:Name="RendererAuto" Content="Auto" Tag="Auto" Click="RendererClicked" Margin="0,0,4,4"
+                          Padding="6,5" MinHeight="30" FontSize="12" AutomationProperties.Name="Renderer: Auto"
+                          ToolTip="Prefer Vulkan with OpenGL and CPU Reference fallback"/>
+                  <Button x:Name="RendererVulkan" Content="Vulkan" Tag="Vulkan" Click="RendererClicked" Margin="0,0,0,4"
+                          Padding="6,5" MinHeight="30" FontSize="12" AutomationProperties.Name="Renderer: Vulkan"
+                          ToolTip="Use Vulkan GPU renderer"/>
+                  <Button x:Name="RendererOpenGl" Content="OpenGL" Tag="OpenGl" Click="RendererClicked" Margin="0,0,4,0"
+                          Padding="6,5" MinHeight="30" FontSize="12" AutomationProperties.Name="Renderer: OpenGL"
+                          ToolTip="Use OpenGL compatibility renderer"/>
+                  <Button x:Name="RendererCpu" Content="CPU" Tag="CpuReference" Click="RendererClicked" Margin="0"
+                          Padding="6,5" MinHeight="30" FontSize="12" AutomationProperties.Name="Renderer: CPU Reference"
+                          ToolTip="Use CPU software reference renderer"/>
+                </UniformGrid>
+                <TextBlock Text="Project ID" Style="{StaticResource Caption}" Margin="0,2,0,3"/>
+                <TextBlock x:Name="ProjectId" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
               </StackPanel>
             </ScrollViewer>
           </TabItem>
@@ -452,27 +559,56 @@
         <TabControl x:Name="AssistantTabs" Style="{StaticResource WorkspaceTabs}" Grid.Row="2" BorderThickness="0" AutomationProperties.Name="ATLAS workspace">
           <TabItem x:Name="SceneAtlasTab" Header="ATLAS" Visibility="Collapsed">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-              <StackPanel Margin="15,17,15,14">
-                <TextBlock x:Name="SceneAtlasScope" TextWrapping="Wrap" Style="{StaticResource Caption}" Margin="0,5,0,8"/>
-                <Button x:Name="SceneAtlasAccess" Click="SceneAtlasAccessClicked" Content="Allow scene read"/>
-                <TextBlock Text="Question or proposed change" Style="{StaticResource Caption}" Margin="0,15,0,5"/>
+              <StackPanel Margin="13,12,13,14">
+                <StackPanel Orientation="Horizontal" Margin="0,2,0,8">
+                  <Ellipse x:Name="SceneAtlasStatusDot" Width="8" Height="8" Fill="#5A6E78" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                  <TextBlock x:Name="SceneAtlasScope" TextWrapping="Wrap" Style="{StaticResource Caption}" VerticalAlignment="Center"/>
+                </StackPanel>
+                <Button x:Name="SceneAtlasAccess" Style="{StaticResource ToolbarButton}" Click="SceneAtlasAccessClicked" Content="Allow scene read"/>
+                <WrapPanel x:Name="SceneAtlasPromptChips" Margin="0,8,0,2">
+                  <Button Content="Inspect selection" Tag="Inspect selection" Style="{StaticResource ChipButton}" Click="SceneAtlasChipClicked" Margin="0,0,4,4"/>
+                  <Button Content="Check health" Tag="__health__" Style="{StaticResource ChipButton}" Click="SceneAtlasChipClicked" Margin="0,0,4,4"/>
+                  <Button Content="Keyed gate" Tag="Build a keyed gate named Cobalt on the right" Style="{StaticResource ChipButton}" Click="SceneAtlasChipClicked" Margin="0,0,4,4"/>
+                  <Button Content="Add lamp" Tag="Add lamp Ember at 0.35, 0.45" Style="{StaticResource ChipButton}" Click="SceneAtlasChipClicked" Margin="0,0,0,4"/>
+                </WrapPanel>
+                <TextBlock Text="Question or proposed change" Style="{StaticResource Caption}" Margin="0,6,0,5"/>
                 <TextBox x:Name="SceneAtlasQuestion" AutomationProperties.Name="Scene question" MaxLength="220"
-                         Text="Inspect selection" MinHeight="62" TextWrapping="Wrap" Padding="6"
-                         ToolTip="Try Inspect selection, Where is Bench light?, or Move Bench light to 0.62, 0.33."
-                         Background="{StaticResource Page}" Foreground="{StaticResource Text}"
-                         BorderBrush="{StaticResource Border}" CaretBrush="{StaticResource Accent}"/>
-                <Button x:Name="SceneAtlasAsk" Content="Ask ATLAS" Click="SceneAtlasAskClicked" Margin="0,7,0,10"/>
-                <Button x:Name="SceneAtlasHealth" Content="Check scene health" Click="SceneAtlasHealthClicked" Margin="0,0,0,10"/>
+                         Text="Inspect selection" MinHeight="52" TextWrapping="Wrap" VerticalContentAlignment="Top" Padding="7,6"
+                         PreviewKeyDown="SceneAtlasQuestionKeyDown"
+                         ToolTip="Try Inspect selection, Where is Bench light?, or Move Bench light to 0.62, 0.33."/>
+                <UniformGrid Columns="2" Margin="0,7,0,8">
+                  <Button x:Name="SceneAtlasAsk" Content="Ask ATLAS" Style="{StaticResource PrimaryButton}" MinHeight="32" Click="SceneAtlasAskClicked" Margin="0,0,5,0"/>
+                  <Button x:Name="SceneAtlasHealth" Content="Check scene health" Style="{StaticResource ToolbarButton}" Click="SceneAtlasHealthClicked"/>
+                </UniformGrid>
                 <TextBlock x:Name="SceneAtlasResult" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                 <StackPanel x:Name="SceneAtlasAnswerCard" Visibility="Collapsed" Margin="0,8,0,0">
-                  <Button x:Name="SceneAtlasShow" Content="Show object" Click="SceneAtlasShowClicked" Margin="0,0,0,5"/>
-                  <Button x:Name="SceneAtlasTarget" Content="Show linked target" Click="SceneAtlasTargetClicked" Margin="0,0,0,5"/>
-                  <Button x:Name="SceneAtlasPreview" Content="Preview change" Click="SceneAtlasPreviewClicked" Margin="0,0,0,5"/>
+                  <Button x:Name="SceneAtlasShow" Content="Show object" Style="{StaticResource ToolbarButton}" Click="SceneAtlasShowClicked" Margin="0,0,0,5"/>
+                  <Button x:Name="SceneAtlasTarget" Content="Show linked target" Style="{StaticResource ToolbarButton}" Click="SceneAtlasTargetClicked" Margin="0,0,0,5"/>
+                  <Button x:Name="SceneAtlasPreview" Content="Preview change" Style="{StaticResource ToolbarButton}" Click="SceneAtlasPreviewClicked" Margin="0,0,0,5"/>
                   <Expander Header="Working source details">
                     <TextBlock x:Name="SceneAtlasSource" TextWrapping="Wrap" FontSize="11" FontFamily="Consolas"/>
                   </Expander>
                 </StackPanel>
-                <Expander x:Name="SceneAtlasReceipt" Header="Latest ATLAS edit" Visibility="Collapsed" Margin="0,14,0,0">
+                <Border x:Name="SceneAtlasTranscriptCard" Style="{StaticResource SectionCard}" Padding="8" Margin="0,8,0,0" Visibility="Collapsed">
+                  <StackPanel>
+                    <TextBlock Text="Session log" Style="{StaticResource Caption}" Margin="0,0,0,4"/>
+                    <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto">
+                      <ItemsControl x:Name="SceneAtlasTranscript">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <Border BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1" Padding="0,3" Margin="0,0,0,2">
+                              <StackPanel>
+                                <TextBlock Text="{Binding Role}" FontSize="11" FontWeight="SemiBold" Foreground="{Binding RoleBrush}"/>
+                                <TextBlock Text="{Binding Summary}" FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource Text}"/>
+                              </StackPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
+                  </StackPanel>
+                </Border>
+                <Expander x:Name="SceneAtlasReceipt" Header="Latest ATLAS edit" Visibility="Collapsed" Margin="0,10,0,0">
                   <TextBlock x:Name="SceneAtlasReceiptText" TextWrapping="Wrap" FontSize="11" FontFamily="Consolas"/>
                 </Expander>
               </StackPanel>
@@ -486,13 +622,9 @@
                 <Button x:Name="AtlasAccess" Content="Allow project read" Click="AtlasAccessClicked" Margin="0,10,0,18"/>
                 <TextBlock Text="Question" Style="{StaticResource Caption}" Margin="0,0,0,5"/>
                 <TextBox x:Name="AtlasQuestion" AutomationProperties.Name="ATLAS question" TextWrapping="Wrap"
-                         MinHeight="57" Padding="8" VerticalContentAlignment="Center"
-                         Background="{StaticResource Page}" Foreground="{StaticResource Text}"
-                         BorderBrush="{StaticResource Border}" CaretBrush="{StaticResource Accent}"/>
+                         MinHeight="57" Padding="8" VerticalContentAlignment="Center"/>
                 <Button x:Name="AtlasAsk" Click="AtlasAskClicked" Style="{StaticResource PrimaryButton}"
-                        Margin="0,9,0,0" AutomationProperties.Name="Ask ATLAS">
-                  <TextBlock Text="Ask ATLAS" Foreground="#221B16"/>
-                </Button>
+                        Margin="0,9,0,0" Content="Ask ATLAS" AutomationProperties.Name="Ask ATLAS"/>
                 <TextBlock x:Name="AtlasReadStatus" TextWrapping="Wrap" Foreground="{StaticResource Muted}"
                            Margin="0,10,0,0" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
                 <Border x:Name="AtlasAnswerCard" Visibility="Collapsed" Margin="0,17,0,0" Padding="10"
@@ -528,18 +660,30 @@
         </TabControl>
         <ScrollViewer x:Name="PlayPanel" Grid.RowSpan="3" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Play controls">
-          <StackPanel Margin="15,17,15,14">
-            <TextBlock Text="Switches" Foreground="{StaticResource PlayAccent}" FontSize="20" FontWeight="SemiBold"/>
-            <StackPanel x:Name="ScenePlayControls" Visibility="Collapsed" Margin="0,7,0,0">
-              <UniformGrid Columns="4">
-                <Button Content="←" Tag="Left" Click="SceneWalkClicked" AutomationProperties.Name="Walk left" Padding="3"/>
-                <Button Content="↑" Tag="Up" Click="SceneWalkClicked" AutomationProperties.Name="Walk up" Padding="3"/>
-                <Button Content="↓" Tag="Down" Click="SceneWalkClicked" AutomationProperties.Name="Walk down" Padding="3"/>
-                <Button Content="→" Tag="Right" Click="SceneWalkClicked" AutomationProperties.Name="Walk right" Padding="3"/>
-              </UniformGrid>
-              <TextBlock Text="Arrow keys or WASD" Style="{StaticResource Caption}" Margin="0,6,0,0"/>
-              <TextBlock x:Name="SceneNearby" TextWrapping="Wrap" Margin="0,9,0,5" AutomationProperties.LiveSetting="Polite"/>
-              <Button x:Name="SceneUseSwitch" Click="ScenePlayUseClicked" Content="Use nearby switch (E)" />
+          <StackPanel Margin="13,14,13,14">
+            <TextBlock Text="Playtest" Foreground="{StaticResource PlayAccent}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,10"/>
+            <StackPanel x:Name="ScenePlayControls" Visibility="Collapsed">
+              <Border Style="{StaticResource SectionCard}" Background="{StaticResource PlaySurface}" BorderBrush="{StaticResource PlayAccent}">
+                <StackPanel>
+                  <TextBlock Text="Objective &amp; proximity" Style="{StaticResource Caption}" Foreground="{StaticResource PlayAccent}"/>
+                  <TextBlock x:Name="SceneNearby" TextWrapping="Wrap" Margin="0,6,0,0" FontWeight="SemiBold" AutomationProperties.LiveSetting="Polite"/>
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource SectionCard}">
+                <StackPanel>
+                  <TextBlock Text="Movement &amp; interact" Style="{StaticResource Caption}" Margin="0,0,0,8"/>
+                  <Grid HorizontalAlignment="Center" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition Width="48"/><ColumnDefinition Width="48"/></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="38"/><RowDefinition Height="38"/></Grid.RowDefinitions>
+                    <Button Grid.Row="0" Grid.Column="1" Content="↑" Tag="Up" Click="SceneWalkClicked" AutomationProperties.Name="Walk up" Padding="3" Margin="2"/>
+                    <Button Grid.Row="1" Grid.Column="0" Content="←" Tag="Left" Click="SceneWalkClicked" AutomationProperties.Name="Walk left" Padding="3" Margin="2"/>
+                    <Button Grid.Row="1" Grid.Column="1" Content="↓" Tag="Down" Click="SceneWalkClicked" AutomationProperties.Name="Walk down" Padding="3" Margin="2"/>
+                    <Button Grid.Row="1" Grid.Column="2" Content="→" Tag="Right" Click="SceneWalkClicked" AutomationProperties.Name="Walk right" Padding="3" Margin="2"/>
+                  </Grid>
+                  <TextBlock Text="Arrow keys or WASD" Style="{StaticResource Caption}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                  <Button x:Name="SceneUseSwitch" Click="ScenePlayUseClicked" Style="{StaticResource PrimaryButton}" Content="Use nearby switch (E)"/>
+                </StackPanel>
+              </Border>
             </StackPanel>
             <TextBlock x:Name="PlayEmpty" Text="This scene has no switches." Visibility="Collapsed"
                        Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,9,0,0"/>
@@ -552,13 +696,12 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <Border x:Name="PlayResultCard" Visibility="Collapsed" BorderBrush="{StaticResource Border}"
-                    BorderThickness="1" Background="{StaticResource Surface}" CornerRadius="5" Padding="10"
-                    Margin="0,10,0,0">
+            <Border x:Name="PlayResultCard" Visibility="Collapsed" Style="{StaticResource SectionCard}" Margin="0">
               <StackPanel>
-                <TextBlock x:Name="PlayResultTitle" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                <TextBlock Text="Last action" Style="{StaticResource Caption}"/>
+                <TextBlock x:Name="PlayResultTitle" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,4,0,0"/>
                 <TextBlock x:Name="PlayResultText" Foreground="{StaticResource Muted}" TextWrapping="Wrap"
-                           Margin="0,5,0,0" AutomationProperties.LiveSetting="Polite"/>
+                           Margin="0,4,0,0" AutomationProperties.LiveSetting="Polite"/>
               </StackPanel>
             </Border>
           </StackPanel>

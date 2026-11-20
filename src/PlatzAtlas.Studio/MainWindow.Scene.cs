@@ -14,6 +14,7 @@ public partial class MainWindow
 {
     public static readonly RoutedUICommand DuplicateSceneCommand = new("Duplicate object", nameof(DuplicateSceneCommand), typeof(MainWindow));
     private SceneDrag? _sceneDrag;
+    private OutlinerFilterMode _outlinerFilter = OutlinerFilterMode.All;
     private Guid? SelectedEntityId => (Objects.SelectedItem as SceneObjectItem)?.Id;
     private SceneEntity? SelectedEntity => _session.Current.Scene?.Entities.SingleOrDefault(item => item.Id == SelectedEntityId);
 
@@ -27,10 +28,17 @@ public partial class MainWindow
     {
         var project = _session.Current;
         _sceneNumbers = project.Scene is { } numbered ? SceneNumbers.FromHistory(numbered) : new Dictionary<Guid, long>();
+        var animated = project.Assets.Where(asset => asset.MediaType == PixelClip.MediaType).Select(asset => asset.Id).ToHashSet();
+        var search = project.Scene is null ? "" : OutlinerSearch?.Text.Trim() ?? "";
         var items = project.Scene is { } scene
             ? scene.Entities.OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(item => item.Id)
-                .Select(item => new SceneObjectItem(item.Id, item.Name, ComponentLabel(item.Component), ReadableId(item.Id),
-                    PresetBrowserWindow.ComponentIcon(item.Component))).ToArray()
+                .Where(item => MatchesOutlinerFilter(item, search, _outlinerFilter))
+                .Select(item =>
+                {
+                    var (badge, accent) = BadgeFor(item, animated);
+                    return new SceneObjectItem(item.Id, item.Name, ComponentLabel(item.Component), ReadableId(item.Id),
+                        PresetBrowserWindow.ComponentIcon(item.Component), badge, accent);
+                }).ToArray()
             : project.Objects.OrderBy(item => item.X)
                 .Select(item => new SceneObjectItem(item.Id, item.Name, item.Location)).ToArray();
         var wasChanging = _changingProject;
@@ -38,7 +46,100 @@ public partial class MainWindow
         Objects.ItemsSource = items;
         Objects.SelectedItem = items.FirstOrDefault(item => item.Id == selectedId) ?? items.FirstOrDefault();
         _changingProject = wasChanging;
+        UpdateOutlinerFilterButtons();
     }
+
+    private void OutlinerSearchChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!IsLoaded || _session.Current.Scene is null)
+            return;
+        RefreshSceneList(SelectedEntityId);
+        UpdateGeneralEditor(null);
+    }
+
+    private void OutlinerFilterClicked(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string tag } || !Enum.TryParse<OutlinerFilterMode>(tag, out var mode))
+            return;
+        _outlinerFilter = mode;
+        RefreshSceneList(SelectedEntityId);
+        UpdateGeneralEditor(null);
+    }
+
+    private void UpdateOutlinerFilterButtons()
+    {
+        if (FilterAll is null)
+            return;
+        SetChipState(FilterAll, _outlinerFilter == OutlinerFilterMode.All);
+        SetChipState(FilterProps, _outlinerFilter == OutlinerFilterMode.Props);
+        SetChipState(FilterLogic, _outlinerFilter == OutlinerFilterMode.Logic);
+
+        void SetChipState(Button button, bool active)
+        {
+            button.Background = (System.Windows.Media.Brush)FindResource(active ? "Selection" : "Panel");
+            button.BorderBrush = (System.Windows.Media.Brush)FindResource(active ? "Accent" : "Border");
+            button.FontWeight = active ? FontWeights.SemiBold : FontWeights.Normal;
+        }
+    }
+
+    private void QuickAddClicked(object sender, RoutedEventArgs e)
+    {
+        if (_play is not null || _session.Current.Scene is not { } scene || sender is not Button { Tag: string kind })
+            return;
+        Func<SceneComponent, bool> match = kind switch
+        {
+            "wall" => c => c is WallPanel,
+            "door" => c => c is SceneDoor,
+            "lamp" => c => c is SceneLamp,
+            "switch" => c => c is SceneSwitch,
+            "key" => c => c is SceneKey,
+            _ => _ => false
+        };
+        var preset = _presets.FirstOrDefault(item => match(item.Template.Component));
+        if (preset is null)
+            return;
+        var names = scene.Entities.Select(item => item.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var baseName = preset.Template.Name;
+        var name = baseName;
+        for (var suffix = 2; !names.Add(name); suffix++)
+            name = $"{baseName} {suffix}";
+        var offset = .03 * (scene.Entities.Count % 6);
+        var tx = Math.Clamp(.42 + offset, .08, .92);
+        var ty = Math.Clamp(.44 + offset, .08, .92);
+        var entity = preset.Place(Guid.NewGuid(), preset.Template.Transform with { X = tx, Y = ty }, name, preset.Template.Component);
+        PlacePresets([entity]);
+    }
+
+    private bool MatchesOutlinerFilter(SceneEntity entity, string search, OutlinerFilterMode mode)
+    {
+        var kindOk = mode switch
+        {
+            OutlinerFilterMode.Props => entity.Component is WallPanel or SceneLamp or SceneSprite,
+            OutlinerFilterMode.Logic => entity.Component is SceneDoor or SceneSwitch or SceneSpawn or SceneKey or SceneGoal,
+            _ => true
+        };
+        if (!kindOk)
+            return false;
+        if (string.IsNullOrEmpty(search))
+            return true;
+        return entity.Name.Contains(search, StringComparison.CurrentCultureIgnoreCase) ||
+               ComponentLabel(entity.Component).Contains(search, StringComparison.CurrentCultureIgnoreCase) ||
+               ReadableId(entity.Id).Contains(search, StringComparison.CurrentCultureIgnoreCase);
+    }
+
+    private static (string? Badge, bool Accent) BadgeFor(SceneEntity entity, IReadOnlySet<Guid> animated) => entity.Component switch
+    {
+        SceneDoor door => (door.IsOpen ? "Open" : "Closed", door.IsOpen),
+        SceneLamp lamp => (lamp.IsOn ? "On" : "Off", lamp.IsOn),
+        SceneSwitch control => (control.TargetId is null && control.SecondTargetId is null ? "Unlinked" : "Linked",
+            control.TargetId is not null || control.SecondTargetId is not null),
+        SceneGoal goal => (goal.RequiredKeys > 0 ? $"Req {goal.RequiredKeys}" : "Exit", true),
+        SceneKey => ("Key", true),
+        SceneSpawn => ("Spawn", false),
+        SceneSprite sprite when animated.Contains(sprite.AssetId) => ("Anim", true),
+        WallPanel wall => (wall.Color.ToString(), false),
+        _ => (null, false)
+    };
 
     private void UpdateGeneralEditor(long? editStarted)
     {
@@ -46,7 +147,9 @@ public partial class MainWindow
         var entity = SelectedEntity;
         RoomTitle.Text = project.DisplayName;
         RoomNameEdit.Text = project.DisplayName;
-        FloorColorEdit.Text = $"{project.Scene!.Appearance?.BackgroundRgb ?? SceneAppearance.DefaultBackgroundRgb:X6}";
+        var rgb = project.Scene!.Appearance?.BackgroundRgb ?? SceneAppearance.DefaultBackgroundRgb;
+        FloorColorEdit.Text = $"{rgb:X6}";
+        UpdateFloorSwatch(FloorColorEdit.Text);
         var count = project.Scene!.Entities.Count;
         ObjectCount.Text = count == 1 ? "1 object" : $"{count} objects";
         SelectedName.Text = entity?.Name ?? "Select an object";
@@ -64,6 +167,8 @@ public partial class MainWindow
             var layer = Array.FindIndex(order, item => item.Id == entity.Id);
             BringForward.IsEnabled = layer < order.Length - 1;
             SendBackward.IsEnabled = layer > 0;
+            PropertiesCard.Visibility = entity.Component is WallPanel or SceneLamp or SceneDoor or SceneSwitch or SceneGoal
+                ? Visibility.Visible : Visibility.Collapsed;
             ChangeColor.Visibility = entity.Component is WallPanel ? Visibility.Visible : Visibility.Collapsed;
             if (entity.Component is WallPanel wall)
                 ChangeColor.Content = $"Wall color · {wall.Color}";
@@ -352,6 +457,48 @@ public partial class MainWindow
         ApplyScene(new ConfigureRoomAppearance(_session.Current.ProjectId, _session.Current.Revision,
             _session.Current.SceneId, RoomNameEdit.Text, rgb), "Updated the room name and floor color.");
     }
+
+    private void FloorColorEditChanged(object sender, TextChangedEventArgs e) => UpdateFloorSwatch(FloorColorEdit.Text);
+
+    private void UpdateFloorSwatch(string raw)
+    {
+        if (FloorColorSwatch is null)
+            return;
+        var hex = raw.Trim().TrimStart('#');
+        if (hex.Length == 6 && uint.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var rgb))
+        {
+            FloorColorSwatch.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(
+                (byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb));
+            FloorColorSwatch.BorderBrush = (System.Windows.Media.Brush)FindResource("Border");
+        }
+        else
+        {
+            FloorColorSwatch.Background = System.Windows.Media.Brushes.Transparent;
+            FloorColorSwatch.BorderBrush = (System.Windows.Media.Brush)FindResource("Error");
+        }
+    }
+
+    private void SceneNameKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) { RenameSceneClicked(sender, e); e.Handled = true; }
+    }
+
+    private void TransformFieldKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) { ApplyTransformClicked(sender, e); e.Handled = true; }
+    }
+
+    private void RequiredKeysKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) { ApplyGoalClicked(sender, e); e.Handled = true; }
+    }
+
+    private void RoomAppearanceFieldKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) { ApplyRoomAppearanceClicked(sender, e); e.Handled = true; }
+    }
+
+    private enum OutlinerFilterMode { All, Props, Logic }
 
     private static string SafeProjectFileName(string name) =>
         new string(name.Select(character => Path.GetInvalidFileNameChars().Contains(character) ? '_' : character).ToArray()) + ".platz";

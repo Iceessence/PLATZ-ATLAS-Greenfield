@@ -162,9 +162,11 @@ public partial class PresetBrowserWindow : Window
         var preset = ScenePreset.FromObject(template with { PresetId = parent.Id });
         if (SavePreset(this, preset))
         {
+            var priorCount = PresetCount.Text;
             _presets.Add(preset);
             PresetSearch.Clear();
             Filter(preset.Id);
+            PresetCount.Text = priorCount;
             PresetStatus.Text = "Saved reusable variant.";
         }
     });

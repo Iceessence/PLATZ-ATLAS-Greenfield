@@ -1,5 +1,50 @@
 # PLATZ ATLAS Greenfield — Independent Audit & Persistent Agent Handoff
 
+## Authoritative Independent Audit — Step 0 (`c1a41d6`) & GF-022 through GF-026 (`0df729a`)
+
+> **Audit role notice:** This audit section was authored independently against the unmodified repository at `0df729a4f53ff97a6c1755521599ae5513f62d5e` (`main`). Product source code, tests, lockfiles, and `WORKING.md` were not modified during this audit, and nothing was pushed to `origin`.
+
+### 1. Provenance & Reference Environment
+
+- **Repository root:** `C:\PLATZ ATLAS\PLATZ-ATLAS-Greenfield`
+- **Audited `HEAD` / branch:** `0df729a4f53ff97a6c1755521599ae5513f62d5e` (`main`)
+- **Commits audited past `c019f3d`:** `c1a41d6` (Step 0 Pixel Editor stroke repair), `21c0a79` (GF-022), `bc981bc` (GF-023), `0b27714` (GF-024 partial), `731b949` (GF-026 partial), `bf42c09` (GF-023 workspace theme), `0df729a` (docs/walkthroughs). GF-025 (3D) has `0` commits and `0` 3D constructs.
+- **Master specification:** `docs/Ultimate_PLATZ_ATLAS_MASTER_Version_1.docx` (SHA-256: `ee95a50f205f85a3867488d7fc4a5e066b694b291f5657764eda8b35a2b32ebc`)
+- **Independent evidence directory (outside checkout):** `C:\PLATZ ATLAS\.platz-atlas-verification\audit-gf022-026` (`raw-results.md`, `logs\build-run{1,2}.log`, `logs\probe.log`, `logs\audit-{core,pixel,gui}.log`, `logs\screenshots-before.log`, `screenshots\before\before-{workspace,settings,presets,pixel,play}.png`, `player-dist\`, `clean-checkout\`).
+- **Reference host:** Windows 11 x64, `.NET SDK 10`, NVIDIA GeForce RTX 5080, Vulkan `1.4.351` (`VK_LAYER_KHRONOS_validation` `errors=0, warnings=0`), OpenGL `3.3` NVIDIA. In this non-foreground agent session (`FOREGROUND=0`), `PlatzAtlas.Studio.Tests` `PixelInput()` fails on `CaptureMouse()`; non-capture WPF tests (`WorkingRoom`, `PresetsInStudio`, `AnimateRoom`, `PlanInStudio`), `AuditHarness core/pixel/gui`, and direct UIA/Win32 verification all succeeded.
+
+---
+
+### 2. Accepted Baseline Decision
+
+- **Independently Accepted Greenfield Baseline:** advances from `e77ef40` to **`21c0a79` (`gf-022`)**
+  - Step 0 (`c1a41d6`) cleanly resolved the two GF-017 unhandled crash/status bugs, promoting GF-017..GF-020 + GF-022 into the linear baseline (`21c0a79`). Bounded to tested Windows 11 x64 RTX 5080 scope; unlocked-desktop physical input, >96 DPI scaling, and clean second machine remain `UNVERIFIED`.
+- **Current `HEAD` (`0df729a`) status:** **`REPAIRS_REQUIRED`** *(cannot advance past `21c0a79` until GF-023 and GF-024 UI legibility/reset defects are repaired)*.
+- **Native ATLAS Specialist status:** Greenfield GF-021 remains **`FAILED_QUALIFICATION`**; read-only `C:\ATLAS\ATLAS-Next` (`HEAD = 712d88b`) has `NEXT-022` (`cea141c`) `ACCEPTED_WITH_LIMITATIONS` (`19/24` protected, tied linear baseline) and `NEXT-023..025` (`19f3f46`) **`REPAIRS_REQUIRED`** (`NR-023-1` drops Primary `withhold` in `rank_policy`/`route`). Zero native model is integrated in Greenfield.
+
+---
+
+### 3. Per-Milestone Verdicts
+
+| Milestone / Checkpoint | Scope | Independent Verdict | Key Empirical Findings & Notes |
+| --- | --- | --- | --- |
+| **Step 0 (`c1a41d6`) + GF-017 (`76360f4`)** | Mid-stroke Undo/Redo/Resize/Space cleanup & hex validation in `PixelEditorWindow` | **ACCEPTED** | `AuditHarness pixel` (`0` failures) + Step 0 probe verified Undo/Redo/Resize end strokes safely, `Space` during open stroke does not re-begin, and invalid hex error stays visible. *(Non-foreground `CaptureMouse()` physical test unverified directly in this session.)* |
+| **GF-022 (`21c0a79`)** | Live unsaved working room, unsaved ATLAS read/preview/confirm, isolated Play & Restart, explicit Save guard | **ACCEPTED** | Verified working revisions without disk side effects (`0` `.platz` files written), stale proposal retirement on manual edit, unsaved Play win/Restart/Stop, and saved-head `.platzroom` export guard. *(Queued polish: hide `BlankRoomHelp` during empty-room Play mode.)* |
+| **GF-023 (`bc981bc`, `bf42c09`)** | Workspace layout, Examples, Settings, `.platzpreset` variants, readable IDs (`#000002`), world zoom/pan/snap | **REPAIRS_REQUIRED** | Logic, presets, variants, multi-place, readable IDs, and zoom/pan passed in `AuditHarness core` & `gui`. **Blocked by Studio XAML/UI defects:** white-on-white `ComboBox` (`GridSpacing`, `PresetChoice`, `Switch*`) and `Examples` `ContextMenu`, white text on amber `PrimaryButton` (`App.xaml:19-21`), unstyled white `TextBox`es/scrollbars, and `PresetBrowserWindow.SaveVariantClicked` (`157-170`) resetting `PresetCount` to `1`. |
+| **GF-024 partial (`0b27714`)** | 16–256px canvas, 2–16 frame animation, sheet ZIP export, animated Player playback | **REPAIRS_REQUIRED** | Animation engine, budget/tamper guards, sprite sheet ZIP (`sprites.png` + `animation.json`), and extracted Player Vulkan v3 playback passed. **Blocked visually** by white-on-white `TimelineFrames` `ComboBox` and unstyled white `FrameDuration` `TextBox`. *(Open GF-024 scope: drawing tools/onion skin/sliders, non-rectangular geometry, pressure plates, held-key locomotion.)* |
+| **GF-025 (3D)** | 3D scene representation, native 3D rendering, picking, gizmos, lighting, 3D Play | **UNVERIFIED** | Not implemented (`3D-construct scan: 0 hit(s)`, `Transform2D` remains 2D-only `[X, Y, Width, Height, Rotation]`). |
+| **GF-026 partial (`731b949`)** | Deterministic keyed-gate plan, detached 8-edit preview, grouped Undo/Redo & receipt | **ACCEPTED** *(single-room plan)* | `AuditHarness core` & `gui` verified Cobalt keyed-gate plan, stale/revoked/foreign/replay/forged rejection, 4 grouped-history forgery blocks, and single grouped Undo/Redo surviving save/reopen. *(Open: general composition, developer workspace, native specialist qualification.)* |
+
+---
+
+### 4. Confirmed Phase A Evidence Summary
+
+1. **Clean offline rebuilds ×2 (`Build.ps1 -Offline -Test -Bundle`):** `0 Warning(s)`, `0 Error(s)`, `31` Core test groups `PASS`; identical `PlatzAtlas.Player-release.zip` SHA-256 `796E5CDA41DA5B279E524D57C352B1400BE1EA5F5A0DEDC07730E4A2BE7E5B67`; `24/24` `SHA256SUMS.txt` match; `0` Studio/ATLAS leaks.
+2. **Rendering Probe (`--require-validation`):** `PASS` on RTX 5080 Vulkan `1.4.351` (`errors=0, warnings=0`), Vulkan & OpenGL parity (`0.7, 0.34: #1a5a7fff`, `0.928, 0.36: #f783d2ff`).
+3. **Standalone Player quarantine test:** `--check-room` passed `v3`, `v1`, `v2` (`rc=0`) and rejected tampered `.platzroom` (`rc=1`); full animated Cobalt Bastion playthrough and `Restart` passed with `0` Vulkan validation errors/warnings.
+
+---
+
 ## GPT implementation handoff · owner-directed GF-022 through GF-026
 
 The owner assigned GPT the sole implementation role for this batch at `c019f3d` and reprioritized GF-022–GF-026. The last independently accepted linear baseline remains **`e77ef40`**. The independent GF-017 repair gate and the individual GF-018–GF-020 verdicts below still govern acceptance. The original-model experiments remain quarantined. The candidate for review is **`bf42c09c178e0d14a693bdca99a0977447521c21`**. The [owner report](ATLAS_OWNER_REPORT.md) records walkthroughs, builds and limitations.

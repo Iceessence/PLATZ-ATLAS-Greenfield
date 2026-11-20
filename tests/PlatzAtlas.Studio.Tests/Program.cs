@@ -23,6 +23,7 @@ internal static partial class Program
                 PresetsInStudio(folder);
                 AnimateRoom(folder);
                 PlanInStudio(folder);
+                WorkspaceUxChecks(folder);
             }
             return 0;
         }
