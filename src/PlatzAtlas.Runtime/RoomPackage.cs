@@ -66,7 +66,7 @@ public static class RoomPackage
             if (package.Version != 1 || package.RuntimeProfile != RuntimeProfile)
                 throw new InvalidDataException("This room package needs a different player profile.");
             var payload = Encoding.UTF8.GetBytes(package.Room.GetRawText());
-            if (package.Sha256 != Digest(payload))
+            if (!string.Equals(package.Sha256, Digest(payload), StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("The room package checksum does not match.");
             var room = JsonSerializer.Deserialize<RuntimeRoom>(payload, Json)
                 ?? throw new InvalidDataException("The room package is missing its scene.");

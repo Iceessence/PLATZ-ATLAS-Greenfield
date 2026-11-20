@@ -49,6 +49,9 @@ internal static class AtlasReadChecks
                 && !json.Contains("contentBase64", StringComparison.Ordinal)
                 && !json.Contains("history", StringComparison.Ordinal), "checksum and bounded source projection");
         }
+        var uppercase = Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(bytes)
+            .Replace(answer.SnapshotSha256, answer.SnapshotSha256.ToUpperInvariant(), StringComparison.Ordinal));
+        Require(SwitchEvidenceProfile.Read(uppercase).Snapshot is not null, "uppercase envelope checksum is accepted");
         Require(savedBytes.SequenceEqual(File.ReadAllBytes(savedPath)), "read did not modify the editable project");
         Console.WriteLine("PASS saved snapshot, stable switch target, exact evidence and read-only artifact");
 

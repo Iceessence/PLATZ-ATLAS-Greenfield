@@ -22,9 +22,13 @@ internal static class RoomPackageChecks
         using (var envelope = JsonDocument.Parse(bytes))
         {
             var payload = envelope.RootElement.GetProperty("room");
+            var checksum = envelope.RootElement.GetProperty("sha256").GetString()!;
             Require(!payload.TryGetProperty("history", out _) && !payload.TryGetProperty("assets", out _)
                 && decoded.ProjectId == room.ProjectId && decoded.SourceRevision == room.SourceRevision,
                 "package pins revision and carries runtime-only data");
+            var uppercase = Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(bytes)
+                .Replace(checksum, checksum.ToUpperInvariant(), StringComparison.Ordinal));
+            Require(RoomPackage.Decode(uppercase).SourceRevision == room.SourceRevision, "uppercase package checksum is accepted");
         }
         Reject<ArgumentException>(() => RoomPackage.Save(source, room, overwrite: true));
         Reject<IOException>(() => RoomPackage.Save(package, room));

@@ -74,7 +74,7 @@ public static class SwitchEvidenceProfile
                 return (QuestionStatus.InvalidSnapshot, null, null);
 
             var payload = Encoding.UTF8.GetBytes(envelope.Snapshot.GetRawText());
-            if (!string.Equals(envelope.Sha256, Digest(payload), StringComparison.Ordinal))
+            if (!string.Equals(envelope.Sha256, Digest(payload), StringComparison.OrdinalIgnoreCase))
                 return (QuestionStatus.InvalidSnapshot, null, null);
 
             if (!envelope.Snapshot.TryGetProperty("profileVersion", out var version)
