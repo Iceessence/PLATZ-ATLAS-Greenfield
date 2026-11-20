@@ -12,6 +12,8 @@ public sealed record RuntimeRoom(Guid ProjectId, Guid SceneId, long SourceRevisi
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<SceneEntity>? Entities { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<ProjectAsset>? RasterAssets { get; init; }
 
     public static RuntimeRoom FromProject(MuseumProject project)
     {
@@ -19,8 +21,15 @@ public sealed record RuntimeRoom(Guid ProjectId, Guid SceneId, long SourceRevisi
         return new RuntimeRoom(project.ProjectId, project.SceneId, project.Revision, project.Name,
             Array.AsReadOnly(project.Objects.ToArray()), Array.AsReadOnly(project.Switches.ToArray()))
         {
-            Entities = project.Scene?.Entities
+            Entities = project.Scene?.Entities,
+            RasterAssets = project.Scene is { } scene ? SceneAssets(scene, project.Assets) : null
         };
+    }
+
+    private static IReadOnlyList<ProjectAsset>? SceneAssets(SceneDocument scene, IReadOnlyList<ProjectAsset> assets)
+    {
+        var needed = scene.Entities.Select(item => item.Component).OfType<SceneSprite>().Select(item => item.AssetId).ToHashSet();
+        return needed.Count == 0 ? null : Array.AsReadOnly(assets.Where(item => needed.Contains(item.Id)).ToArray());
     }
 }
 
@@ -29,7 +38,8 @@ public static class RoomPackage
     public const string Extension = ".platzroom";
     public const string RuntimeProfile = "night-museum/1";
     public const string SceneProfile = "room-scene/2";
-    private const int MaxBytes = 256 * 1024;
+    private const int MuseumMaxBytes = 256 * 1024;
+    private const int MaxBytes = 2 * 1024 * 1024;
     private const int MaxRecords = 128;
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -61,7 +71,7 @@ public static class RoomPackage
             writer.WriteRawValue(payload);
             writer.WriteEndObject();
         }
-        if (buffer.Length > MaxBytes)
+        if (buffer.Length > (room.Entities is null ? MuseumMaxBytes : MaxBytes))
             throw new InvalidDataException("The room exceeds the package size limit.");
         return buffer.ToArray();
     }
@@ -76,6 +86,8 @@ public static class RoomPackage
                 ?? throw new InvalidDataException("The room package has no manifest.");
             if ((package.Version, package.RuntimeProfile) is not ((1, RuntimeProfile) or (2, SceneProfile)))
                 throw new InvalidDataException("This room package needs a different player profile.");
+            if (package.Version == 1 && bytes.Length > MuseumMaxBytes)
+                throw new InvalidDataException("The museum package exceeds the supported size.");
             var payload = Encoding.UTF8.GetBytes(package.Room.GetRawText());
             if (!string.Equals(package.Sha256, Digest(payload), StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("The room package checksum does not match.");
@@ -88,7 +100,8 @@ public static class RoomPackage
             {
                 Objects = Array.AsReadOnly(room.Objects.ToArray()),
                 Switches = Array.AsReadOnly(room.Switches.ToArray()),
-                Entities = room.Entities is null ? null : Array.AsReadOnly(room.Entities.ToArray())
+                Entities = room.Entities is null ? null : Array.AsReadOnly(room.Entities.ToArray()),
+                RasterAssets = room.RasterAssets is null ? null : Array.AsReadOnly(room.RasterAssets.ToArray())
             };
         }
         catch (JsonException error)
@@ -151,9 +164,12 @@ public static class RoomPackage
             if (room.Objects.Count != 0 || room.Switches.Count != 0)
                 throw new InvalidDataException("The scene contains incompatible museum records.");
             SceneValidation.ValidateEntities(entities, room.ProjectId, room.SceneId);
+            PixelAsset.ValidateRuntime(room.RasterAssets ?? [], entities, room.ProjectId, room.SceneId);
             MuseumPlaySession.FindSpawn(entities);
             return;
         }
+        if (room.RasterAssets is not null)
+            throw new InvalidDataException("The museum package has unexpected image assets.");
 
         var ids = new HashSet<Guid> { room.ProjectId, room.SceneId };
         var targets = new HashSet<Guid>();

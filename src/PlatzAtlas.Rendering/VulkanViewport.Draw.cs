@@ -9,7 +9,7 @@ public sealed unsafe partial class VulkanViewport
 {
     private Buffer _vertices;
     private DeviceMemory _vertexMemory;
-    private GpuVertex* _mappedVertices;
+    private GpuSceneVertex* _mappedVertices;
     private int _vertexCapacity;
 
     private Buffer _readbackBuffer;
@@ -17,19 +17,14 @@ public sealed unsafe partial class VulkanViewport
     private byte* _mappedReadback;
     private ulong _readbackCapacity;
 
-    [StructLayout(LayoutKind.Sequential)]
-    private readonly struct GpuVertex(RenderVertex vertex, RenderColor color)
-    {
-        public readonly float X = vertex.X;
-        public readonly float Y = vertex.Y;
-        public readonly float R = color.R;
-        public readonly float G = color.G;
-        public readonly float B = color.B;
-    }
-
     private void CreatePipeline()
     {
-        var layout = new PipelineLayoutCreateInfo { SType = StructureType.PipelineLayoutCreateInfo };
+        EnsureTextureDescriptors();
+        var imageLayout = _imageLayout;
+        var layout = new PipelineLayoutCreateInfo
+        {
+            SType = StructureType.PipelineLayoutCreateInfo, SetLayoutCount = 1, PSetLayouts = &imageLayout
+        };
         Check(_vk.CreatePipelineLayout(_device, &layout, null, out _pipelineLayout), "create pipeline layout");
 
         ShaderModule vertex = default;
@@ -76,18 +71,20 @@ public sealed unsafe partial class VulkanViewport
             new() { SType = StructureType.PipelineShaderStageCreateInfo, Stage = ShaderStageFlags.VertexBit, Module = vertex, PName = main },
             new() { SType = StructureType.PipelineShaderStageCreateInfo, Stage = ShaderStageFlags.FragmentBit, Module = fragment, PName = main }
         };
-        var binding = new VertexInputBindingDescription(0, (uint)sizeof(GpuVertex), VertexInputRate.Vertex);
-        VertexInputAttributeDescription* attributes = stackalloc VertexInputAttributeDescription[2]
+        var binding = new VertexInputBindingDescription(0, (uint)sizeof(GpuSceneVertex), VertexInputRate.Vertex);
+        VertexInputAttributeDescription* attributes = stackalloc VertexInputAttributeDescription[4]
         {
             new(0, 0, Format.R32G32Sfloat, 0),
-            new(1, 0, Format.R32G32B32Sfloat, 2 * sizeof(float))
+            new(1, 0, Format.R32G32B32Sfloat, 2 * sizeof(float)),
+            new(2, 0, Format.R32G32Sfloat, 5 * sizeof(float)),
+            new(3, 0, Format.R32G32B32Sfloat, 7 * sizeof(float))
         };
         var vertexInput = new PipelineVertexInputStateCreateInfo
         {
             SType = StructureType.PipelineVertexInputStateCreateInfo,
             VertexBindingDescriptionCount = 1,
             PVertexBindingDescriptions = &binding,
-            VertexAttributeDescriptionCount = 2,
+            VertexAttributeDescriptionCount = 4,
             PVertexAttributeDescriptions = attributes
         };
         var inputAssembly = new PipelineInputAssemblyStateCreateInfo
@@ -116,6 +113,13 @@ public sealed unsafe partial class VulkanViewport
         };
         var colorAttachment = new PipelineColorBlendAttachmentState
         {
+            BlendEnable = true,
+            SrcColorBlendFactor = BlendFactor.SrcAlpha,
+            DstColorBlendFactor = BlendFactor.OneMinusSrcAlpha,
+            ColorBlendOp = BlendOp.Add,
+            SrcAlphaBlendFactor = BlendFactor.One,
+            DstAlphaBlendFactor = BlendFactor.OneMinusSrcAlpha,
+            AlphaBlendOp = BlendOp.Add,
             ColorWriteMask = ColorComponentFlags.RBit | ColorComponentFlags.GBit | ColorComponentFlags.BBit | ColorComponentFlags.ABit
         };
         var blend = new PipelineColorBlendStateCreateInfo
@@ -155,7 +159,7 @@ public sealed unsafe partial class VulkanViewport
 
     private bool TryPresent(RenderSnapshot snapshot, Span<byte> bgraReadback)
     {
-        uint vertexCount = UploadTriangles(snapshot.Triangles);
+        uint vertexCount = UploadVertices(snapshot);
         bool captureReadback = !bgraReadback.IsEmpty;
         ulong requiredReadbackBytes = captureReadback ? (ulong)_extent.Width * _extent.Height * 4UL : 0UL;
         if (captureReadback && requiredReadbackBytes > _readbackCapacity)
@@ -246,6 +250,8 @@ public sealed unsafe partial class VulkanViewport
             _vk.CmdSetViewport(_commands, 0, 1, &viewport);
             _vk.CmdSetScissor(_commands, 0, 1, &area);
             _vk.CmdBindPipeline(_commands, PipelineBindPoint.Graphics, _pipeline);
+            var imageSet = _imageSet;
+            _vk.CmdBindDescriptorSets(_commands, PipelineBindPoint.Graphics, _pipelineLayout, 0, 1, &imageSet, 0, null);
             Buffer vertices = _vertices;
             ulong offset = 0;
             _vk.CmdBindVertexBuffers(_commands, 0, 1, &vertices, &offset);
@@ -343,19 +349,15 @@ public sealed unsafe partial class VulkanViewport
         return ticks * (double)_timestampPeriod / 1_000_000.0;
     }
 
-    private uint UploadTriangles(IReadOnlyList<RenderTriangle> triangles)
+    private uint UploadVertices(RenderSnapshot snapshot)
     {
-        int vertexCount = checked(triangles.Count * 3);
+        if (_imageStrip.Update(snapshot) || _imageView.Handle == 0)
+            UploadImageStrip();
+        int vertexCount = GpuImageStrip.VertexCount(snapshot);
         if (vertexCount > _vertexCapacity)
             CreateVertexBuffer(Math.Max(vertexCount, 64));
 
-        int i = 0;
-        foreach (RenderTriangle triangle in triangles)
-        {
-            _mappedVertices[i++] = new GpuVertex(triangle.A, AttachmentColor(triangle.A.Color));
-            _mappedVertices[i++] = new GpuVertex(triangle.B, AttachmentColor(triangle.B.Color));
-            _mappedVertices[i++] = new GpuVertex(triangle.C, AttachmentColor(triangle.C.Color));
-        }
+        _imageStrip.Fill(snapshot, new Span<GpuSceneVertex>(_mappedVertices, vertexCount), AttachmentColor, UsesSrgbAttachment);
         return (uint)vertexCount;
     }
 
@@ -366,7 +368,7 @@ public sealed unsafe partial class VulkanViewport
         var create = new BufferCreateInfo
         {
             SType = StructureType.BufferCreateInfo,
-            Size = (ulong)capacity * (uint)sizeof(GpuVertex),
+            Size = (ulong)capacity * (uint)sizeof(GpuSceneVertex),
             Usage = BufferUsageFlags.VertexBufferBit,
             SharingMode = SharingMode.Exclusive
         };
@@ -382,7 +384,7 @@ public sealed unsafe partial class VulkanViewport
         Check(_vk.BindBufferMemory(_device, _vertices, _vertexMemory, 0), "bind vertex memory");
         void* mapped = null;
         Check(_vk.MapMemory(_device, _vertexMemory, 0, allocate.AllocationSize, 0, &mapped), "map vertex memory");
-        _mappedVertices = (GpuVertex*)mapped;
+        _mappedVertices = (GpuSceneVertex*)mapped;
         _vertexCapacity = capacity;
     }
 

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using PlatzAtlas.Core;
 using PlatzAtlas.Rendering;
 using PlatzAtlas.Runtime;
@@ -9,14 +10,25 @@ public static class SceneArt
     private static readonly RenderColor Background = Rgb(17, 25, 33);
     private static readonly RenderColor Grid = Rgb(32, 44, 53);
     private static readonly RenderColor Selection = Rgb(255, 214, 152);
+    private static readonly ConditionalWeakTable<ProjectAsset, RasterTexture> Images = new();
+
+    public static RasterTexture Image(ProjectAsset source) => Images.GetValue(source, asset =>
+    {
+        var pixels = PixelAsset.Read(asset);
+        return new RasterTexture(pixels.Width, pixels.Height, pixels.Rgba);
+    });
 
     public static IEnumerable<SceneEntity> PaintOrder(IReadOnlyList<SceneEntity> entities) =>
-        entities.OrderBy(item => item.Component is WallPanel ? 0 : 1).ThenBy(item => item.Id);
+        entities.OrderBy(item => item.Component is WallPanel ? 0 : item.Component is SceneSprite ? 2 : 1).ThenBy(item => item.Id);
 
     public static RenderSnapshot Create(Guid projectId, long revision, IReadOnlyList<SceneEntity> entities,
-        Guid? selected, bool grid = false, PlayRoomSnapshot? play = null, Guid? nearbySwitch = null)
+        Guid? selected, bool grid = false, PlayRoomSnapshot? play = null, Guid? nearbySwitch = null,
+        IReadOnlyList<ProjectAsset>? assets = null)
     {
         var triangles = new List<RenderTriangle>();
+        var foreground = new List<RenderTriangle>();
+        var sprites = new List<RenderSprite>();
+        var surface = triangles;
         if (grid)
         {
             for (var index = 1; index < 20; index++)
@@ -30,10 +42,12 @@ public static class SceneArt
             var t = item.Transform;
             if (item.Id == selected)
             {
+                surface = foreground;
                 AtLocal(t, -.508, 0, .025, 1.026, Selection);
                 AtLocal(t, .508, 0, .025, 1.026, Selection);
                 AtLocal(t, 0, -.508, 1.026, .025, Selection);
                 AtLocal(t, 0, .508, 1.026, .025, Selection);
+                surface = triangles;
             }
             if (item.Component is WallPanel panel)
             {
@@ -74,14 +88,21 @@ public static class SceneArt
                 Quad(t with { Width = t.Width * .58, Height = t.Height * .58 }, item.Id == nearbySwitch
                     ? Selection : control.TargetId is null ? Rgb(118, 121, 128) : Rgb(122, 192, 213));
             }
+            else if (item.Component is SceneSprite sprite &&
+                assets?.FirstOrDefault(asset => asset.Id == sprite.AssetId) is { } asset)
+            {
+                var (a, b, c, d) = Corners(t);
+                sprites.Add(new RenderSprite(Image(asset), a, b, c, d));
+            }
         }
         if (play?.Visitor is { } actor)
         {
+            surface = foreground;
             Quad(new Transform2D(actor.X, actor.Y, .032, .054, 45), Rgb(47, 100, 148));
             Quad(new Transform2D(actor.X, actor.Y, .022, .037, 45), Rgb(125, 205, 243));
         }
         return new RenderSnapshot(projectId, revision, Background, triangles,
-            playSessionId: play?.SessionId, playStep: play?.Step);
+            playSessionId: play?.SessionId, playStep: play?.Step, sprites: sprites, foreground: foreground);
 
         void AtLocal(Transform2D t, double x, double y, double width, double height, RenderColor color)
         {
@@ -93,6 +114,14 @@ public static class SceneArt
 
         void Quad(Transform2D t, RenderColor color)
         {
+            var (a, b, c, d) = Corners(t);
+            surface.Add(new RenderTriangle(Vertex(a), Vertex(b), Vertex(c)));
+            surface.Add(new RenderTriangle(Vertex(a), Vertex(c), Vertex(d)));
+            RenderVertex Vertex(RenderPoint p) => new(p.X, p.Y, color);
+        }
+
+        static (RenderPoint, RenderPoint, RenderPoint, RenderPoint) Corners(Transform2D t)
+        {
             var angle = t.Rotation * Math.PI / 180;
             var cos = Math.Cos(angle);
             var sin = Math.Sin(angle);
@@ -100,10 +129,9 @@ public static class SceneArt
             var b = Vertex(t.Width / 2, -t.Height / 2);
             var c = Vertex(t.Width / 2, t.Height / 2);
             var d = Vertex(-t.Width / 2, t.Height / 2);
-            triangles.Add(new RenderTriangle(a, b, c));
-            triangles.Add(new RenderTriangle(a, c, d));
-            RenderVertex Vertex(double x, double y) => new((float)(t.X + x * cos - y * sin),
-                (float)(t.Y + x * sin + y * cos), color);
+            return (a, b, c, d);
+            RenderPoint Vertex(double x, double y) => new((float)(t.X + x * cos - y * sin),
+                (float)(t.Y + x * sin + y * cos));
         }
     }
 

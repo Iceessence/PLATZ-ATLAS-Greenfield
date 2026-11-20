@@ -1,10 +1,12 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using PlatzAtlas.Rendering;
 
@@ -221,6 +223,7 @@ public sealed class RoomViewport : Grid
             _cpu = new CpuPreview(OnCpuDrawn);
             Fit(_cpu);
             RenderOptions.SetEdgeMode(_cpu, EdgeMode.Aliased);
+            RenderOptions.SetBitmapScalingMode(_cpu, BitmapScalingMode.NearestNeighbor);
             var surface = _cpu;
             surface.MouseLeftButtonDown += (_, e) =>
             {
@@ -338,6 +341,7 @@ public sealed class RoomViewport : Grid
 
     private sealed class CpuPreview(Action<RenderSnapshot, int, int, double> completed) : FrameworkElement
     {
+        private static readonly ConditionalWeakTable<RasterTexture, BitmapSource> Images = new();
         private readonly Dictionary<RenderColor, SolidColorBrush> _brushes = new();
         public RenderSnapshot? Snapshot { get; set; }
 
@@ -350,24 +354,52 @@ public sealed class RoomViewport : Grid
             var width = ActualWidth;
             var height = ActualHeight;
             drawingContext.DrawRectangle(BrushFor(snapshot.Background), null, new Rect(0, 0, width, height));
-            foreach (var triangle in snapshot.Triangles)
+            DrawTriangles(snapshot.Triangles);
+            foreach (var image in snapshot.Sprites)
             {
-                var geometry = new StreamGeometry();
-                using (var figure = geometry.Open())
-                {
-                    figure.BeginFigure(PointFor(triangle.A), isFilled: true, isClosed: true);
-                    figure.LineTo(PointFor(triangle.B), isStroked: false, isSmoothJoin: false);
-                    figure.LineTo(PointFor(triangle.C), isStroked: false, isSmoothJoin: false);
-                }
-                geometry.Freeze();
-                drawingContext.DrawGeometry(BrushFor(triangle.A.Color), null, geometry);
+                var a = image.A;
+                var b = image.B;
+                var d = image.D;
+                var matrix = new Matrix((b.X - a.X) * width, (b.Y - a.Y) * height,
+                    (d.X - a.X) * width, (d.Y - a.Y) * height, a.X * width, a.Y * height);
+                drawingContext.PushTransform(new MatrixTransform(matrix));
+                drawingContext.DrawImage(Images.GetValue(image.Image, BuildBitmap), new Rect(0, 0, 1, 1));
+                drawingContext.Pop();
             }
+            DrawTriangles(snapshot.Foreground);
             var elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
             var dpi = VisualTreeHelper.GetDpi(this);
             Dispatcher.InvokeAsync(() => completed(snapshot, (int)Math.Round(width * dpi.DpiScaleX),
                 (int)Math.Round(height * dpi.DpiScaleY), elapsed), DispatcherPriority.Loaded);
 
             Point PointFor(RenderVertex vertex) => new(vertex.X * width, vertex.Y * height);
+
+            void DrawTriangles(IReadOnlyList<RenderTriangle> triangles)
+            {
+                foreach (var triangle in triangles)
+                {
+                    var geometry = new StreamGeometry();
+                    using (var figure = geometry.Open())
+                    {
+                        figure.BeginFigure(PointFor(triangle.A), isFilled: true, isClosed: true);
+                        figure.LineTo(PointFor(triangle.B), isStroked: false, isSmoothJoin: false);
+                        figure.LineTo(PointFor(triangle.C), isStroked: false, isSmoothJoin: false);
+                    }
+                    geometry.Freeze();
+                    drawingContext.DrawGeometry(BrushFor(triangle.A.Color), null, geometry);
+                }
+            }
+        }
+
+        private static BitmapSource BuildBitmap(RasterTexture source)
+        {
+            var bgra = source.Rgba.ToArray();
+            for (var index = 0; index < bgra.Length; index += 4)
+                (bgra[index], bgra[index + 2]) = (bgra[index + 2], bgra[index]);
+            var bitmap = BitmapSource.Create(source.Width, source.Height, 96, 96, PixelFormats.Bgra32,
+                null, bgra, source.Width * 4);
+            bitmap.Freeze();
+            return bitmap;
         }
 
         private SolidColorBrush BrushFor(RenderColor color)

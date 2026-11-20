@@ -277,7 +277,7 @@ public partial class MainWindow : Window
     {
         var project = _session.Current;
         var general = project.Scene is not null;
-        SceneActions.Visibility = general ? Visibility.Visible : Visibility.Collapsed;
+        SceneActions.Visibility = SceneAssetsTab.Visibility = general ? Visibility.Visible : Visibility.Collapsed;
         MuseumAtlasTab.Visibility = MuseumInspector.Visibility = general ? Visibility.Collapsed : Visibility.Visible;
         if (general)
         {

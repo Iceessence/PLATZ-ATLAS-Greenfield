@@ -7,7 +7,7 @@ namespace PlatzAtlas.Rendering;
 public sealed class OpenGlViewportException(string message, Exception? cause = null) : Exception(message, cause);
 
 /// <summary>A single-threaded, on-demand OpenGL compatibility renderer for a caller-owned HWND.</summary>
-public sealed unsafe class OpenGlViewport : IDisposable
+public sealed unsafe partial class OpenGlViewport : IDisposable
 {
     private const uint ColorBufferBit = 0x00004000;
     private const uint GlTriangles = 0x0004;
@@ -48,7 +48,7 @@ public sealed unsafe class OpenGlViewport : IDisposable
     private bool _simulateDeviceLoss;
     private bool _disposed;
     private long _frames;
-    private GpuVertex[] _uploadScratch = [];
+    private GpuSceneVertex[] _uploadScratch = [];
     private byte[] _readbackScratch = [];
 
     private delegate* unmanaged[Stdcall]<uint, uint> _glCreateShader;
@@ -79,16 +79,6 @@ public sealed unsafe class OpenGlViewport : IDisposable
     private delegate* unmanaged[Stdcall]<uint, void> _glEndQuery;
     private delegate* unmanaged[Stdcall]<uint, uint, int*, void> _glGetQueryObjectiv;
     private delegate* unmanaged[Stdcall]<uint, uint, ulong*, void> _glGetQueryObjectui64v;
-
-    [StructLayout(LayoutKind.Sequential)]
-    private readonly struct GpuVertex(RenderVertex vertex)
-    {
-        public readonly float X = vertex.X;
-        public readonly float Y = vertex.Y;
-        public readonly float R = vertex.Color.R;
-        public readonly float G = vertex.Color.G;
-        public readonly float B = vertex.Color.B;
-    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct PixelFormatDescriptor
@@ -178,7 +168,7 @@ public sealed unsafe class OpenGlViewport : IDisposable
         glClearColor(snapshot.Background.R, snapshot.Background.G, snapshot.Background.B, 1f);
         glClear(ColorBufferBit);
 
-        int vertexCount = UploadTriangles(snapshot.Triangles);
+        int vertexCount = UploadVertices(snapshot);
         if (vertexCount > 0)
         {
             _glUseProgram(_program);
@@ -339,21 +329,36 @@ public sealed unsafe class OpenGlViewport : IDisposable
             #version 330 core
             layout(location = 0) in vec2 position;
             layout(location = 1) in vec3 color;
+            layout(location = 2) in vec2 imageUv;
+            layout(location = 3) in vec3 imageData;
             out vec3 vertexColor;
+            out vec2 uv;
+            flat out ivec3 image;
             void main()
             {
                 gl_Position = vec4(position.x * 2.0 - 1.0, 1.0 - position.y * 2.0, 0.0, 1.0);
                 vertexColor = color;
+                uv = imageUv;
+                image = ivec3(imageData);
             }
             """;
 
         const string fragmentSource = """
             #version 330 core
             in vec3 vertexColor;
+            in vec2 uv;
+            flat in ivec3 image;
+            uniform samplerBuffer imageStrip;
             out vec4 fragmentColor;
             void main()
             {
-                fragmentColor = vec4(vertexColor, 1.0);
+                if (image.y == 0)
+                {
+                    fragmentColor = vec4(vertexColor, 1.0);
+                    return;
+                }
+                ivec2 pixel = clamp(ivec2(uv * vec2(image.yz)), ivec2(0), image.yz - 1);
+                fragmentColor = texelFetch(imageStrip, image.x + pixel.y * image.y + pixel.x);
             }
             """;
 
@@ -391,11 +396,16 @@ public sealed unsafe class OpenGlViewport : IDisposable
         _glBindVertexArray(_vao);
         _glBindBuffer(GlArrayBuffer, _vbo);
         _glEnableVertexAttribArray(0);
-        _glVertexAttribPointer(0, 2, GlFloat, 0, sizeof(GpuVertex), 0);
+        _glVertexAttribPointer(0, 2, GlFloat, 0, sizeof(GpuSceneVertex), 0);
         _glEnableVertexAttribArray(1);
-        _glVertexAttribPointer(1, 3, GlFloat, 0, sizeof(GpuVertex), 2 * sizeof(float));
+        _glVertexAttribPointer(1, 3, GlFloat, 0, sizeof(GpuSceneVertex), 2 * sizeof(float));
+        _glEnableVertexAttribArray(2);
+        _glVertexAttribPointer(2, 2, GlFloat, 0, sizeof(GpuSceneVertex), 5 * sizeof(float));
+        _glEnableVertexAttribArray(3);
+        _glVertexAttribPointer(3, 3, GlFloat, 0, sizeof(GpuSceneVertex), 7 * sizeof(float));
         _glBindVertexArray(0);
         _glBindBuffer(GlArrayBuffer, 0);
+        CreateTextureBuffer();
 
         if (_glGenQueries != null)
         {
@@ -457,26 +467,21 @@ public sealed unsafe class OpenGlViewport : IDisposable
         }
     }
 
-    private int UploadTriangles(IReadOnlyList<RenderTriangle> triangles)
+    private int UploadVertices(RenderSnapshot snapshot)
     {
-        int vertexCount = checked(triangles.Count * 3);
+        if (_imageStrip.Update(snapshot))
+            UploadImageStrip();
+        int vertexCount = GpuImageStrip.VertexCount(snapshot);
         if (vertexCount == 0)
             return 0;
 
         if (_uploadScratch.Length < vertexCount)
-            _uploadScratch = new GpuVertex[Math.Max(vertexCount, 64)];
-
-        int index = 0;
-        foreach (RenderTriangle triangle in triangles)
-        {
-            _uploadScratch[index++] = new GpuVertex(triangle.A);
-            _uploadScratch[index++] = new GpuVertex(triangle.B);
-            _uploadScratch[index++] = new GpuVertex(triangle.C);
-        }
+            _uploadScratch = new GpuSceneVertex[Math.Max(vertexCount, 64)];
+        _imageStrip.Fill(snapshot, _uploadScratch, null, linearTexture: false);
 
         _glBindBuffer(GlArrayBuffer, _vbo);
-        fixed (GpuVertex* first = _uploadScratch)
-            _glBufferData(GlArrayBuffer, checked(vertexCount * sizeof(GpuVertex)), first, GlStreamDraw);
+        fixed (GpuSceneVertex* first = _uploadScratch)
+            _glBufferData(GlArrayBuffer, checked(vertexCount * sizeof(GpuSceneVertex)), first, GlStreamDraw);
         _glBindBuffer(GlArrayBuffer, 0);
         return vertexCount;
     }
@@ -524,6 +529,7 @@ public sealed unsafe class OpenGlViewport : IDisposable
         {
             if (wglMakeCurrent(_hdc, _context))
             {
+                DestroyTextureBuffer();
                 if (_timeQuery != 0 && _glDeleteQueries != null)
                 {
                     uint q = _timeQuery;

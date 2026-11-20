@@ -17,6 +17,8 @@ public sealed partial class ProjectSession
         CheckEditBase(operation.ProjectId, operation.BaseRevision);
         var scene = Current.Scene ?? throw new ProjectEditException(EditRejection.WrongTarget,
             "Create a blank project to edit scene objects.");
+        if (operation is ImportSceneAsset import)
+            return ApplyAssetImport(scene, import);
         var prior = scene.Entities.SingleOrDefault(entity => entity.Id == operation.EntityId);
         if (operation is AddSceneEntity && (prior is not null || operation.EntityId == Current.ProjectId ||
             operation.EntityId == Current.SceneId || scene.History.Any(edit => edit.EntityId == operation.EntityId)))
@@ -50,11 +52,23 @@ public sealed partial class ProjectSession
         if (prior is null)
             return false;
         CommitScene(Current.Scene!, new SceneEdit(Current.Revision + 1, prior.EntityId,
-            prior.After, prior.Before, kind, prior.Revision));
+            prior.After, prior.Before, kind, prior.Revision) { AssetChange = SceneJournal.InvertAssetChange(prior.AssetChange) });
         return true;
     }
 
-    private void CommitScene(SceneDocument scene, SceneEdit edit)
+    private bool ApplyAssetImport(SceneDocument scene, ImportSceneAsset operation)
+    {
+        if (Current.Assets.Any(item => item.Id == operation.Asset.Id) ||
+            scene.History.Any(edit => edit.EntityId == operation.Asset.Id))
+            throw new ProjectEditException(EditRejection.WrongTarget, "This asset ID already exists.");
+        var catalog = Array.AsReadOnly(Current.Assets.Append(operation.Asset).OrderBy(item => item.Id).ToArray());
+        PixelAsset.ValidateCatalog(catalog, Current.ProjectId, Current.SceneId);
+        CommitScene(scene, new SceneEdit(Current.Revision + 1, operation.Asset.Id, null, null, LightEditKind.Edit, null)
+            { AssetChange = new AssetPresence(true) }, catalog);
+        return true;
+    }
+
+    private void CommitScene(SceneDocument scene, SceneEdit edit, IReadOnlyList<ProjectAsset>? catalog = null)
     {
         if (scene.History.Count == SceneValidation.MaxEdits)
             throw new InvalidDataException("This scene has reached its edit history limit.");
@@ -63,8 +77,20 @@ public sealed partial class ProjectSession
             entities = entities.Append(edit.After);
         var ordered = Array.AsReadOnly(entities.OrderBy(item => item.Id).ToArray());
         SceneValidation.ValidateEntities(ordered, Current.ProjectId, Current.SceneId);
-        var next = new SceneDocument(ordered, Array.AsReadOnly(scene.History.Append(edit).ToArray()));
+        var active = (scene.ActiveAssetIds ?? []).ToHashSet();
+        if (edit.AssetChange is { } change)
+        {
+            if (change.IsPresent)
+                active.Add(edit.EntityId);
+            else
+                active.Remove(edit.EntityId);
+        }
+        SceneValidation.ValidateImages(ordered, active);
+        var next = new SceneDocument(ordered, Array.AsReadOnly(scene.History.Append(edit).ToArray()))
+        {
+            ActiveAssetIds = active.Count == 0 ? null : Array.AsReadOnly(active.Order().ToArray())
+        };
         sceneJournal.Record(edit);
-        Current = Current with { Revision = edit.Revision, Scene = next };
+        Current = Current with { Revision = edit.Revision, Scene = next, Assets = catalog ?? Current.Assets };
     }
 }

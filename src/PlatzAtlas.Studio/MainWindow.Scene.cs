@@ -47,6 +47,7 @@ public partial class MainWindow
         SceneInspector.Visibility = entity is null ? Visibility.Collapsed : Visibility.Visible;
         ObjectId.Text = entity?.Id.ToString() ?? "—";
         ProjectId.Text = project.ProjectId.ToString();
+        RefreshAssetBrowser();
         if (entity is not null)
         {
             SceneName.Text = entity.Name;
@@ -79,7 +80,7 @@ public partial class MainWindow
         AutomationProperties.SetName(Viewport, play is null ? "Room canvas" : "Playable room canvas");
         Viewport.Show(SceneArt.Create(current.ProjectId, current.Revision, entities,
             play is null ? SelectedEntityId : _lastPlaySwitch?.TargetId,
-            grid: play is null, play: play, nearbySwitch: _play?.NearbySwitch?.SwitchId), editStarted);
+            grid: play is null, play: play, nearbySwitch: _play?.NearbySwitch?.SwitchId, assets: current.Assets), editStarted);
     }
 
     private void AddSceneClicked(object sender, RoutedEventArgs e)
@@ -263,6 +264,7 @@ public partial class MainWindow
         WallPanel => "Wall",
         SceneDoor => "Door",
         SceneSwitch => "Switch",
+        SceneSprite => "Image",
         _ => "Lamp"
     };
     private sealed record SwitchTargetItem(Guid? Id, string Label);

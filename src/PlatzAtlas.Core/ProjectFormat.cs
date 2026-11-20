@@ -87,13 +87,13 @@ internal static class ProjectFormat
 
         if (project.SchemaVersion == MuseumProject.SceneFormatVersion)
         {
-            if (project.Scene is null || project.Objects.Count != 0 || project.Switches.Count != 0 ||
-                project.Assets.Count != 0 || project.History.Count != 0)
+            if (project.Scene is null || project.Objects.Count != 0 || project.Switches.Count != 0 || project.History.Count != 0)
                 throw new InvalidDataException("The scene document contains incompatible project records.");
+            PixelAsset.ValidateCatalog(project.Assets, project.ProjectId, project.SceneId);
             return project with
             {
-                Scene = SceneJournal.Validate(project.Scene, project.ProjectId, project.SceneId, project.Revision),
-                Objects = [], Switches = [], Assets = [], History = []
+                Scene = SceneJournal.Validate(project.Scene, project.Assets, project.ProjectId, project.SceneId, project.Revision),
+                Objects = [], Switches = [], Assets = Array.AsReadOnly(project.Assets.OrderBy(asset => asset.Id).ToArray()), History = []
             };
         }
 

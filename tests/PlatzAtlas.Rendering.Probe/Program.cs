@@ -23,7 +23,15 @@ RenderTriangle[] triangles =
     new(new(.2f, .8f, yellow), new(.5f, .2f, yellow), new(.8f, .8f, yellow)),
     new(new(.4f, .65f, green), new(.5f, .44f, green), new(.6f, .65f, green))
 ];
-var snapshot = new RenderSnapshot(new Guid("a84faf30-efe9-4c7a-956a-ed066a292cc8"), 0, blue, triangles);
+var id = new Guid("a84faf30-efe9-4c7a-956a-ed066a292cc8");
+var blank = new RenderSnapshot(id, 0, blue, triangles);
+var image = new RasterTexture(2, 2, new byte[]
+{
+    224, 81, 39, 255, 255, 0, 255, 0,
+    38, 154, 210, 128, 60, 205, 162, 255
+});
+var snapshot = new RenderSnapshot(id, 1, blue, triangles,
+    sprites: [new RenderSprite(image, new(.64f, .10f), new(.94f, .10f), new(.94f, .40f), new(.64f, .40f))]);
 
 byte[] vkPixels;
 using (var window = CreateProbeWindow("PLATZ ATLAS Vulkan frame probe"))
@@ -34,7 +42,7 @@ using (var window = CreateProbeWindow("PLATZ ATLAS Vulkan frame probe"))
         if (requireValidation && !renderer.ValidationEnabled)
             throw new InvalidOperationException("Khronos validation layer was required but not enabled.");
 
-        ShowVulkanFrame(renderer, snapshot, window);
+        ShowVulkanFrame(renderer, blank, window);
         Console.WriteLine(renderer.Diagnostics);
 
         window.ClientSize = new Size(340, 260);
@@ -48,6 +56,7 @@ using (var window = CreateProbeWindow("PLATZ ATLAS Vulkan frame probe"))
             CheckPixel(bitmap, .10, .10, Color.FromArgb(14, 26, 44), "Vulkan");
             CheckPixel(bitmap, .50, .30, Color.FromArgb(240, 180, 70), "Vulkan");
             CheckPixel(bitmap, .50, .55, Color.FromArgb(34, 158, 95), "Vulkan");
+            CheckTexture(bitmap, "Vulkan");
         }
 
         renderer.SimulateDeviceLoss();
@@ -75,7 +84,7 @@ using (var glWindow = CreateProbeWindow("PLATZ ATLAS OpenGL frame probe"))
 {
     using (var glRenderer = new OpenGlViewport(glWindow.Handle))
     {
-        ShowOpenGlFrame(glRenderer, snapshot, glWindow);
+        ShowOpenGlFrame(glRenderer, blank, glWindow);
         Console.WriteLine(glRenderer.Diagnostics);
 
         glWindow.ClientSize = new Size(340, 260);
@@ -89,6 +98,7 @@ using (var glWindow = CreateProbeWindow("PLATZ ATLAS OpenGL frame probe"))
             CheckPixel(glBitmap, .10, .10, Color.FromArgb(14, 26, 44), "OpenGL");
             CheckPixel(glBitmap, .50, .30, Color.FromArgb(240, 180, 70), "OpenGL");
             CheckPixel(glBitmap, .50, .55, Color.FromArgb(34, 158, 95), "OpenGL");
+            CheckTexture(glBitmap, "OpenGL");
         }
 
         glRenderer.SimulateDeviceLoss();
@@ -171,7 +181,8 @@ static void CheckPixel(Bitmap pixels, double x, double y, Color expected, string
 
 static void CompareSampledPixels(byte[] vkBgra, byte[] glBgra, int width, int height)
 {
-    foreach ((double x, double y) in new[] { (.10, .10), (.50, .30), (.50, .55), (.25, .75), (.75, .75) })
+    foreach ((double x, double y) in new[] { (.10, .10), (.50, .30), (.50, .55), (.25, .75), (.75, .75),
+        (.70, .16), (.88, .16), (.70, .34), (.88, .34) })
     {
         int offset = (((int)(y * height) * width) + (int)(x * width)) * 4;
         int db = Math.Abs(vkBgra[offset] - glBgra[offset]);
@@ -180,6 +191,14 @@ static void CompareSampledPixels(byte[] vkBgra, byte[] glBgra, int width, int he
         if (db > 2 || dg > 2 || dr > 2)
             throw new InvalidOperationException($"Vulkan vs OpenGL mismatch at ({x}, {y}): delta BGR=({db},{dg},{dr}).");
     }
+}
+
+static void CheckTexture(Bitmap bitmap, string backend)
+{
+    CheckPixel(bitmap, .70, .16, Color.FromArgb(224, 81, 39), backend);
+    CheckPixel(bitmap, .88, .16, Color.FromArgb(14, 26, 44), backend);
+    CheckPixel(bitmap, .70, .34, Color.FromArgb(26, 90, 127), backend);
+    CheckPixel(bitmap, .88, .34, Color.FromArgb(60, 205, 162), backend);
 }
 
 static void AssertZeroValidationIssues(VulkanViewport viewport, string phase)

@@ -538,6 +538,7 @@ public sealed unsafe partial class VulkanViewport : IDisposable
                 _vk.DeviceWaitIdle(_device);
                 DestroySwapchain();
                 DestroyVertexBuffer();
+                DestroyTextureResources();
                 DestroyReadbackBuffer();
                 if (_timestamps.Handle != 0)
                     _vk.DestroyQueryPool(_device, _timestamps, null);

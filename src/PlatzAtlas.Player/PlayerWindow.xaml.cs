@@ -163,7 +163,7 @@ public partial class PlayerWindow : Window
                     _ => null
                 }).OfType<string>());
             Viewport.Show(SceneArt.Create(snapshot.ProjectId, snapshot.SourceRevision, entities,
-                _lastSwitch?.TargetId, play: snapshot, nearbySwitch: nearby?.SwitchId));
+                _lastSwitch?.TargetId, play: snapshot, nearbySwitch: nearby?.SwitchId, assets: _room?.RasterAssets));
         }
         else
         {
