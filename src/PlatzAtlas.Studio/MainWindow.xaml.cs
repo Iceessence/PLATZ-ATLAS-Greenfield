@@ -297,8 +297,9 @@ public partial class MainWindow : Window
         var general = project.Scene is not null;
         BlankRoomHelp.Visibility = _play is null && project.Scene is { Entities.Count: 0 } ? Visibility.Visible : Visibility.Collapsed;
         SceneActions.Visibility = SceneAssetsTab.Visibility = SceneAtlasTab.Visibility =
+            OutlinerFilterBar.Visibility = OutlinerFilterChips.Visibility = QuickAddStrip.Visibility =
             general ? Visibility.Visible : Visibility.Collapsed;
-        RoomAppearanceEditor.Visibility = SceneActions.Visibility;
+        RoomAppearanceCard.Visibility = RoomAppearanceEditor.Visibility = SceneActions.Visibility;
         MuseumAtlasTab.Visibility = MuseumInspector.Visibility = general ? Visibility.Collapsed : Visibility.Visible;
         AssistantTabs.SelectedItem = general ? SceneAtlasTab : MuseumAtlasTab;
         if (general)
@@ -442,9 +443,13 @@ public partial class MainWindow : Window
         button.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
     }
 
-    private sealed record SceneObjectItem(Guid Id, string Name, string Location, string? Number = null, Geometry? Icon = null)
+    private sealed record SceneObjectItem(Guid Id, string Name, string Location, string? Number = null,
+        Geometry? Icon = null, string? Badge = null, bool BadgeAccent = false)
     {
         public string Subheading => Number is null ? Location : $"{Number} · {Location}";
         public string AccessibleName => $"{Name}, {Subheading}";
+        public Visibility BadgeVisibility => string.IsNullOrEmpty(Badge) ? Visibility.Collapsed : Visibility.Visible;
+        public Brush BadgeBorder => (Brush)Application.Current.FindResource(BadgeAccent ? "Accent" : "Border");
+        public Brush BadgeForeground => (Brush)Application.Current.FindResource(BadgeAccent ? "Accent" : "Muted");
     }
 }

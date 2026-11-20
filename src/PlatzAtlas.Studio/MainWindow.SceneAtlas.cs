@@ -1,5 +1,9 @@
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
 using PlatzAtlas.Atlas;
 using PlatzAtlas.Core;
 using PlatzAtlas.Runtime;
@@ -9,6 +13,7 @@ namespace PlatzAtlas.Studio;
 public partial class MainWindow
 {
     private readonly SceneQuestionHost _sceneAtlasHost = new();
+    private readonly ObservableCollection<AtlasTranscriptEntry> _atlasTranscript = [];
     private ProjectReadGrant? _sceneAtlasGrant;
     private string? _sceneAtlasPath;
     private SceneAnswer? _sceneAtlasAnswer;
@@ -17,6 +22,9 @@ public partial class MainWindow
     private void ResetSceneAtlas()
     {
         RevokeSceneAtlas();
+        _atlasTranscript.Clear();
+        SceneAtlasTranscript.ItemsSource = _atlasTranscript;
+        SceneAtlasTranscriptCard.Visibility = Visibility.Collapsed;
         SceneAtlasQuestion.Text = "Inspect selection";
     }
 
@@ -52,6 +60,8 @@ public partial class MainWindow
         SceneAtlasAccess.Content = _sceneAtlasGrant is null ? "Allow scene read" : "Revoke scene read";
         SceneAtlasAsk.IsEnabled = _sceneAtlasGrant is not null;
         SceneAtlasHealth.IsEnabled = SceneAtlasAsk.IsEnabled;
+        if (SceneAtlasStatusDot is not null)
+            SceneAtlasStatusDot.Fill = (Brush)FindResource(!available ? "Error" : _sceneAtlasGrant is not null ? "PreviewAccent" : "Border");
         SceneAtlasScope.Text = !available ? "Return to Edit to ask about your room." : _sceneAtlasGrant is null
             ? $"Allow a read of working revision {current.Revision}."
             : $"Reading working revision {current.Revision}. Proposed changes require your approval.";
@@ -77,6 +87,7 @@ public partial class MainWindow
         {
             RevokeSceneAtlas();
             SceneAtlasResult.Text = "Scene access revoked.";
+            AppendAtlasTranscript("Access", "Scene read revoked.", accent: false);
         }
         else
         {
@@ -93,10 +104,50 @@ public partial class MainWindow
             });
             _sceneAtlasPath = session.FilePath;
             SceneAtlasResult.Text = "";
+            AppendAtlasTranscript("Access", $"Granted read of working r{scope.Revision}.", accent: true);
         }
         UpdateSceneAtlas();
         UpdateScenePresentation();
     });
+
+    private void SceneAtlasChipClicked(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string tag })
+            return;
+        if (tag == "__health__")
+        {
+            if (_sceneAtlasGrant is not null)
+                SceneAtlasHealthClicked(sender, e);
+            else
+                SceneAtlasResult.Text = "Allow scene read first to check health.";
+            return;
+        }
+        SceneAtlasQuestion.Text = tag;
+        if (_sceneAtlasGrant is not null)
+            SceneAtlasAskClicked(sender, e);
+    }
+
+    private void SceneAtlasQuestionKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            e.Handled = true;
+            if (SceneAtlasAsk.IsEnabled)
+                SceneAtlasAskClicked(sender, e);
+        }
+    }
+
+    private void AppendAtlasTranscript(string role, string summary, bool accent)
+    {
+        if (_atlasTranscript.Count >= 20)
+            _atlasTranscript.RemoveAt(0);
+        _atlasTranscript.Add(new AtlasTranscriptEntry(role, summary,
+            (Brush)FindResource(accent ? "PreviewAccent" : "Muted")));
+        SceneAtlasTranscript.ItemsSource = _atlasTranscript;
+        SceneAtlasTranscriptCard.Visibility = _atlasTranscript.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private sealed record AtlasTranscriptEntry(string Role, string Summary, Brush RoleBrush);
 
     private void SceneAtlasAskClicked(object sender, RoutedEventArgs e) => WithSceneAtlas(() =>
     {
@@ -134,6 +185,7 @@ public partial class MainWindow
         }
         _diagnostics.Log("scene-atlas-read", new { status = result.Status.ToString(), revision = grant.Scope.Revision,
             objectId = result.Answer?.Source?.Id, healthIssues = result.Health?.Issues.Count });
+        AppendAtlasTranscript("ATLAS", SceneAtlasResult.Text.Replace('\n', ' '), accent: result.Answer is not null);
         UpdateSceneAtlas();
         UpdateScenePresentation();
     });

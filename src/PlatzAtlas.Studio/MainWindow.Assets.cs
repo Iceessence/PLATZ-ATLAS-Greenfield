@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using PlatzAtlas.Core;
+using PlatzAtlas.Rendering;
 using PlatzAtlas.RoomView;
 
 namespace PlatzAtlas.Studio;
@@ -133,9 +134,9 @@ public partial class MainWindow
             .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
             .Select(item =>
             {
-                var dimensions = SceneArt.Image(item);
-                return new AssetItem(item.Id, item.Name, ReadableId(item.Id, "A"), dimensions.Width, dimensions.Height,
-                    item.MediaType == PixelClip.MediaType);
+                var image = SceneArt.Image(item);
+                return new AssetItem(item.Id, item.Name, ReadableId(item.Id, "A"), image.Width, image.Height,
+                    item.MediaType == PixelClip.MediaType, ThumbnailFor(image));
             }).Where(item => item.Label.Contains(search, StringComparison.CurrentCultureIgnoreCase)).ToArray();
         SceneAssetList.ItemsSource = items;
         SceneAssetList.SelectedItem = items.FirstOrDefault(item => item.Id == prior) ?? items.FirstOrDefault();
@@ -168,8 +169,23 @@ public partial class MainWindow
         SideTabs.SelectedItem = InspectorTab;
     }
 
-    private sealed record AssetItem(Guid Id, string Name, string Number, int Width, int Height, bool Animated)
+    private static BitmapSource ThumbnailFor(RasterTexture image)
     {
+        var raw = image.Rgba.Span;
+        var bgra = new byte[raw.Length];
+        raw.CopyTo(bgra);
+        for (var i = 0; i < bgra.Length; i += 4)
+            (bgra[i], bgra[i + 2]) = (bgra[i + 2], bgra[i]);
+        var bmp = BitmapSource.Create(image.Width, image.Height, 96, 96, PixelFormats.Bgra32, null, bgra, image.Width * 4);
+        bmp.Freeze();
+        return bmp;
+    }
+
+    private sealed record AssetItem(Guid Id, string Name, string Number, int Width, int Height, bool Animated, BitmapSource Thumbnail)
+    {
+        public string MetaText => $"{Number} · {Width} × {Height}";
         public string Label => $"{Name} · {Number} · {Width} × {Height}" + (Animated ? " · Animated" : "");
+        public Visibility AnimatedVisibility => Animated ? Visibility.Visible : Visibility.Collapsed;
+        public override string ToString() => Label;
     }
 }

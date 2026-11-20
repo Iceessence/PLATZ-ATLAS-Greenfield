@@ -15,17 +15,20 @@ public partial class PixelEditorWindow : Window
 {
     private static readonly uint[] Colors =
     [
-        0x192331ff, 0x334b64ff, 0x6585a1ff, 0xc1d6dcff, 0xf7f4eaff,
-        0x654260ff, 0xab5788ff, 0xdd847fff, 0xf0ba83ff, 0xffdc8fff,
-        0x245349ff, 0x338678ff, 0x51b785ff, 0xaed58fff, 0x78b5eaff
+        0x192331ff, 0x334b64ff, 0x6585a1ff, 0xc1d6dcff, 0xf7f4eaff, 0x11151cff,
+        0x654260ff, 0xab5788ff, 0xdd847fff, 0xf0ba83ff, 0xffdc8fff, 0xd77643ff,
+        0x245349ff, 0x338678ff, 0x51b785ff, 0xaed58fff, 0x78b5eaff, 0x2ce8f5ff,
+        0x262b44ff, 0x3a4466ff, 0x7a367bff, 0xfeae34ff, 0x3e8948ff, 0xffffff80
     ];
     private PixelDraft _draft => _frames[_activeFrame].Drawing;
     private WriteableBitmap? _editBitmap;
     private byte[] _bgra = [];
     private Point? _last;
+    private (int StartX, int StartY, int EndX, int EndY)? _shape;
     private int _x, _y;
     private Tool _tool = Tool.Paint;
     private uint _strokeColor;
+    private bool _syncColor;
 
     internal PixelEditorWindow(ProjectAsset? source)
     {
@@ -78,6 +81,14 @@ public partial class PixelEditorWindow : Window
     {
         if (_last is not { } prior || Cell(point) is not { } next || next == prior)
             return;
+        if (_shape is { } shape)
+        {
+            _shape = shape with { EndX = (int)next.X, EndY = (int)next.Y };
+            _last = next;
+            _x = (int)next.X; _y = (int)next.Y;
+            RefreshPixels();
+            return;
+        }
         _draft.PaintLine((int)prior.X, (int)prior.Y, (int)next.X, (int)next.Y, _strokeColor);
         _last = next;
         _x = (int)next.X; _y = (int)next.Y;
@@ -117,6 +128,12 @@ public partial class PixelEditorWindow : Window
             RefreshPixels();
             return false;
         }
+        if (_tool is Tool.Line or Tool.Rect)
+        {
+            _shape = (x, y, x, y);
+            RefreshPixels();
+            return true;
+        }
         if (_tool == Tool.Erase)
             _strokeColor = 0;
         _draft.BeginStroke();
@@ -128,9 +145,34 @@ public partial class PixelEditorWindow : Window
     private void FinishStroke()
     {
         _last = null;
-        _draft.EndStroke();
+        if (_shape is { } shape)
+        {
+            _shape = null;
+            _draft.BeginStroke();
+            CommitShape(shape.StartX, shape.StartY, shape.EndX, shape.EndY, _tool == Tool.Rect, _strokeColor);
+            _draft.EndStroke();
+        }
+        else
+            _draft.EndStroke();
         if (PixelSurface.IsMouseCaptured)
             PixelSurface.ReleaseMouseCapture();
+    }
+
+    private void CommitShape(int x0, int y0, int x1, int y1, bool rect, uint color)
+    {
+        if (!rect)
+        {
+            _draft.PaintLine(x0, y0, x1, y1, color);
+            return;
+        }
+        var minX = Math.Min(x0, x1);
+        var maxX = Math.Max(x0, x1);
+        var minY = Math.Min(y0, y1);
+        var maxY = Math.Max(y0, y1);
+        _draft.PaintLine(minX, minY, maxX, minY, color);
+        _draft.PaintLine(minX, maxY, maxX, maxY, color);
+        _draft.PaintLine(minX, minY, minX, maxY, color);
+        _draft.PaintLine(maxX, minY, maxX, maxY, color);
     }
 
     private void SizeClicked(object sender, RoutedEventArgs e)
@@ -270,7 +312,53 @@ public partial class PixelEditorWindow : Window
         }
     }
 
-    private void SelectColor(uint color) => PixelColor.Text = $"{color:X8}";
+    private void SelectColor(uint color)
+    {
+        _syncColor = true;
+        PixelColor.Text = $"{color:X8}";
+        ApplyRgbaToSliders(color);
+        _syncColor = false;
+    }
+
+    private void PixelColorChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_syncColor || SliderR is null)
+            return;
+        var value = PixelColor.Text.Trim().TrimStart('#');
+        if (value.Length == 8 && uint.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var color))
+        {
+            _syncColor = true;
+            ApplyRgbaToSliders(color);
+            _syncColor = false;
+        }
+        else if (ColorPreviewSwatch is not null)
+            ColorPreviewSwatch.Background = Brushes.Transparent;
+    }
+
+    private void RgbaSliderChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_syncColor || !IsLoaded || PixelColor is null)
+            return;
+        var rgba = ((uint)(byte)SliderR.Value << 24) | ((uint)(byte)SliderG.Value << 16) |
+                   ((uint)(byte)SliderB.Value << 8) | (byte)SliderA.Value;
+        _syncColor = true;
+        ApplyRgbaToSliders(rgba);
+        PixelColor.Text = $"{rgba:X8}";
+        _syncColor = false;
+    }
+
+    private void ApplyRgbaToSliders(uint rgba)
+    {
+        if (SliderR is null)
+            return;
+        byte r = (byte)(rgba >> 24), g = (byte)(rgba >> 16), b = (byte)(rgba >> 8), a = (byte)rgba;
+        SliderR.Value = r; SliderG.Value = g; SliderB.Value = b; SliderA.Value = a;
+        LabelR.Text = r.ToString(CultureInfo.InvariantCulture);
+        LabelG.Text = g.ToString(CultureInfo.InvariantCulture);
+        LabelB.Text = b.ToString(CultureInfo.InvariantCulture);
+        LabelA.Text = a.ToString(CultureInfo.InvariantCulture);
+        ColorPreviewSwatch.Background = BrushFor(rgba);
+    }
 
     private bool TryReadColor(out uint color)
     {
@@ -306,6 +394,8 @@ public partial class PixelEditorWindow : Window
             _editBitmap = new WriteableBitmap(_draft.Size, _draft.Size, 96, 96, PixelFormats.Bgra32, null);
         }
         _draft.CopyBgraTo(_bgra);
+        if (_shape is { } shape)
+            OverlayShapePreview(_bgra, _draft.Size, shape.StartX, shape.StartY, shape.EndX, shape.EndY, _tool == Tool.Rect, _strokeColor);
         _editBitmap.WritePixels(new Int32Rect(0, 0, _draft.Size, _draft.Size), _bgra, _draft.Size * 4, 0);
         PixelImage.Source = _editBitmap;
         PixelUndo.IsEnabled = _frames.Count == 1 ? _draft.CanUndo : _draft.CanUndoWithoutResize;
@@ -315,6 +405,45 @@ public partial class PixelEditorWindow : Window
         foreach (var button in ToolButtons.Children.OfType<Button>())
             button.BorderBrush = (Brush)FindResource(button.Tag.ToString() == _tool.ToString() ? "Accent" : "Border");
         PixelStatus.Text = $"{_tool} · Pixel {_x + 1}, {_y + 1}";
+    }
+
+    private static void OverlayShapePreview(byte[] bgra, int size, int x0, int y0, int x1, int y1, bool rect, uint color)
+    {
+        if (!rect)
+        {
+            PlotLine(bgra, size, x0, y0, x1, y1, color);
+            return;
+        }
+        var minX = Math.Min(x0, x1);
+        var maxX = Math.Max(x0, x1);
+        var minY = Math.Min(y0, y1);
+        var maxY = Math.Max(y0, y1);
+        PlotLine(bgra, size, minX, minY, maxX, minY, color);
+        PlotLine(bgra, size, minX, maxY, maxX, maxY, color);
+        PlotLine(bgra, size, minX, minY, minX, maxY, color);
+        PlotLine(bgra, size, maxX, minY, maxX, maxY, color);
+
+        static void PlotLine(byte[] buf, int side, int ax, int ay, int bx, int by, uint rgba)
+        {
+            int dx = Math.Abs(bx - ax), sx = ax < bx ? 1 : -1;
+            int dy = -Math.Abs(by - ay), sy = ay < by ? 1 : -1;
+            int err = dx + dy;
+            while (true)
+            {
+                if ((uint)ax < (uint)side && (uint)ay < (uint)side)
+                {
+                    int o = (ay * side + ax) * 4;
+                    buf[o] = (byte)(rgba >> 8);
+                    buf[o + 1] = (byte)(rgba >> 16);
+                    buf[o + 2] = (byte)(rgba >> 24);
+                    buf[o + 3] = (byte)rgba;
+                }
+                if (ax == bx && ay == by) break;
+                int e2 = 2 * err;
+                if (e2 >= dy) { err += dy; ax += sx; }
+                if (e2 <= dx) { err += dx; ay += sy; }
+            }
+        }
     }
 
     private BitmapSource CreateBitmap()
@@ -328,5 +457,5 @@ public partial class PixelEditorWindow : Window
     private static Brush BrushFor(uint rgba) => new SolidColorBrush(Color.FromArgb((byte)rgba,
         (byte)(rgba >> 24), (byte)(rgba >> 16), (byte)(rgba >> 8)));
 
-    private enum Tool { Paint, Erase, Fill, Eyedropper }
+    private enum Tool { Paint, Erase, Fill, Eyedropper, Line, Rect }
 }

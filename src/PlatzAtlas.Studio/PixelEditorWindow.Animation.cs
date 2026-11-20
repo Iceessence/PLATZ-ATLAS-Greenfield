@@ -47,9 +47,30 @@ public partial class PixelEditorWindow
         DeleteFrame.IsEnabled = TimelinePlay.IsEnabled = ExportSpriteSheet.IsEnabled = count > 1;
         FrameEarlier.IsEnabled = _activeFrame > 0;
         FrameLater.IsEnabled = _activeFrame < count - 1;
+        var totalMs = _frames.Sum(frame => frame.Duration);
+        TimelineSummary.Text = $"{count} {(count == 1 ? "frame" : "frames")} · {totalMs} ms loop";
         CanvasSizeNote.Text = count == 1 ? $"{_draft.Size} × {_draft.Size} pixels" :
             $"{_draft.Size} × {_draft.Size} pixels · Resize single-frame sprites.";
+        UpdateOnionSkin();
         _syncTimeline = false;
+    }
+
+    private void OnionSkinChanged(object sender, RoutedEventArgs e) => UpdateOnionSkin();
+
+    private void UpdateOnionSkin()
+    {
+        if (OnionSkinImage is null)
+            return;
+        if (OnionSkinToggle?.IsChecked == true && !_previewTimer.IsEnabled && _activeFrame > 0)
+        {
+            OnionSkinImage.Source = BitmapFor(_frames[_activeFrame - 1].Drawing);
+            OnionSkinImage.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            OnionSkinImage.Source = null;
+            OnionSkinImage.Visibility = Visibility.Collapsed;
+        }
     }
 
     private void FrameSelected(object sender, SelectionChangedEventArgs e)
@@ -125,6 +146,7 @@ public partial class PixelEditorWindow
         _previewImages = _frames.Select(frame => BitmapFor(frame.Drawing)).ToArray();
         _previewStart = Stopwatch.GetTimestamp();
         TimelinePlay.Content = "Pause preview";
+        UpdateOnionSkin();
         PreviewFrame();
         _previewTimer.Start();
     }
@@ -144,6 +166,7 @@ public partial class PixelEditorWindow
         _previewClip = null;
         TimelinePlay.Content = "Play frames";
         PixelImage.Source = _editBitmap;
+        UpdateOnionSkin();
     }
 
     private static BitmapSource BitmapFor(PixelDraft draft)
