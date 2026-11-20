@@ -7,6 +7,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../PlatzAtlas.RoomView/PlatzAtlas.RoomView.csproj" />
     <ProjectReference Include="../PlatzAtlas.Runtime/PlatzAtlas.Runtime.csproj" />
     <ProjectReference Include="../PlatzAtlas.Atlas/PlatzAtlas.Atlas.csproj" />
     <ProjectReference Include="../PlatzAtlas.Core/PlatzAtlas.Core.csproj" />

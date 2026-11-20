@@ -1,6 +1,6 @@
 # PLATZ ATLAS Studio
 
-PLATZ ATLAS Studio is a local Windows editor for the Night Museum scene. Studio identifies its two identically named lanterns by gallery and stable object ID. You can test the west switch in Play, or ask ATLAS about the saved museum and review a proposed light change.
+PLATZ ATLAS Studio is a local Windows editor for the Night Museum scene. Studio identifies its two identically named lanterns by gallery and stable object ID. You can test the west switch in Play, export the saved room to PLATZ Player, or ask ATLAS about the saved museum and review a proposed light change.
 
 ## Build and launch
 
@@ -36,10 +36,32 @@ Vulkan presentation uses the machine's Vulkan loader and compatible display driv
 ## Play the saved museum
 
 1. Open a saved museum, or save the current revision first. Choose **Play** above the viewport or press **F5**.
-2. Under **Switches**, choose **Use West Switch** twice. Each action toggles the west lantern, and the panel reports the gallery and old and new light states. East stays as it was in the saved room.
+2. Under **Switches**, choose **Use West Switch** twice. With the default **Toggle** behavior, the west lantern changes each time. The panel reports the gallery and old and new light states. East stays as it was in the saved room.
 3. Choose **Stop** or press **F5** again to return to the saved view. For an easy comparison, use the switch a third time before stopping. Closing Studio during Play also ends that session.
 
 Play starts from the exact saved revision and keeps its switch state in memory. If another window saved a newer revision before you started, reopen the file to Play that revision.
+
+## Export and play a room
+
+1. In Studio, save a museum with the west lantern off, then choose **Export room…** and save a `.platzroom` file. Export uses the saved revision and is available outside Play when the editor has no unsaved changes.
+2. Launch Player and open the file. From the repository root, the Release build accepts the package path directly.
+
+   ```powershell
+   & '.\artifacts\bin\PlatzAtlas.Player\release\PlatzAtlas.Player.exe' --room 'C:\path\NightMuseum.platzroom'
+   ```
+
+3. From the spawn position in the default layout, press **Left** five times and **Up** twice. You can also use **WASD** or the on-screen arrows. When the west diamond turns gold, press **E** twice. With **Toggle**, West goes off → on → off. **Restart room** restores the original light states and visitor position.
+4. To try **Turn on**, select the West Gallery lantern in Studio and choose **Turn on** under **Switch behavior in Play**. Undo and redo with **Ctrl+Z** and **Ctrl+Y**. Save and export to a second file. Open it in Player and repeat step 3. West stays on after the second activation.
+
+For a repeatable command-line export from a saved project, choose a new output filename. Player's `--check-room` validates a package and exits with code `0` on success or `1` on rejection.
+
+```powershell
+$studio = '.\artifacts\bin\PlatzAtlas.Studio\release\PlatzAtlas.Studio.exe'
+& $studio --project 'C:\path\NightMuseum.platz' --export-room 'C:\path\NightMuseum.platzroom'
+& '.\artifacts\bin\PlatzAtlas.Player\release\PlatzAtlas.Player.exe' --check-room 'C:\path\NightMuseum.platzroom'
+```
+
+`Build.ps1 -Offline -Test -Bundle` produces `artifacts\distribution\PlatzAtlas.Player-release.zip` from the cached dependencies. Extract the ZIP, run `PlatzAtlas.Player.exe`, and open the exported room. The bundle requires the .NET 10 Windows Desktop Runtime on Windows x64. It contains a quick-start file, the dependency notices and a SHA-256 manifest. A room export contains the scene and switch links for the Night Museum profile, with its source revision and a payload checksum. Player keeps a running session in memory and reads its artwork from the shared room renderer.
 
 ## Ask about the saved museum
 
@@ -57,7 +79,7 @@ This first version uses a deterministic local lookup for the supplied question. 
 3. While previewing, choose **Review save…** in **ATLAS**. Check the named file and light change, then choose **Confirm and save** within one minute. Studio saves a new revision, preserves the previous file and displays **Latest saved ATLAS edit** with the operation ID and payload checksum.
 4. Reopen the saved project to inspect the receipt or choose **Undo** to reverse the light change. Save the reversal to keep it. **Cancel review** returns to the preview. If another window has saved a newer revision, reopen that revision before starting a new review.
 
-**Save** writes the actual scene when a preview is open. Approved edits add their receipt to project schema 2. Current Studio opens schemas 1 and 2. After the first approved edit on a schema 1 file, its adjacent previous revision still uses schema 1.
+**Save** writes the actual scene when a preview is open. Studio opens project schemas 1 through 3. The first approved edit on a schema 1 file saves its receipt in schema 2. The first switch behavior edit uses schema 3 and preserves earlier receipts. The adjacent `.platz.previous` file retains the preceding saved bytes.
 
 [WORKING.md](WORKING.md) records which paths were exercised, the evidence and the next milestone.
 
@@ -68,7 +90,7 @@ For local verification, launch Studio with `--diagnostics 'C:\path\studio.ndjson
 | Dependency | Version and license |
 | --- | --- |
 | Microsoft .NET SDK and Desktop Runtime | SDK 10.0.401 pinned in [global.json](global.json). The tested desktop runtime is 10.0.12. Microsoft SDK and runtime distributions include their own license and third-party notices. WPF and the .NET runtime source use MIT. [WPF license](https://github.com/dotnet/wpf/blob/main/LICENSE.TXT), [.NET runtime license](https://github.com/dotnet/runtime/blob/main/LICENSE.TXT) |
-| Silk.NET Vulkan bindings | `Silk.NET.Vulkan`, `Silk.NET.Vulkan.Extensions.KHR` and transitive `Silk.NET.Core` 2.23.0, MIT. Package metadata identifies source commit `94605142f7b7bd6e69c9201e8e721d245c69eb7e`. [Silk.NET license](https://github.com/dotnet/Silk.NET/blob/main/LICENSE.md) |
+| Silk.NET Vulkan bindings | `Silk.NET.Vulkan`, `Silk.NET.Vulkan.Extensions.KHR` and transitive `Silk.NET.Core` 2.23.0, MIT. Package metadata identifies source commit `94605142f7b7bd6e69c9201e8e721d245c69eb7e`. [Silk.NET license](https://github.com/dotnet/Silk.NET/blob/94605142f7b7bd6e69c9201e8e721d245c69eb7e/LICENSE.md) |
 | Microsoft NuGet transitive dependencies | `Microsoft.DotNet.PlatformAbstractions` 3.1.6 and `Microsoft.Extensions.DependencyModel` 9.0.9, MIT. The packages include license and third-party notice files. Exact application package digests are in the [renderer lockfile](src/PlatzAtlas.Rendering/packages.lock.json). |
 | Optional shader rebuild | `Silk.NET.Shaderc` 2.23.0, MIT, and `Silk.NET.Shaderc.Native` 2.23.0, Apache-2.0. [Shader build lockfile](tools/ShaderBuild/packages.lock.json), [shaderc license](https://github.com/google/shaderc/blob/main/LICENSE) |
 

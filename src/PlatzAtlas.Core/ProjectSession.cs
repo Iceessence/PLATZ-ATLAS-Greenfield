@@ -88,6 +88,23 @@ public sealed class ProjectSession
         return new LightPreview(request, target, target with { IsOn = request.IsOn });
     }
 
+    public bool Apply(SetSwitchBehavior request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        CheckEditBase(request.ProjectId, request.BaseRevision);
+        if (!Enum.IsDefined(request.Behavior))
+            throw new ArgumentOutOfRangeException(nameof(request));
+        var control = Current.Switches.SingleOrDefault(item => item.Id == request.SwitchId)
+            ?? throw new ProjectEditException(EditRejection.WrongTarget, "This switch is no longer in the room.");
+        var before = control.Behavior ?? SwitchBehavior.Toggle;
+        if (before == request.Behavior)
+            return false;
+        var light = Current.Objects.Single(item => item.Id == control.TargetId);
+        Commit(new LightEdit(Current.Revision + 1, light.Id, light.IsOn, light.IsOn, LightEditKind.Edit,
+            null, control.Id) { BehaviorChange = new SwitchBehaviorChange(before, request.Behavior) });
+        return true;
+    }
+
     public MuseumProject ReadSavedSnapshot()
     {
         if (IsDirty || FilePath is null || diskFingerprint is null)
@@ -135,7 +152,7 @@ public sealed class ProjectSession
 
             var edit = new LightEdit(Current.Revision + 1, target.Id, wasOn, request.IsOn,
                 LightEditKind.Edit, null, switchId) { AtlasCommit = new AtlasCommitStamp(operationId, payload) };
-            var candidate = WithEdit(edit) with { SchemaVersion = MuseumProject.FormatVersion };
+            var candidate = WithEdit(edit) with { SchemaVersion = Math.Max(Current.SchemaVersion, MuseumProject.ReceiptFormatVersion) };
             var bytes = ProjectFormat.Write(candidate);
             return (new ApprovedPublication(LightCommitReceipt.FromEdit(candidate, edit), candidate,
                 ProjectFormat.Digest(bytes)), bytes);
@@ -154,17 +171,7 @@ public sealed class ProjectSession
     private Lantern ValidateLightTarget(SetLight request)
     {
         ArgumentNullException.ThrowIfNull(request);
-
-        if (request.ProjectId != Current.ProjectId)
-        {
-            throw new ProjectEditException(EditRejection.WrongProject, "This edit belongs to a different project.");
-        }
-
-        if (request.BaseRevision != Current.Revision)
-        {
-            throw new ProjectEditException(EditRejection.StaleRevision,
-                $"This edit was based on revision {request.BaseRevision}. The room is at revision {Current.Revision}.");
-        }
+        CheckEditBase(request.ProjectId, request.BaseRevision);
 
         if (request.SwitchId is Guid switchId &&
             !Current.Switches.Any(item => item.Id == switchId && item.TargetId == request.ObjectId))
@@ -180,6 +187,15 @@ public sealed class ProjectSession
         }
 
         return target;
+    }
+
+    private void CheckEditBase(Guid projectId, long revision)
+    {
+        if (projectId != Current.ProjectId)
+            throw new ProjectEditException(EditRejection.WrongProject, "This edit belongs to a different project.");
+        if (revision != Current.Revision)
+            throw new ProjectEditException(EditRejection.StaleRevision,
+                $"This edit was based on revision {revision}. The room is at revision {Current.Revision}.");
     }
 
     public bool Undo() => Reverse(history.NextUndo, LightEditKind.Undo);
@@ -212,7 +228,10 @@ public sealed class ProjectSession
         }
 
         Commit(new LightEdit(Current.Revision + 1, prior.ObjectId, prior.IsOn, prior.WasOn,
-            kind, prior.Revision, prior.SwitchId));
+            kind, prior.Revision, prior.SwitchId)
+        {
+            BehaviorChange = prior.BehaviorChange is { } change ? new SwitchBehaviorChange(change.After, change.Before) : null
+        });
         return true;
     }
 
@@ -225,15 +244,22 @@ public sealed class ProjectSession
 
     private MuseumProject WithEdit(LightEdit edit)
     {
-        var lights = Current.Objects.Select(item =>
-            item.Id == edit.ObjectId ? item with { IsOn = edit.IsOn } : item).ToArray();
-        var edits = Current.History.Append(edit).ToArray();
-        return Current with
+        var next = Current with
         {
             Revision = edit.Revision,
-            Objects = Array.AsReadOnly(lights),
-            History = Array.AsReadOnly(edits)
+            History = Array.AsReadOnly(Current.History.Append(edit).ToArray())
         };
+        if (edit.BehaviorChange is { } behavior)
+            return next with
+            {
+                SchemaVersion = MuseumProject.FormatVersion,
+                Switches = Array.AsReadOnly(Current.Switches.Select(item => item.Id == edit.SwitchId
+                    ? item with { Behavior = behavior.After == SwitchBehavior.Toggle ? null : behavior.After }
+                    : item).ToArray())
+            };
+
+        return next with { Objects = Array.AsReadOnly(Current.Objects.Select(item => item.Id == edit.ObjectId
+            ? item with { IsOn = edit.IsOn } : item).ToArray()) };
     }
 
     private sealed record ApprovedPublication(LightCommitReceipt Receipt, MuseumProject? Project, string? Fingerprint);

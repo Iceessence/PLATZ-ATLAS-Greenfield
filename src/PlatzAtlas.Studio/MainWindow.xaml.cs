@@ -10,6 +10,7 @@ using System.Windows.Media;
 using Microsoft.Win32;
 using PlatzAtlas.Core;
 using PlatzAtlas.Rendering;
+using PlatzAtlas.RoomView;
 
 namespace PlatzAtlas.Studio;
 
@@ -253,7 +254,7 @@ public partial class MainWindow : Window
         var started = Stopwatch.GetTimestamp();
         if (_play is null && _session.Undo())
         {
-            ShowStatus("Undid the last light change.");
+            ShowStatus("Undid the last scene change.");
             UpdateStudio(started);
         }
     }
@@ -263,7 +264,7 @@ public partial class MainWindow : Window
         var started = Stopwatch.GetTimestamp();
         if (_play is null && _session.Redo())
         {
-            ShowStatus("Redid the light change.");
+            ShowStatus("Redid the last scene change.");
             UpdateStudio(started);
         }
     }
@@ -280,6 +281,7 @@ public partial class MainWindow : Window
         ProjectId.Text = project.ProjectId.ToString();
         ObjectId.Text = selected?.Id.ToString() ?? "—";
         SwitchHeading.Text = control?.Name ?? "Light control";
+        UpdateSwitchBehaviorControls(control);
         SwitchTarget.Text = selected is null ? "Choose an object in the scene."
             : $"{(control is null ? "Light" : $"{selected.Location} lantern")} · {(selected.IsOn ? "On" : "Off")}";
         ToggleLabel.Text = selected?.IsOn == true ? "Turn light off" : "Turn light on";

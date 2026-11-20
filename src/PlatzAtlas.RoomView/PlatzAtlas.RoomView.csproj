@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PlatzAtlas.Runtime/PlatzAtlas.Runtime.csproj" />
+    <ProjectReference Include="../PlatzAtlas.Rendering/PlatzAtlas.Rendering.csproj" />
+  </ItemGroup>
+</Project>

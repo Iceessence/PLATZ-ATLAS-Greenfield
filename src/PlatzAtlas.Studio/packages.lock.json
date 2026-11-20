@@ -51,6 +51,13 @@
           "Silk.NET.Vulkan.Extensions.KHR": "[2.23.0, 2.23.0]"
         }
       },
+      "platzatlas.roomview": {
+        "type": "Project",
+        "dependencies": {
+          "PlatzAtlas.Rendering": "[1.0.0, )",
+          "PlatzAtlas.Runtime": "[1.0.0, )"
+        }
+      },
       "platzatlas.runtime": {
         "type": "Project",
         "dependencies": {

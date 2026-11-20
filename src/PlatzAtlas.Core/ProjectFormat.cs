@@ -15,7 +15,11 @@ internal static class ProjectFormat
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
         AllowDuplicateProperties = false,
         WriteIndented = true,
-        Converters = { new JsonStringEnumConverter<LightEditKind>(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+        Converters =
+        {
+            new JsonStringEnumConverter<LightEditKind>(JsonNamingPolicy.CamelCase, allowIntegerValues: false),
+            new JsonStringEnumConverter<SwitchBehavior>(JsonNamingPolicy.CamelCase, allowIntegerValues: false)
+        }
     };
 
     public static MuseumProject Read(byte[] bytes)
@@ -43,9 +47,9 @@ internal static class ProjectFormat
                 !project.TryGetProperty("schemaVersion", out var schema) ||
                 schema.ValueKind != JsonValueKind.Number ||
                 !schema.TryGetInt32(out var version) ||
-                version is not (MuseumProject.LegacyFormatVersion or MuseumProject.FormatVersion))
+                version is < MuseumProject.LegacyFormatVersion or > MuseumProject.FormatVersion)
             {
-                throw new InvalidDataException("This editor supports PLATZ project schemas 1 and 2.");
+                throw new InvalidDataException("This editor supports PLATZ project schemas 1 through 3.");
             }
 
             var snapshot = JsonSerializer.Deserialize<MuseumProject>(payload, Settings)
@@ -117,6 +121,8 @@ internal static class ProjectFormat
                 throw new InvalidDataException("The room has an invalid switch or a missing switch target.");
             }
 
+            if (lightSwitch.Behavior is not null && project.SchemaVersion < MuseumProject.FormatVersion)
+                throw new InvalidDataException("Switch behavior requires project schema 3.");
             switchTargets.Add(lightSwitch.Id, lightSwitch.TargetId);
         }
 
@@ -158,19 +164,33 @@ internal static class ProjectFormat
 
         var expectedRevision = project.Revision;
         var operationIds = new HashSet<Guid>();
+        var behaviors = project.Switches.ToDictionary(item => item.Id, item => item.Behavior ?? SwitchBehavior.Toggle);
         foreach (var edit in project.History.Reverse())
         {
             if (edit is null || edit.Revision != expectedRevision ||
                 !lights.TryGetValue(edit.ObjectId, out var value) ||
-                edit.IsOn != value || edit.IsOn == edit.WasOn ||
+                edit.IsOn != value ||
                 (edit.SwitchId is Guid switchId &&
                     (!switchTargets.TryGetValue(switchId, out var target) || target != edit.ObjectId)))
             {
                 throw new InvalidDataException("The saved light history does not match the room.");
             }
 
+            if (edit.BehaviorChange is { } change)
+            {
+                if (project.SchemaVersion != MuseumProject.FormatVersion || edit.AtlasCommit is not null ||
+                    edit.SwitchId is not Guid behaviorSwitchId || edit.WasOn != edit.IsOn ||
+                    change.Before == change.After || behaviors[behaviorSwitchId] != change.After)
+                    throw new InvalidDataException("The saved switch behavior does not match the edit history.");
+                behaviors[behaviorSwitchId] = change.Before;
+            }
+            else if (edit.IsOn == edit.WasOn)
+            {
+                throw new InvalidDataException("A light edit must change the light state.");
+            }
+
             if (edit.AtlasCommit is { } stamp &&
-                (project.SchemaVersion != MuseumProject.FormatVersion || edit.Kind != LightEditKind.Edit ||
+                (project.SchemaVersion < MuseumProject.ReceiptFormatVersion || edit.Kind != LightEditKind.Edit ||
                  stamp.OperationId == Guid.Empty || !operationIds.Add(stamp.OperationId) ||
                  edit.SwitchId is not Guid receiptSwitchId ||
                  stamp.PayloadSha256 != LightCommitReceipt.Digest(project.ProjectId, project.SceneId,
@@ -182,6 +202,8 @@ internal static class ProjectFormat
             lights[edit.ObjectId] = edit.WasOn;
             expectedRevision--;
         }
+        if (behaviors.Values.Any(value => value != SwitchBehavior.Toggle))
+            throw new InvalidDataException("The room must start with toggle switches before its edit history.");
 
         var history = new LightHistory();
         foreach (var edit in project.History)

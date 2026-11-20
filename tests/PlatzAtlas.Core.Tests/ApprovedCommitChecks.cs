@@ -74,7 +74,7 @@ internal static class ApprovedCommitChecks
             && receipt.BaseRevision == baseline.Revision && receipt.Revision == baseline.Revision + 1
             && receipt.ObjectId == proposal.ObjectId && !receipt.WasOn && receipt.IsOn,
             "successful confirmed proposal produces the exact receipt");
-        Require(editor.Current.SchemaVersion == MuseumProject.FormatVersion && !editor.IsDirty && editor.CanUndo
+        Require(editor.Current.SchemaVersion == MuseumProject.ReceiptFormatVersion && !editor.IsDirty && editor.CanUndo
             && before.SequenceEqual(File.ReadAllBytes(path + ".previous"))
             && editor.Current.Objects.Single(item => item.Location == "East Gallery") ==
                 baseline.Objects.Single(item => item.Location == "East Gallery"), "save publishes one revision and leaves east intact");

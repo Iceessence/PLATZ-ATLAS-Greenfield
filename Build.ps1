@@ -3,6 +3,7 @@ param(
     [ValidateSet('Debug', 'Release')]
     [string] $Configuration = 'Release',
     [switch] $Test,
+    [switch] $Bundle,
     [switch] $Run,
     [switch] $Offline,
     [switch] $Cpu,
@@ -33,9 +34,13 @@ function Invoke-AtlasDotnet {
 }
 
 $studioProject = 'src/PlatzAtlas.Studio/PlatzAtlas.Studio.csproj'
+$playerProject = 'src/PlatzAtlas.Player/PlatzAtlas.Player.csproj'
 $testProject = 'tests/PlatzAtlas.Core.Tests/PlatzAtlas.Core.Tests.csproj'
 $studioExecutable = Join-Path $PSScriptRoot (
     'artifacts/bin/PlatzAtlas.Studio/{0}/PlatzAtlas.Studio.exe' -f $Configuration.ToLowerInvariant()
+)
+$playerExecutable = Join-Path $PSScriptRoot (
+    'artifacts/bin/PlatzAtlas.Player/{0}/PlatzAtlas.Player.exe' -f $Configuration.ToLowerInvariant()
 )
 $restoreOptions = @('--locked-mode', '--source', 'https://api.nuget.org/v3/index.json')
 if ($Offline) {
@@ -61,10 +66,15 @@ try {
     $env:DOTNET_GENERATE_ASPNET_CERTIFICATE = 'false'
     Invoke-AtlasDotnet restore $studioProject @restoreOptions @buildOptions
     Invoke-AtlasDotnet build $studioProject --configuration $Configuration --no-restore @buildOptions
+    Invoke-AtlasDotnet restore $playerProject @restoreOptions @buildOptions
+    Invoke-AtlasDotnet build $playerProject --configuration $Configuration --no-restore @buildOptions
     if ($Test) {
         Invoke-AtlasDotnet restore $testProject @restoreOptions @buildOptions
         Invoke-AtlasDotnet build $testProject --configuration $Configuration --no-restore @buildOptions
         Invoke-AtlasDotnet run --project $testProject --configuration $Configuration --no-build
+    }
+    if ($Bundle) {
+        & (Join-Path $PSScriptRoot 'tools/BundlePlayer.ps1') -Dotnet $dotnet.Source -Configuration $Configuration
     }
 }
 finally {
@@ -75,6 +85,7 @@ finally {
 }
 
 Write-Output "Studio executable: $studioExecutable"
+Write-Output "Player executable: $playerExecutable"
 if ($Run) {
     $studioOptions = @()
     if ($Cpu) {

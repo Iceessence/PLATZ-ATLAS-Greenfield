@@ -34,7 +34,9 @@ internal sealed class LightHistory
             reversal.ObjectId != prior.ObjectId ||
             reversal.SwitchId != prior.SwitchId ||
             reversal.WasOn != prior.IsOn ||
-            reversal.IsOn != prior.WasOn)
+            reversal.IsOn != prior.WasOn ||
+            reversal.BehaviorChange != (prior.BehaviorChange is { } change
+                ? new SwitchBehaviorChange(change.After, change.Before) : null))
         {
             throw new InvalidDataException("The light history contains an invalid undo or redo.");
         }

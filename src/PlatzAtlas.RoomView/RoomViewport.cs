@@ -7,14 +7,14 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using PlatzAtlas.Rendering;
 
-namespace PlatzAtlas.Studio;
+namespace PlatzAtlas.RoomView;
 
-internal sealed record ViewportFrame(
+public sealed record ViewportFrame(
     string Label, string Detail, Guid ProjectId, long Revision, int Width, int Height,
     double DrawMilliseconds, double? GpuMilliseconds, double? EditToDrawMilliseconds,
     long PeakWorkingSetBytes, int? FixedCameraSample, Guid? PreviewObjectId, Guid? PlaySessionId, long? PlayStep);
 
-internal sealed record VulkanValidationSummary(
+public sealed record VulkanValidationSummary(
     bool ValidationEnabled, int ErrorCount, int WarningCount, IReadOnlyList<string> Messages);
 
 public sealed class RoomViewport : Grid
@@ -54,11 +54,11 @@ public sealed class RoomViewport : Grid
         set => SetPreference(value ? RendererPreference.CpuReference : RendererPreference.Auto);
     }
 
-    internal bool SimulateDeviceLoss { get; set; }
-    internal bool MeasureFrames { get; set; }
-    internal event Action<ViewportFrame>? FrameCompleted;
-    internal event Action<VulkanValidationSummary>? VulkanValidated;
-    internal event Action<double, double>? LanternClicked;
+    public bool SimulateDeviceLoss { get; set; }
+    public bool MeasureFrames { get; set; }
+    public event Action<ViewportFrame>? FrameCompleted;
+    public event Action<VulkanValidationSummary>? VulkanValidated;
+    public event Action<double, double>? LanternClicked;
 
     public void SetPreference(RendererPreference preference)
     {
@@ -73,21 +73,21 @@ public sealed class RoomViewport : Grid
         QueueDraw();
     }
 
-    internal void Show(RenderSnapshot snapshot, long? editStarted)
+    public void Show(RenderSnapshot snapshot, long? editStarted = null)
     {
         _snapshot = snapshot;
         _editStarted = editStarted;
         QueueDraw();
     }
 
-    internal void Shutdown()
+    public void Shutdown()
     {
         _closed = true;
         ReleaseNative();
         ReleaseCpu();
     }
 
-    internal void Refresh() => QueueDraw();
+    public void Refresh() => QueueDraw();
 
     private void QueueDraw()
     {

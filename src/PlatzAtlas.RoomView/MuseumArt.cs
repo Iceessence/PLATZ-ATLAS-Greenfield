@@ -2,21 +2,31 @@ using PlatzAtlas.Core;
 using PlatzAtlas.Rendering;
 using PlatzAtlas.Runtime;
 
-namespace PlatzAtlas.Studio;
+namespace PlatzAtlas.RoomView;
 
-internal static class MuseumArt
+public static class MuseumArt
 {
     private static readonly RenderColor Background = Ink(14, 25, 29);
     private static readonly RenderColor Highlight = Ink(240, 196, 134);
     private static readonly RenderColor PreviewHighlight = Ink(133, 217, 198);
     private static readonly RenderColor PlayHighlight = Ink(169, 213, 255);
 
-    public static RenderSnapshot Create(MuseumProject project, Guid? selectedId, LightPreview? preview, PlayRoomSnapshot? play)
+    public static RenderSnapshot Create(MuseumProject project, Guid? selectedId, LightPreview? preview, PlayRoomSnapshot? play) =>
+        Draw(play?.Objects ?? project.Objects, selectedId, preview, play,
+            play?.ProjectId ?? project.ProjectId, play?.SourceRevision ?? project.Revision);
+
+    public static RenderSnapshot CreatePlayer(MuseumPlaySession session, Guid? activeTarget) =>
+        Draw(session.Current.Objects, activeTarget, null, session.Current, session.Current.ProjectId,
+            session.Current.SourceRevision, session.Markers, session.NearbySwitch?.SwitchId);
+
+    private static RenderSnapshot Draw(IReadOnlyList<Lantern> objects, Guid? selectedId, LightPreview? preview,
+        PlayRoomSnapshot? play, Guid projectId, long revision, IReadOnlyList<PlaySwitchMarker>? markers = null,
+        Guid? nearbySwitch = null)
     {
         var scene = new Drawing();
         var selectionHighlight = play is null ? Highlight : PlayHighlight;
         DrawRoom(scene);
-        foreach (var lantern in play?.Objects ?? project.Objects)
+        foreach (var lantern in objects)
         {
             if (preview is not null)
             {
@@ -29,8 +39,21 @@ internal static class MuseumArt
                 DrawLantern(scene, lantern, lantern.Id == selectedId ? selectionHighlight : null);
         }
 
-        return new RenderSnapshot(play?.ProjectId ?? project.ProjectId, play?.SourceRevision ?? project.Revision,
-            Background, scene.Triangles, preview?.After.Id, play?.SessionId, play?.Step);
+        if (markers is not null && play is not null)
+        {
+            foreach (var marker in markers)
+            {
+                var (x, y) = marker.Position;
+                scene.Ellipse(x, y, 0.018, 0.025, Ink(19, 33, 41));
+                scene.Ellipse(x, y, 0.012, 0.017, marker.SwitchId == nearbySwitch ? Highlight : PlayHighlight, 4);
+            }
+            var (visitorX, visitorY) = play.Visitor;
+            scene.Ellipse(visitorX, visitorY, 0.018, 0.028, Ink(14, 29, 37));
+            scene.Ellipse(visitorX, visitorY, 0.013, 0.021, PlayHighlight);
+            scene.Ellipse(visitorX, visitorY, 0.006, 0.010, Ink(225, 242, 255));
+        }
+
+        return new RenderSnapshot(projectId, revision, Background, scene.Triangles, preview?.After.Id, play?.SessionId, play?.Step);
     }
 
     private static void DrawRoom(Drawing scene)
