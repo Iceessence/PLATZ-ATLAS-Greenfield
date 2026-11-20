@@ -11,6 +11,27 @@ namespace PlatzAtlas.Studio;
 
 public partial class MainWindow
 {
+    private void NewSpriteClicked(object sender, RoutedEventArgs e) => OpenPixelEditor(null);
+
+    private void CloneSpriteClicked(object sender, RoutedEventArgs e)
+    {
+        if (SceneAssetList.SelectedItem is AssetItem item)
+            OpenPixelEditor(_session.Current.Assets.Single(asset => asset.Id == item.Id));
+    }
+
+    private void OpenPixelEditor(ProjectAsset? source)
+    {
+        if (_play is not null || _session.Current.Scene is null)
+            return;
+        var editor = new PixelEditorWindow(source) { Owner = this };
+        if (editor.ShowDialog() != true || editor.Result is not { } asset)
+            return;
+        ApplyScene(new ImportSceneAsset(_session.Current.ProjectId, _session.Current.Revision, asset),
+            $"Created {asset.Name}. Use Place selected image to add it to the room.");
+        SceneAssetList.SelectedItem = SceneAssetList.Items.OfType<AssetItem>().FirstOrDefault(item => item.Id == asset.Id)
+            ?? SceneAssetList.SelectedItem;
+    }
+
     private void ImportPngClicked(object sender, RoutedEventArgs e)
     {
         if (_play is not null || _session.Current.Scene is null)
@@ -111,13 +132,13 @@ public partial class MainWindow
             }).ToArray();
         SceneAssetList.ItemsSource = items;
         SceneAssetList.SelectedItem = items.FirstOrDefault(item => item.Id == prior) ?? items.FirstOrDefault();
-        PlaceAsset.IsEnabled = SceneAssetList.SelectedItem is not null;
+        CloneSprite.IsEnabled = PlaceAsset.IsEnabled = SceneAssetList.SelectedItem is not null;
     }
 
     private void SceneAssetSelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         if (PlaceAsset is not null)
-            PlaceAsset.IsEnabled = SceneAssetList.SelectedItem is not null;
+            CloneSprite.IsEnabled = PlaceAsset.IsEnabled = SceneAssetList.SelectedItem is not null;
     }
 
     private void PlaceAssetClicked(object sender, RoutedEventArgs e)

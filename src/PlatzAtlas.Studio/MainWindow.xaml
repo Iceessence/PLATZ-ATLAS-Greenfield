@@ -355,6 +355,8 @@
           <TabItem x:Name="SceneAssetsTab" Header="Assets" Visibility="Collapsed">
             <DockPanel Margin="15,17,15,14">
               <StackPanel DockPanel.Dock="Top">
+                <Button x:Name="NewSprite" Content="Draw sprite…" Click="NewSpriteClicked" Margin="0,0,0,5"/>
+                <Button x:Name="CloneSprite" Content="Edit image copy…" Click="CloneSpriteClicked" Margin="0,0,0,5"/>
                 <Button x:Name="ImportPng" Content="Import PNG…" Click="ImportPngClicked"/>
                 <TextBlock Text="PNG · Up to 256 × 256 pixels" Style="{StaticResource Caption}" Margin="0,7,0,12" TextWrapping="Wrap"/>
               </StackPanel>

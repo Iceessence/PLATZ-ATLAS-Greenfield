@@ -103,6 +103,7 @@ try
     SceneChecks.Run(scratch.FullName);
     PlayableSceneChecks.Run(scratch.FullName);
     SceneImageChecks.Run(scratch.FullName);
+    PixelDraftChecks.Run(scratch.FullName);
     SceneAtlasChecks.Run(scratch.FullName);
 }
 finally

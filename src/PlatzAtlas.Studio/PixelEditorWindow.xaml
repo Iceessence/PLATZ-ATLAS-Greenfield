@@ -1,0 +1,77 @@
+<Window x:Class="PlatzAtlas.Studio.PixelEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PLATZ Pixel Editor" Width="790" Height="650" MinWidth="650" MinHeight="510"
+        WindowStartupLocation="CenterOwner" Background="{StaticResource Page}" Foreground="{StaticResource Text}"
+        FontFamily="Segoe UI" UseLayoutRounding="True" PreviewKeyDown="EditorKeyDown">
+  <Grid Margin="20">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <DockPanel Margin="0,0,0,13">
+      <StackPanel DockPanel.Dock="Left">
+        <TextBlock Text="Pixel editor" FontSize="25" FontWeight="SemiBold"/>
+        <TextBlock x:Name="SourceNote" Foreground="{StaticResource Muted}" Margin="0,4,0,0"/>
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+        <Button x:Name="PixelUndo" Content="Undo" Click="UndoClicked" Margin="0,0,6,0"/>
+        <Button x:Name="PixelRedo" Content="Redo" Click="RedoClicked"/>
+      </StackPanel>
+    </DockPanel>
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="208"/></Grid.ColumnDefinitions>
+      <Border BorderBrush="{StaticResource Border}" BorderThickness="1" Background="#0C1417" Margin="0,0,14,0">
+        <Viewbox Stretch="Uniform" Margin="12">
+          <Grid x:Name="PixelSurface" Width="384" Height="384" Focusable="True" Cursor="Cross"
+                MouseLeftButtonDown="PixelDown" MouseMove="PixelMove" MouseLeftButtonUp="PixelUp"
+                LostMouseCapture="PixelCaptureLost" AutomationProperties.Name="Pixel canvas, arrow keys and Space">
+            <Grid.Background>
+              <DrawingBrush Viewport="0,0,24,24" ViewportUnits="Absolute" TileMode="Tile">
+                <DrawingBrush.Drawing>
+                  <DrawingGroup>
+                    <GeometryDrawing Brush="#37454B" Geometry="M0,0 H24 V24 H0 Z"/>
+                    <GeometryDrawing Brush="#536169" Geometry="M0,0 H12 V12 H0 Z M12,12 H24 V24 H12 Z"/>
+                  </DrawingGroup>
+                </DrawingBrush.Drawing>
+              </DrawingBrush>
+            </Grid.Background>
+            <Image x:Name="PixelImage" Stretch="Fill" IsHitTestVisible="False" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+            <Canvas x:Name="CursorLayer" IsHitTestVisible="False">
+              <Border x:Name="PixelCursor" BorderBrush="#FFFFFF" BorderThickness="1.5" Visibility="Collapsed"/>
+            </Canvas>
+          </Grid>
+        </Viewbox>
+      </Border>
+      <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+        <StackPanel>
+          <TextBlock Text="Canvas size" Style="{StaticResource Caption}"/>
+          <UniformGrid Columns="2" Margin="0,5,0,13">
+            <Button x:Name="Pixels16" Content="16 × 16" Tag="16" Click="SizeClicked" Margin="0,0,5,0" Padding="4"/>
+            <Button x:Name="Pixels32" Content="32 × 32" Tag="32" Click="SizeClicked" Padding="4"/>
+          </UniformGrid>
+          <TextBlock Text="Tools" Style="{StaticResource Caption}"/>
+          <UniformGrid Columns="2" Margin="0,5,0,13" x:Name="ToolButtons">
+            <Button x:Name="ToolPaint" Content="Paint" Tag="Paint" Click="ToolClicked" Margin="0,0,5,5" Padding="4"/>
+            <Button Content="Erase" Tag="Erase" Click="ToolClicked" Margin="0,0,0,5" Padding="4"/>
+            <Button Content="Fill" Tag="Fill" Click="ToolClicked" Margin="0,0,5,0" Padding="4"/>
+            <Button Content="Eyedropper" Tag="Eyedropper" Click="ToolClicked" Padding="4"/>
+          </UniformGrid>
+          <TextBlock Text="Palette" Style="{StaticResource Caption}"/>
+          <UniformGrid x:Name="Palette" Columns="5" Margin="0,5,0,13"/>
+          <TextBlock Text="Color · RRGGBBAA" Style="{StaticResource Caption}"/>
+          <TextBox x:Name="PixelColor" MaxLength="9" AutomationProperties.Name="Pixel color as RRGGBBAA"
+                   Background="{StaticResource Surface}" Foreground="{StaticResource Text}" Padding="5" Margin="0,5,0,14"/>
+          <TextBlock Text="Asset name" Style="{StaticResource Caption}"/>
+          <TextBox x:Name="AssetName" MaxLength="160" AutomationProperties.Name="Sprite asset name"
+                   Background="{StaticResource Surface}" Foreground="{StaticResource Text}" Padding="5" Margin="0,5,0,2"/>
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+    <DockPanel Grid.Row="2" Margin="0,12,0,0">
+      <TextBlock x:Name="PixelStatus" TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"/>
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+        <Button x:Name="ExportSpritePng" Content="Export PNG…" Click="ExportClicked" Margin="6,0,6,0"/>
+        <Button x:Name="KeepSprite" Content="Add to assets" Click="KeepClicked" Margin="0,0,6,0"/>
+        <Button Content="Close" IsCancel="True"/>
+      </StackPanel>
+    </DockPanel>
+  </Grid>
+</Window>
