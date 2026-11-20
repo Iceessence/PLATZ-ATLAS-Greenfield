@@ -21,20 +21,32 @@ public sealed record PixelAsset(int Width, int Height, ReadOnlyMemory<byte> Rgba
 
     public static PixelAsset Read(ProjectAsset asset)
     {
-        if (asset.MediaType != MediaType || asset.ContentBase64.Length > ((MaxDimension * MaxDimension * 4 + 6) / 3) * 4 ||
+        if (asset.MediaType == PixelClip.MediaType)
+            return PixelClip.Read(asset).Frames[0].Image;
+        if (asset.MediaType != MediaType)
+            throw new InvalidDataException("The image asset has an unsupported media type.");
+        var bytes = VerifiedBytes(asset, MaxDimension * MaxDimension * 4 + 4);
+        if (bytes.Length < 8)
+            throw new InvalidDataException($"Image asset “{asset.Name}” has an invalid size.");
+        var width = BinaryPrimitives.ReadUInt16LittleEndian(bytes);
+        var height = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(2));
+        if (width is < 1 or > MaxDimension || height is < 1 or > MaxDimension || bytes.Length != 4 + width * height * 4)
+            throw new InvalidDataException($"Image asset “{asset.Name}” has invalid dimensions.");
+        return new PixelAsset(width, height, bytes.AsMemory(4));
+    }
+
+    internal static byte[] VerifiedBytes(ProjectAsset asset, int maximum)
+    {
+        if (asset.ContentBase64.Length > ((maximum + 2) / 3) * 4 ||
             asset.Id == Guid.Empty || string.IsNullOrWhiteSpace(asset.Name) || asset.Name.Length > 160 ||
             asset.Name.Any(char.IsControl))
             throw new InvalidDataException("The image asset has an invalid name, type or size.");
         byte[] bytes;
         try { bytes = Convert.FromBase64String(asset.ContentBase64); }
         catch (FormatException error) { throw new InvalidDataException($"Image asset “{asset.Name}” has invalid bytes.", error); }
-        if (bytes.Length < 8 || !string.Equals(ProjectFormat.Digest(bytes), asset.Sha256, StringComparison.OrdinalIgnoreCase))
+        if (bytes.Length > maximum || !string.Equals(ProjectFormat.Digest(bytes), asset.Sha256, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException($"Image asset “{asset.Name}” has an invalid checksum or size.");
-        var width = BinaryPrimitives.ReadUInt16LittleEndian(bytes);
-        var height = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(2));
-        if (width is < 1 or > MaxDimension || height is < 1 or > MaxDimension || bytes.Length != 4 + width * height * 4)
-            throw new InvalidDataException($"Image asset “{asset.Name}” has invalid dimensions.");
-        return new PixelAsset(width, height, bytes.AsMemory(4));
+        return bytes;
     }
 
     internal static void ValidateCatalog(IReadOnlyList<ProjectAsset> assets, Guid projectId, Guid sceneId)
@@ -45,8 +57,8 @@ public sealed record PixelAsset(int Width, int Height, ReadOnlyMemory<byte> Rgba
         {
             if (asset is null || !ids.Add(asset.Id))
                 throw new InvalidDataException("Every asset needs a unique ID.");
-            var image = Read(asset);
-            pixels += image.Width * image.Height;
+            var clip = PixelClip.Read(asset);
+            pixels += clip.Width * clip.Height * clip.Frames.Count;
             if (pixels > MaxProjectPixels)
                 throw new InvalidDataException("The project has reached its imported image budget.");
         }

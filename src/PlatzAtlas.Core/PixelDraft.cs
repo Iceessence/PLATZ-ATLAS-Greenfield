@@ -30,6 +30,8 @@ public sealed class PixelDraft
     public int Size => _frame.Size;
     public bool CanUndo => _undo.Count != 0;
     public bool CanRedo => _redo.Count != 0;
+    public bool CanUndoWithoutResize => CanUndo && _undo[^1].Size == Size;
+    public bool CanRedoWithoutResize => _redo.TryPeek(out var frame) && frame.Size == Size;
     public uint Read(int x, int y) => _frame.Pixels[Index(x, y)];
 
     public void BeginStroke()
@@ -138,6 +140,18 @@ public sealed class PixelDraft
         return rgba;
     }
 
+    public void CopyBgraTo(Span<byte> pixels)
+    {
+        if (pixels.Length != _frame.Pixels.Length * 4)
+            throw new ArgumentException("The buffer must match the canvas.", nameof(pixels));
+        for (var index = 0; index < _frame.Pixels.Length; index++)
+        {
+            var color = _frame.Pixels[index];
+            BinaryPrimitives.WriteUInt32LittleEndian(pixels.Slice(index * 4, 4),
+                (color << 24) | (color >> 8));
+        }
+    }
+
     private void Record(Frame frame)
     {
         _undo.Add(frame);
@@ -155,8 +169,8 @@ public sealed class PixelDraft
 
     private static void CheckSize(int size)
     {
-        if (size is not (16 or 32))
-            throw new ArgumentOutOfRangeException(nameof(size), "Choose a 16 × 16 or 32 × 32 canvas.");
+        if (size is not (16 or 32 or 64 or 128 or 256))
+            throw new ArgumentOutOfRangeException(nameof(size), "Choose a canvas of 16, 32, 64, 128 or 256 pixels.");
     }
 
     private sealed record Frame(int Size, uint[] Pixels);

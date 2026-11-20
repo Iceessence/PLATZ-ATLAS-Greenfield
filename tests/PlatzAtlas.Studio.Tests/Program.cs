@@ -21,6 +21,7 @@ internal static partial class Program
                 var folder = Directory.CreateDirectory(evidenceDirectory).FullName;
                 WorkingRoom(folder);
                 PresetsInStudio(folder);
+                AnimateRoom(folder);
             }
             return 0;
         }

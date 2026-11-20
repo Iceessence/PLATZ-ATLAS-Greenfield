@@ -17,6 +17,7 @@ namespace PlatzAtlas.Studio;
 public partial class MainWindow : Window
 {
     private readonly StudioDiagnostics _diagnostics;
+    private readonly AnimationClock _animation;
     private readonly string? _saveTargetPath;
     private ProjectSession _session;
     private long _openedRevision;
@@ -26,6 +27,7 @@ public partial class MainWindow : Window
         string? projectPath, string? saveTargetPath, StudioDiagnostics diagnostics)
     {
         _diagnostics = diagnostics;
+        _animation = new AnimationClock(UpdateGeneralPresentationFromClock);
         _saveTargetPath = saveTargetPath;
         _session = ProjectSession.NewScene();
         InitializeComponent();
@@ -79,6 +81,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         StopPlay("window-closed");
+        _animation.SetActive(false);
         _atlasHost.Revoke();
         _sceneAtlasHost.Revoke();
         Viewport.Shutdown();
@@ -303,6 +306,7 @@ public partial class MainWindow : Window
             UpdateGeneralEditor(editStarted);
             return;
         }
+        _animation.SetActive(false);
         SceneInspector.Visibility = Visibility.Collapsed;
         SceneAtlasPreviewBanner.Visibility = Visibility.Collapsed;
         PlayToggle.Visibility = Visibility.Visible;

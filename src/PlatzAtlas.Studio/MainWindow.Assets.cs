@@ -26,6 +26,11 @@ public partial class MainWindow
         var editor = new PixelEditorWindow(source) { Owner = this };
         if (editor.ShowDialog() != true || editor.Result is not { } asset)
             return;
+        AddEditedAsset(asset);
+    }
+
+    internal void AddEditedAsset(ProjectAsset asset)
+    {
         ApplyScene(new ImportSceneAsset(_session.Current.ProjectId, _session.Current.Revision, asset),
             $"Created {asset.Name}. Use Place selected image to add it to the room.");
         SceneAssetList.SelectedItem = SceneAssetList.Items.OfType<AssetItem>().FirstOrDefault(item => item.Id == asset.Id)
@@ -129,7 +134,8 @@ public partial class MainWindow
             .Select(item =>
             {
                 var dimensions = SceneArt.Image(item);
-                return new AssetItem(item.Id, item.Name, ReadableId(item.Id, "A"), dimensions.Width, dimensions.Height);
+                return new AssetItem(item.Id, item.Name, ReadableId(item.Id, "A"), dimensions.Width, dimensions.Height,
+                    item.MediaType == PixelClip.MediaType);
             }).Where(item => item.Label.Contains(search, StringComparison.CurrentCultureIgnoreCase)).ToArray();
         SceneAssetList.ItemsSource = items;
         SceneAssetList.SelectedItem = items.FirstOrDefault(item => item.Id == prior) ?? items.FirstOrDefault();
@@ -162,8 +168,8 @@ public partial class MainWindow
         SideTabs.SelectedItem = InspectorTab;
     }
 
-    private sealed record AssetItem(Guid Id, string Name, string Number, int Width, int Height)
+    private sealed record AssetItem(Guid Id, string Name, string Number, int Width, int Height, bool Animated)
     {
-        public string Label => $"{Name} · {Number} · {Width} × {Height}";
+        public string Label => $"{Name} · {Number} · {Width} × {Height}" + (Animated ? " · Animated" : "");
     }
 }

@@ -19,7 +19,9 @@ public partial class PixelEditorWindow : Window
         0x654260ff, 0xab5788ff, 0xdd847fff, 0xf0ba83ff, 0xffdc8fff,
         0x245349ff, 0x338678ff, 0x51b785ff, 0xaed58fff, 0x78b5eaff
     ];
-    private readonly PixelDraft _draft;
+    private PixelDraft _draft => _frames[_activeFrame].Drawing;
+    private WriteableBitmap? _editBitmap;
+    private byte[] _bgra = [];
     private Point? _last;
     private int _x, _y;
     private Tool _tool = Tool.Paint;
@@ -27,8 +29,12 @@ public partial class PixelEditorWindow : Window
 
     internal PixelEditorWindow(ProjectAsset? source)
     {
-        var image = source is null ? null : PixelAsset.Read(source);
-        _draft = new PixelDraft(image is null || Math.Max(image.Width, image.Height) > 16 ? 32 : 16, image);
+        var clip = source is null ? null : PixelClip.Read(source);
+        int[] sizes = [16, 32, 64, 128, 256];
+        var side = clip is null ? 32 : Math.Min(sizes.First(size => size >= Math.Max(clip.Width, clip.Height)),
+            sizes.Last(size => size * size * clip.Frames.Count <= PixelAsset.MaxProjectPixels));
+        _frames = clip is null ? [new(new PixelDraft(side), PixelClip.DefaultDuration)] :
+            clip.Frames.Select(frame => new EditableFrame(new PixelDraft(side, frame.Image), frame.DurationMs)).ToList();
         InitializeComponent();
         SourceNote.Text = source is null ? "Draw a new sprite" : $"Editing a copy of {source.Name}";
         AssetName.Text = source is null ? "New sprite" : (source.Name + " copy")[..Math.Min(160, source.Name.Length + 5)];
@@ -40,6 +46,7 @@ public partial class PixelEditorWindow : Window
             swatch.Click += (_, _) => SelectColor(color);
             Palette.Children.Add(swatch);
         }
+        InitializeAnimation();
         RefreshPixels();
     }
 
@@ -53,6 +60,7 @@ public partial class PixelEditorWindow : Window
 
     internal bool BeginPointerStroke(Point point)
     {
+        StopPreview();
         if (_last is not null || Cell(point) is not { } cell || !StartAt((int)cell.X, (int)cell.Y))
             return false;
         _last = cell;
@@ -127,9 +135,11 @@ public partial class PixelEditorWindow : Window
 
     private void SizeClicked(object sender, RoutedEventArgs e)
     {
+        StopPreview();
         FinishStroke();
-        if (sender is Button { Tag: string value } && int.TryParse(value, out var size))
+        if (_frames.Count == 1 && sender is Button { Tag: string value } && int.TryParse(value, out var size))
             _draft.Resize(size);
+        RefreshTimeline();
         RefreshPixels();
     }
 
@@ -143,15 +153,21 @@ public partial class PixelEditorWindow : Window
 
     private void UndoClicked(object sender, RoutedEventArgs e)
     {
+        StopPreview();
         FinishStroke();
-        _draft.Undo();
+        if (_frames.Count == 1 || _draft.CanUndoWithoutResize)
+            _draft.Undo();
+        RefreshTimeline();
         RefreshPixels();
     }
 
     private void RedoClicked(object sender, RoutedEventArgs e)
     {
+        StopPreview();
         FinishStroke();
-        _draft.Redo();
+        if (_frames.Count == 1 || _draft.CanRedoWithoutResize)
+            _draft.Redo();
+        RefreshTimeline();
         RefreshPixels();
     }
 
@@ -170,6 +186,7 @@ public partial class PixelEditorWindow : Window
 
     internal bool HandleCanvasKey(Key key)
     {
+        StopPreview();
         switch (key)
         {
             case Key.Left: _x--; break;
@@ -191,6 +208,7 @@ public partial class PixelEditorWindow : Window
 
     private void KeepClicked(object sender, RoutedEventArgs e)
     {
+        StopPreview();
         FinishStroke();
         var name = AssetName.Text.Trim();
         if (name.Length == 0 || name.Any(char.IsControl))
@@ -199,13 +217,18 @@ public partial class PixelEditorWindow : Window
             AssetName.Focus();
             return;
         }
-        Result = PixelAsset.Create(Guid.NewGuid(), name, _draft.Size, _draft.Size, _draft.CopyRgba());
-        DialogResult = true;
+        try
+        {
+            Result = CreateAsset(name);
+            DialogResult = true;
+        }
+        catch (InvalidDataException error) { PixelStatus.Text = error.Message; }
     }
 
     private void ExportClicked(object sender, RoutedEventArgs e)
     {
         FinishStroke();
+        StopPreview();
         RefreshPixels();
         var name = AssetName.Text.Trim();
         if (name.Length == 0 || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
@@ -277,11 +300,18 @@ public partial class PixelEditorWindow : Window
         Canvas.SetTop(PixelCursor, _y * unit);
         PixelCursor.Width = PixelCursor.Height = unit;
         PixelCursor.Visibility = Visibility.Visible;
-        PixelImage.Source = CreateBitmap();
-        PixelUndo.IsEnabled = _draft.CanUndo;
-        PixelRedo.IsEnabled = _draft.CanRedo;
-        Pixels16.IsEnabled = _draft.Size != 16;
-        Pixels32.IsEnabled = _draft.Size != 32;
+        if (_editBitmap?.PixelWidth != _draft.Size)
+        {
+            _bgra = new byte[_draft.Size * _draft.Size * 4];
+            _editBitmap = new WriteableBitmap(_draft.Size, _draft.Size, 96, 96, PixelFormats.Bgra32, null);
+        }
+        _draft.CopyBgraTo(_bgra);
+        _editBitmap.WritePixels(new Int32Rect(0, 0, _draft.Size, _draft.Size), _bgra, _draft.Size * 4, 0);
+        PixelImage.Source = _editBitmap;
+        PixelUndo.IsEnabled = _frames.Count == 1 ? _draft.CanUndo : _draft.CanUndoWithoutResize;
+        PixelRedo.IsEnabled = _frames.Count == 1 ? _draft.CanRedo : _draft.CanRedoWithoutResize;
+        foreach (var size in CanvasSizes.Children.OfType<Button>())
+            size.IsEnabled = _frames.Count == 1 && !Equals(size.Tag, _draft.Size.ToString(CultureInfo.InvariantCulture));
         foreach (var button in ToolButtons.Children.OfType<Button>())
             button.BorderBrush = (Brush)FindResource(button.Tag.ToString() == _tool.ToString() ? "Accent" : "Border");
         PixelStatus.Text = $"{_tool} · Pixel {_x + 1}, {_y + 1}";

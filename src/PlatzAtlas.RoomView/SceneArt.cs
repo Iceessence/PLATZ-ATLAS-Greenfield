@@ -25,13 +25,20 @@ public static class SceneArt
     private static readonly RenderColor Background = Rgb(17, 25, 33);
     private static readonly RenderColor Grid = Rgb(32, 44, 53);
     private static readonly RenderColor Selection = Rgb(255, 214, 152);
-    private static readonly ConditionalWeakTable<ProjectAsset, RasterTexture> Images = new();
+    private static readonly ConditionalWeakTable<ProjectAsset, ClipTextures> Images = new();
 
-    public static RasterTexture Image(ProjectAsset source) => Images.GetValue(source, asset =>
+    public static RasterTexture Image(ProjectAsset source, double animationMs = 0)
     {
-        var pixels = PixelAsset.Read(asset);
-        return new RasterTexture(pixels.Width, pixels.Height, pixels.Rgba);
-    });
+        var view = Images.GetValue(source, asset =>
+        {
+            var clip = PixelClip.Read(asset);
+            return new ClipTextures(clip, clip.Frames.Select(frame =>
+                new RasterTexture(clip.Width, clip.Height, frame.Image.Rgba)).ToArray());
+        });
+        return view.Frames[view.Clip.FrameAt(animationMs)];
+    }
+
+    private sealed record ClipTextures(PixelClip Clip, RasterTexture[] Frames);
 
     public static (RenderPoint Resize, RenderPoint Rotate) EditHandles(Transform2D t) =>
         (Place(t, t.Width / 2, t.Height / 2), Place(t, 0, -t.Height / 2 - .045));
@@ -39,7 +46,7 @@ public static class SceneArt
     public static RenderSnapshot Create(Guid projectId, long revision, IReadOnlyList<SceneEntity> entities,
         Guid? selected, bool grid = false, PlayRoomSnapshot? play = null, Guid? nearbySwitch = null,
         IReadOnlyList<ProjectAsset>? assets = null, uint? backgroundRgb = null, IReadOnlyList<Guid>? paintOrder = null,
-        bool editHandles = false, RoomViewTransform? view = null, double gridSpacing = .05)
+        bool editHandles = false, RoomViewTransform? view = null, double gridSpacing = .05, double animationMs = 0)
     {
         var projection = view ?? RoomViewTransform.Fit;
         var triangles = new List<RenderTriangle>();
@@ -55,7 +62,7 @@ public static class SceneArt
             var (right, bottom) = projection.ToWorld(1, 1);
             Quad(new Transform2D(.5, .5, 1, 1, 0), background);
             var interval = Math.Clamp(gridSpacing, .025, .1);
-            var major = new RenderColor(chart.R + .045f, chart.G + .05f, chart.B + .055f);
+            var major = new RenderColor(Math.Min(1, chart.R + .045f), Math.Min(1, chart.G + .05f), Math.Min(1, chart.B + .055f));
             for (var column = (int)Math.Ceiling(left / interval); column <= Math.Floor(right / interval); column++)
                 Quad(new Transform2D(column * interval, projection.CenterY, .001 / projection.Zoom, bottom - top, 0), column % 4 == 0 ? major : chart);
             for (var row = (int)Math.Ceiling(top / interval); row <= Math.Floor(bottom / interval); row++)
@@ -125,7 +132,7 @@ public static class SceneArt
                 assets?.FirstOrDefault(asset => asset.Id == sprite.AssetId) is { } asset)
             {
                 var (a, b, c, d) = Corners(t);
-                sprites.Add(new RenderSprite(Image(asset), a, b, c, d, triangles.Count));
+                sprites.Add(new RenderSprite(Image(asset, animationMs), a, b, c, d, triangles.Count));
             }
             else if (item.Component is SceneSpawn)
             {

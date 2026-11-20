@@ -110,6 +110,7 @@ try
     SceneActionChecks.Run(scratch.FullName);
     WorkingDocumentChecks.Run(scratch.FullName);
     PresetChecks.Run(scratch.FullName);
+    AnimationChecks.Run(scratch.FullName);
 }
 finally
 {

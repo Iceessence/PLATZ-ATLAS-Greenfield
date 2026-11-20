@@ -84,7 +84,7 @@ public partial class MainWindow
         CommandManager.InvalidateRequerySuggested();
     }
 
-    private void UpdateGeneralPresentation(long? editStarted = null)
+    private void UpdateGeneralPresentation(long? editStarted = null, bool drawOnly = false)
     {
         var current = _session.Current;
         var play = _play?.Current;
@@ -94,19 +94,27 @@ public partial class MainWindow
                 entities.Select(entity => entity.Id == draft.Preview.After.Id ? draft.Preview.After : entity).ToArray();
         if (play is null && _sceneDrag is { } drag)
             entities = entities.Select(entity => entity.Id == drag.Id ? entity with { Transform = drag.Preview } : entity).ToArray();
-        AtlasPreviewBanner.Visibility = WestCard.Visibility = EastCard.Visibility = Visibility.Collapsed;
-        UpdatePlayControls();
-        SceneAtlasPreviewBanner.Visibility = _sceneAtlasDraft is null ? Visibility.Collapsed : Visibility.Visible;
-        if (play is null)
-            ViewportCoordinates.Text = $"{_editorView.Zoom:P0}  ·  Wheel to zoom  ·  Middle drag to pan";
-        AutomationProperties.SetName(Viewport, play is null ? "Room canvas" : "Playable room canvas");
+        if (!drawOnly)
+        {
+            var animated = current.Assets.Where(asset => asset.MediaType == PixelClip.MediaType).Select(asset => asset.Id).ToHashSet();
+            _animation.SetActive(entities.Any(entity => entity.Component is SceneSprite sprite && animated.Contains(sprite.AssetId)));
+            AtlasPreviewBanner.Visibility = WestCard.Visibility = EastCard.Visibility = Visibility.Collapsed;
+            UpdatePlayControls();
+            SceneAtlasPreviewBanner.Visibility = _sceneAtlasDraft is null ? Visibility.Collapsed : Visibility.Visible;
+            if (play is null)
+                ViewportCoordinates.Text = $"{_editorView.Zoom:P0}  ·  Wheel to zoom  ·  Middle drag to pan";
+            AutomationProperties.SetName(Viewport, play is null ? "Room canvas" : "Playable room canvas");
+        }
         Viewport.Show(SceneArt.Create(current.ProjectId, current.Revision, entities,
             play is null ? _sceneAtlasDraft?.Preview.After.Id ?? SelectedEntityId : _lastPlaySwitch?.TargetId,
             grid: play is null, play: play, nearbySwitch: _play?.NearbySwitch?.SwitchId, assets: current.Assets,
             backgroundRgb: current.Scene!.Appearance?.BackgroundRgb, paintOrder: current.Scene.Appearance?.PaintOrder,
             editHandles: play is null && _sceneAtlasDraft is null,
-            view: play is null ? _editorView : null, gridSpacing: _gridSpacing), editStarted);
+            view: play is null ? _editorView : null, gridSpacing: _gridSpacing,
+            animationMs: _animation.Milliseconds), editStarted);
     }
+
+    private void UpdateGeneralPresentationFromClock() => UpdateGeneralPresentation(drawOnly: true);
 
     private void RenameSceneClicked(object sender, RoutedEventArgs e)
     {

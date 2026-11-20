@@ -5,21 +5,28 @@
         WindowStartupLocation="CenterOwner" Background="{StaticResource Page}" Foreground="{StaticResource Text}"
         FontFamily="Segoe UI" UseLayoutRounding="True" PreviewKeyDown="EditorKeyDown">
   <Grid Margin="20">
-    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <DockPanel Margin="0,0,0,13">
       <StackPanel DockPanel.Dock="Left">
         <TextBlock Text="Pixel editor" FontSize="25" FontWeight="SemiBold"/>
         <TextBlock x:Name="SourceNote" Foreground="{StaticResource Muted}" Margin="0,4,0,0"/>
       </StackPanel>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-        <Button x:Name="PixelUndo" Content="Undo" Click="UndoClicked" Margin="0,0,6,0"/>
+        <Button Content="−" Tag="out" Click="PixelZoomClicked" Margin="0,0,4,0" AutomationProperties.Name="Zoom out"/>
+        <Button Content="Fit" Tag="fit" Click="PixelZoomClicked" Margin="0,0,4,0"/>
+        <Button Content="+" Tag="in" Click="PixelZoomClicked" Margin="0,0,12,0" AutomationProperties.Name="Zoom in"/>
+        <Button x:Name="PixelUndo" Content="Undo pixels" Click="UndoClicked" Margin="0,0,6,0"/>
         <Button x:Name="PixelRedo" Content="Redo" Click="RedoClicked"/>
       </StackPanel>
     </DockPanel>
     <Grid Grid.Row="1">
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="208"/></Grid.ColumnDefinitions>
       <Border BorderBrush="{StaticResource Border}" BorderThickness="1" Background="#0C1417" Margin="0,0,14,0">
-        <Viewbox Stretch="Uniform" Margin="12">
+        <ScrollViewer x:Name="PixelScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                      PanningMode="Both" PreviewMouseWheel="PixelZoomWheel" PreviewMouseDown="PixelPanDown"
+                      PreviewMouseMove="PixelPanMove" PreviewMouseUp="PixelPanUp">
+        <Viewbox x:Name="CanvasBox" Stretch="Uniform" Margin="12" Width="384" Height="384"
+                 HorizontalAlignment="Center" VerticalAlignment="Center">
           <Grid x:Name="PixelSurface" Width="384" Height="384" Focusable="True" Cursor="Cross"
                 MouseLeftButtonDown="PixelDown" MouseMove="PixelMove" MouseLeftButtonUp="PixelUp"
                 LostMouseCapture="PixelCaptureLost" AutomationProperties.Name="Pixel canvas, arrow keys and Space">
@@ -39,14 +46,19 @@
             </Canvas>
           </Grid>
         </Viewbox>
+        </ScrollViewer>
       </Border>
       <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
         <StackPanel>
           <TextBlock Text="Canvas size" Style="{StaticResource Caption}"/>
-          <UniformGrid Columns="2" Margin="0,5,0,13">
+          <UniformGrid x:Name="CanvasSizes" Columns="3" Margin="0,5,0,7">
             <Button x:Name="Pixels16" Content="16 × 16" Tag="16" Click="SizeClicked" Margin="0,0,5,0" Padding="4"/>
-            <Button x:Name="Pixels32" Content="32 × 32" Tag="32" Click="SizeClicked" Padding="4"/>
+            <Button x:Name="Pixels32" Content="32 × 32" Tag="32" Click="SizeClicked" Margin="0,0,5,0" Padding="4"/>
+            <Button x:Name="Pixels64" Content="64" Tag="64" Click="SizeClicked" Margin="0,0,0,4" Padding="4" AutomationProperties.Name="64 by 64"/>
+            <Button Content="128" Tag="128" Click="SizeClicked" Margin="0,0,5,0" Padding="4" AutomationProperties.Name="128 by 128"/>
+            <Button Content="256" Tag="256" Click="SizeClicked" Padding="4" AutomationProperties.Name="256 by 256"/>
           </UniformGrid>
+          <TextBlock x:Name="CanvasSizeNote" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,0,0,9"/>
           <TextBlock Text="Tools" Style="{StaticResource Caption}"/>
           <UniformGrid Columns="2" Margin="0,5,0,13" x:Name="ToolButtons">
             <Button x:Name="ToolPaint" Content="Paint" Tag="Paint" Click="ToolClicked" Margin="0,0,5,5" Padding="4"/>
@@ -65,9 +77,29 @@
         </StackPanel>
       </ScrollViewer>
     </Grid>
-    <DockPanel Grid.Row="2" Margin="0,12,0,0">
+    <Border Grid.Row="2" Margin="0,10,0,0" Padding="7" Background="{StaticResource Surface}" CornerRadius="4">
+      <StackPanel>
+        <DockPanel Margin="0,0,0,6">
+          <Button x:Name="TimelinePlay" DockPanel.Dock="Right" Content="Play frames" Click="TimelinePlayClicked" Margin="5,0,0,0"/>
+          <TextBlock Text="Frames" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,9,0" DockPanel.Dock="Left"/>
+          <ComboBox x:Name="TimelineFrames" SelectionChanged="FrameSelected" AutomationProperties.Name="Animation frame"/>
+        </DockPanel>
+        <WrapPanel>
+          <Button x:Name="AddFrame" Content="Add blank" Tag="blank" Click="TimelineEdited" Margin="0,0,4,3"/>
+          <Button x:Name="DuplicateFrame" Content="Duplicate" Tag="duplicate" Click="TimelineEdited" Margin="0,0,4,3"/>
+          <Button x:Name="DeleteFrame" Content="Delete frame" Tag="delete" Click="TimelineEdited" Margin="0,0,4,3"/>
+          <Button x:Name="FrameEarlier" Content="←" Tag="earlier" Click="TimelineEdited" Margin="0,0,4,3" AutomationProperties.Name="Move frame earlier"/>
+          <Button x:Name="FrameLater" Content="→" Tag="later" Click="TimelineEdited" Margin="0,0,9,3" AutomationProperties.Name="Move frame later"/>
+          <TextBlock Text="Frame ms" VerticalAlignment="Center" Margin="0,0,4,3"/>
+          <TextBox x:Name="FrameDuration" Width="45" MaxLength="4" Margin="0,0,4,3" AutomationProperties.Name="Frame duration in milliseconds"/>
+          <Button x:Name="SetDuration" Content="Set" Tag="duration" Click="TimelineEdited" Margin="0,0,0,3"/>
+        </WrapPanel>
+      </StackPanel>
+    </Border>
+    <DockPanel Grid.Row="3" Margin="0,9,0,0">
       <TextBlock x:Name="PixelStatus" TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"/>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+        <Button x:Name="ExportSpriteSheet" Content="Export sheet…" Click="ExportSheetClicked" Margin="6,0,0,0"/>
         <Button x:Name="ExportSpritePng" Content="Export PNG…" Click="ExportClicked" Margin="6,0,6,0"/>
         <Button x:Name="KeepSprite" Content="Add to assets" Click="KeepClicked" Margin="0,0,6,0"/>
         <Button Content="Close" IsCancel="True"/>

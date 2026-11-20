@@ -16,12 +16,14 @@ namespace PlatzAtlas.Player;
 public partial class PlayerWindow : Window
 {
     private readonly string? _diagnostics;
+    private readonly AnimationClock _animation;
     private RuntimeRoom? _room;
     private MuseumPlaySession? _session;
     private PlaySwitchResult? _lastSwitch;
 
     internal PlayerWindow(RendererPreference renderer, string? roomPath, string? diagnostics)
     {
+        _animation = new AnimationClock(DrawRoom);
         if (diagnostics is not null)
         {
             _diagnostics = Path.GetFullPath(diagnostics);
@@ -44,6 +46,7 @@ public partial class PlayerWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _session?.Stop();
+        _animation.SetActive(false);
         Viewport.Shutdown();
         base.OnClosed(e);
     }
@@ -76,6 +79,8 @@ public partial class PlayerWindow : Window
         _session?.Stop();
         _session = session;
         _room = room;
+        _animation.SetActive(room.RasterAssets?.Any(asset => asset.MediaType == PixelClip.MediaType) == true);
+        _animation.Restart();
         _lastSwitch = null;
         RoomTitle.Text = room.Name;
         SourceLabel.Text = $"Exported revision {room.SourceRevision}";
@@ -165,16 +170,26 @@ public partial class PlayerWindow : Window
                     SceneLamp lamp => $"{item.Name} · {State(lamp.IsOn)}",
                     _ => null
                 }).OfType<string>());
-            Viewport.Show(SceneArt.Create(snapshot.ProjectId, snapshot.SourceRevision, entities,
-                _lastSwitch?.TargetId, play: snapshot, nearbySwitch: nearby?.SwitchId, assets: _room?.RasterAssets,
-                backgroundRgb: _room?.BackgroundRgb, paintOrder: _room?.PaintOrder));
         }
         else
         {
             LightLabel.Text = string.Join("\n", snapshot.Objects.OrderBy(item => item.X)
                 .Select(item => $"{item.Location} · {State(item.IsOn)}"));
-            Viewport.Show(MuseumArt.CreatePlayer(session, _lastSwitch?.TargetId));
         }
+        DrawRoom();
+    }
+
+    private void DrawRoom()
+    {
+        if (_session is not { } session)
+            return;
+        var snapshot = session.Current;
+        if (snapshot.Entities is { } entities)
+            Viewport.Show(SceneArt.Create(snapshot.ProjectId, snapshot.SourceRevision, entities,
+                _lastSwitch?.TargetId, play: snapshot, nearbySwitch: session.NearbySwitch?.SwitchId, assets: _room?.RasterAssets,
+                backgroundRgb: _room?.BackgroundRgb, paintOrder: _room?.PaintOrder, animationMs: _animation.Milliseconds));
+        else
+            Viewport.Show(MuseumArt.CreatePlayer(session, _lastSwitch?.TargetId));
     }
 
     private void SetStatus(string message, bool error = false)

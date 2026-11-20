@@ -46,6 +46,7 @@ public partial class MainWindow
             _sceneDrag = null;
             _playSource = source;
             _play = session;
+            _animation.Restart();
             var snapshot = session.Current;
             PlaySwitches.ItemsSource = session.Switches.Select(item =>
                 new PlaySwitchItem(snapshot.SessionId, item.Id, $"Use {item.Name}")).ToArray();
