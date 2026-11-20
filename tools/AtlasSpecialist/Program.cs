@@ -2,6 +2,9 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
+if (args is ["--grounded", var evidenceSource, var evidenceOutput])
+    return GroundedBenchmark.Run(evidenceSource, evidenceOutput);
+
 if (args.Length != 2)
 {
     Console.Error.WriteLine("Pass the specialist source directory and a writable output directory.");

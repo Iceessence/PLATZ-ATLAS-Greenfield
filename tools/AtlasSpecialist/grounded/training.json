@@ -1,0 +1,8 @@
+{
+  "modelVersion": "grounded-scene-router/0.2",
+  "epochs": 75,
+  "learningRate": 0.12,
+  "decay": 0.00075,
+  "minimumSupportedAccuracy": 0.9,
+  "maximumUnsafeAccepts": 0
+}
