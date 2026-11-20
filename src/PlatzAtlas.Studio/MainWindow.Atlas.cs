@@ -84,13 +84,40 @@ public partial class MainWindow
         }
         else if (CurrentSavedScope() is { } scope)
         {
-            var saved = _session.Current;
-            _atlasGrant = _atlasHost.Allow(scope, () => PublishSwitchEvidence(saved));
-            UpdateAtlasAccess();
-            _diagnostics.Log("atlas-access", new { status = "allowed", revision = scope.Revision });
+            var session = _session;
+            if (CanReadAtlasHead(session))
+            {
+                _atlasGrant = _atlasHost.Allow(scope, () => PublishSwitchEvidence(session.ReadSavedSnapshot()));
+                UpdateAtlasAccess();
+                _diagnostics.Log("atlas-access", new { status = "allowed", revision = scope.Revision });
+            }
         }
 
         UIElementAutomationPeer.FromElement(AtlasScopeLabel)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+    }
+
+    private bool CanReadAtlasHead(ProjectSession session)
+    {
+        try
+        {
+            session.ReadSavedSnapshot();
+            return true;
+        }
+        catch (Exception error) when (error is ProjectEditException or IOException or UnauthorizedAccessException)
+        {
+            RejectAtlasHead(error);
+            return false;
+        }
+    }
+
+    private void RejectAtlasHead(Exception error)
+    {
+        ClearAtlasAccess();
+        UpdateAtlasAccess();
+        AtlasScopeLabel.Text = error is ProjectEditException ? error.Message :
+            "Could not verify the saved project. Reopen it before asking ATLAS.";
+        UIElementAutomationPeer.FromElement(AtlasScopeLabel)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+        _diagnostics.Log("atlas-access", new { status = "source-rejected", reason = error.GetType().Name });
     }
 
     private static byte[] PublishSwitchEvidence(MuseumProject saved)
@@ -115,9 +142,17 @@ public partial class MainWindow
             UpdateAtlasAccess();
             return;
         }
-
         var started = Stopwatch.GetTimestamp();
-        var result = _atlasHost.Ask(new SwitchQuestion(SwitchEvidenceProfile.Version, grant, AtlasQuestion.Text));
+        SwitchQuestionResult result;
+        try
+        {
+            result = _atlasHost.Ask(new SwitchQuestion(SwitchEvidenceProfile.Version, grant, AtlasQuestion.Text));
+        }
+        catch (Exception error) when (error is ProjectEditException or IOException or UnauthorizedAccessException)
+        {
+            RejectAtlasHead(error);
+            return;
+        }
         ClearAtlasAnswer();
         if (result.Answer is { } answer)
         {
