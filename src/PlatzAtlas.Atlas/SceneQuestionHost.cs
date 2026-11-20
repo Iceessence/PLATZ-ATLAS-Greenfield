@@ -149,7 +149,7 @@ public sealed class SceneQuestionHost(TimeProvider? clock = null)
             double.TryParse(y, NumberStyles.Float, CultureInfo.InvariantCulture, out var dy) && dy is >= 0 and <= 1)
             return new(movement.Name, new(SceneProposalKind.Move, X: dx, Y: dy));
         if (Strip("Rename ") is { } rename && Split(rename, " to ") is { } newName &&
-            newName.Value.Length <= 96 && !newName.Value.Any(char.IsControl))
+            newName.Value is { Length: > 0 and <= 96 } && !newName.Value.Any(char.IsControl))
             return new(newName.Name, new(SceneProposalKind.Rename, Name: newName.Value));
         if (Strip("Set ") is { } set && Split(set, " ") is { } value)
         {
@@ -173,7 +173,9 @@ public sealed class SceneQuestionHost(TimeProvider? clock = null)
         var index = input.LastIndexOf(separator, StringComparison.OrdinalIgnoreCase);
         if (index <= 0 || (index + separator.Length) >= input.Length)
             return null;
-        return (input[..index].Trim(), input[(index + separator.Length)..].Trim());
+        var name = input[..index].Trim();
+        var value = input[(index + separator.Length)..].Trim();
+        return name.Length == 0 || value.Length == 0 ? null : (name, value);
     }
 
     private sealed record ParsedQuestion(string Name, SceneProposal? Proposal = null, string? Criterion = null);

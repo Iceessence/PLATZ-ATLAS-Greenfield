@@ -39,6 +39,9 @@ internal static class SceneAtlasChecks
         Require(bad.Status == QuestionStatus.IncompatibleProfile && reads == 0, "unknown profile reads nothing");
         var invalid = host.Ask(grant, 2, null, "delete the room");
         Require(invalid.Status == QuestionStatus.UnsupportedQuestion && reads == 0, "unsupported operation reads nothing");
+        foreach (var blankRename in new[] { "Rename selection to    ", "Rename selection to \t ?", "Rename     to title" })
+            Require(host.Ask(grant, 2, door.Id, blankRename).Status == QuestionStatus.UnsupportedQuestion && reads == 0,
+                "incomplete rename never requests evidence or creates a proposal");
         Require(host.Ask(grant, 2, null, "Inspect Gate").Status == QuestionStatus.EvidenceUnavailable, "ambiguous name denied");
         var answer = host.Ask(grant, 2, lamp.Id, "Inspect selection").Answer!;
         Require(answer.Source.Id == lamp.Id && answer.Source.Active == true && answer.Scope == scope, "selected lamp by stable identity");
