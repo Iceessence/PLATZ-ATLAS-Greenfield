@@ -107,6 +107,7 @@ try
     SceneImageChecks.Run(scratch.FullName);
     PixelDraftChecks.Run(scratch.FullName);
     SceneAtlasChecks.Run(scratch.FullName);
+    SceneActionChecks.Run(scratch.FullName);
 }
 finally
 {

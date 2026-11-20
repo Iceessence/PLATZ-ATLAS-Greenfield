@@ -412,6 +412,7 @@
                          Background="{StaticResource Page}" Foreground="{StaticResource Text}"
                          BorderBrush="{StaticResource Border}" CaretBrush="{StaticResource Accent}"/>
                 <Button x:Name="SceneAtlasAsk" Content="Ask ATLAS" Click="SceneAtlasAskClicked" Margin="0,7,0,10"/>
+                <Button x:Name="SceneAtlasHealth" Content="Check scene health" Click="SceneAtlasHealthClicked" Margin="0,0,0,10"/>
                 <TextBlock x:Name="SceneAtlasResult" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                 <StackPanel x:Name="SceneAtlasAnswerCard" Visibility="Collapsed" Margin="0,8,0,0">
                   <Button x:Name="SceneAtlasShow" Content="Show object" Click="SceneAtlasShowClicked" Margin="0,0,0,5"/>

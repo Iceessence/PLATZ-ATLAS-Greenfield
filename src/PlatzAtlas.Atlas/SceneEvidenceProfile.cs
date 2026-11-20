@@ -13,6 +13,8 @@ public sealed record SceneSource(Guid Id, string Name, SceneSourceKind Kind, dou
     public Guid? SecondTargetId { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? RequiredKeys { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? SpawnBlocked { get; init; }
 }
 public sealed record SceneEvidence(ProjectReadScope Scope, IReadOnlyList<SceneSource> Objects);
 
@@ -108,6 +110,7 @@ public static class SceneEvidenceProfile
                 _ => false
             };
             if (!propertiesMatch || (item.Kind != SceneSourceKind.Switch && item.SecondTargetId is not null) ||
+                (item.Kind != SceneSourceKind.Spawn && item.SpawnBlocked is not null) ||
                 (item.Kind == SceneSourceKind.Goal ? item.RequiredKeys is not (>= 0 and <= 64) : item.RequiredKeys is not null))
                 throw new InvalidDataException("Scene evidence contains properties outside its declared object type.");
         }

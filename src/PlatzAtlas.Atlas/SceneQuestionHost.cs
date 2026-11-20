@@ -2,13 +2,21 @@ using System.Globalization;
 
 namespace PlatzAtlas.Atlas;
 
-public enum SceneProposalKind { Rename, Move, SetState }
-public sealed record SceneProposal(SceneProposalKind Kind, string? Name = null, double X = 0, double Y = 0, bool State = false);
-public sealed record SceneAnswer(ProjectReadScope Scope, SceneSource Source, SceneSource? Target, string Sha256, SceneProposal? Proposal)
+public enum SceneProposalKind { Rename, Move, SetState, Resize, Rotate, Wire, Unlink, Add, Duplicate }
+public sealed record SceneProposal(SceneProposalKind Kind, string? Name = null, double X = 0, double Y = 0, bool State = false)
+{
+    public Guid? TargetId { get; init; }
+    public SceneSourceKind? ObjectKind { get; init; }
+}
+public sealed record SceneAnswer(ProjectReadScope Scope, SceneSource? Source, SceneSource? Target, string Sha256, SceneProposal? Proposal)
 {
     public SceneSource? AdditionalTarget { get; init; }
+    public SceneSource? ProposedTarget { get; init; }
 }
-public sealed record SceneQuestionResult(QuestionStatus Status, SceneAnswer? Answer = null, string? Message = null);
+public sealed record SceneQuestionResult(QuestionStatus Status, SceneAnswer? Answer = null, string? Message = null)
+{
+    public SceneHealthReport? Health { get; init; }
+}
 public sealed record SceneWriteReview(Guid Id, ProjectReadGrant Grant, SceneAnswer Answer);
 
 public sealed class SceneQuestionHost(TimeProvider? clock = null)
@@ -62,7 +70,7 @@ public sealed class SceneQuestionHost(TimeProvider? clock = null)
                 return new(QuestionStatus.IncompatibleProfile);
             if (text is not { Length: <= MaxQuestionLength } || Parse(text) is not { } query)
                 return new(QuestionStatus.UnsupportedQuestion, Message:
-                    "Try Inspect selection, Where is <name>?, What does <switch> control?, or Move <name> to 0.5, 0.4.");
+                    "Try Inspect selection, Check scene, or Move <name> to 0.5, 0.4. Write changes require explicit preview and confirmation.");
 
             SceneEvidence evidence;
             string sha;
@@ -70,32 +78,52 @@ public sealed class SceneQuestionHost(TimeProvider? clock = null)
             catch (InvalidDataException error) { return new(QuestionStatus.InvalidSnapshot, Message: error.Message); }
             if (_grant != grant || evidence.Scope != grant.Scope)
                 return new(QuestionStatus.AccessDenied);
-            var request = query.Name.Trim();
-            var candidates = (Guid.TryParse(request, out var id)
-                ? evidence.Objects.Where(item => item.Id == id)
-                : request.Equals("selection", StringComparison.OrdinalIgnoreCase) || request.Equals("this object", StringComparison.OrdinalIgnoreCase)
-                    ? evidence.Objects.Where(item => item.Id == selected)
-                    : evidence.Objects.Where(item => item.Name.Equals(request, StringComparison.OrdinalIgnoreCase))).Take(2).ToArray();
-            if (candidates.Length != 1)
-                return new(QuestionStatus.EvidenceUnavailable, Message: candidates.Length == 2
-                    ? "More than one object has that name. Select one and ask about selection, or use its exact ID."
-                    : "There is no matching object in the authorized revision.");
+            if (query.Criterion == "scene-health")
+                return new(QuestionStatus.Answered) { Health = SceneHealthReport.Inspect(evidence, sha) };
+            var proposal = query.Proposal;
+            if (proposal?.Kind == SceneProposalKind.Add)
+            {
+                _latest = new SceneAnswer(grant.Scope, null, null, sha, proposal);
+                return new(QuestionStatus.Answered, _latest);
+            }
+            var candidates = SceneSourceResolver.Resolve(evidence, query.Name, selected);
+            if (candidates.Count != 1)
+                return Missing(candidates.Count);
 
             var source = candidates[0];
             if (query.Proposal is { Kind: SceneProposalKind.SetState } &&
                 ((query.Criterion == "door" && source.Kind != SceneSourceKind.Door) ||
                  (query.Criterion == "lamp" && source.Kind != SceneSourceKind.Lamp)))
                 return new(QuestionStatus.UnsupportedQuestion, Message: "Use open or closed for a door, and on or off for a lamp.");
-            if (query.Criterion == "control" && source.Kind != SceneSourceKind.Switch)
+            if ((query.Criterion == "control" || proposal?.Kind is SceneProposalKind.Wire or SceneProposalKind.Unlink)
+                && source.Kind != SceneSourceKind.Switch)
                 return new(QuestionStatus.UnsupportedQuestion, Message: "Choose a switch to inspect its link.");
-            var target = source.TargetId is { } linked ? evidence.Objects.Single(item => item.Id == linked) : null;
-            _latest = new SceneAnswer(grant.Scope, source, target, sha, query.Proposal)
+            if (proposal?.Kind == SceneProposalKind.Duplicate && source.Kind == SceneSourceKind.Spawn)
+                return new(QuestionStatus.UnsupportedQuestion, Message: "A room can have only one spawn.");
+            SceneSource? proposedTarget = null;
+            if (proposal is { Kind: SceneProposalKind.Wire, Name: { } requested })
             {
-                AdditionalTarget = source.SecondTargetId is Guid second ? evidence.Objects.Single(item => item.Id == second) : null
+                var destinations = SceneSourceResolver.Resolve(evidence, requested, selected);
+                if (destinations.Count != 1)
+                    return Missing(destinations.Count);
+                proposedTarget = destinations[0];
+                if (proposedTarget.Kind is not (SceneSourceKind.Door or SceneSourceKind.Lamp))
+                    return new(QuestionStatus.UnsupportedQuestion, Message: "Wire a switch to a door or lamp.");
+                proposal = proposal with { TargetId = proposedTarget.Id };
+            }
+            var target = source.TargetId is { } linked ? evidence.Objects.Single(item => item.Id == linked) : null;
+            _latest = new SceneAnswer(grant.Scope, source, target, sha, proposal)
+            {
+                AdditionalTarget = source.SecondTargetId is Guid second ? evidence.Objects.Single(item => item.Id == second) : null,
+                ProposedTarget = proposedTarget
             };
             return new(QuestionStatus.Answered, _latest);
         }
     }
+
+    private static SceneQuestionResult Missing(int count) => new(QuestionStatus.EvidenceUnavailable,
+        Message: count > 1 ? "More than one object has that name. Select one or use its exact ID."
+            : "There is no matching object in the authorized revision.");
 
     public SceneWriteReview BeginReview(ProjectReadGrant grant, SceneAnswer answer, ProjectReadScope current)
     {
@@ -139,6 +167,9 @@ public sealed class SceneQuestionHost(TimeProvider? clock = null)
     private static ParsedQuestion? Parse(string text)
     {
         var input = text.Trim().TrimEnd('?').Trim();
+        if (input.Equals("Check scene", StringComparison.OrdinalIgnoreCase) ||
+            input.Equals("Scene health", StringComparison.OrdinalIgnoreCase))
+            return new("", Criterion: "scene-health");
         if (Strip("Inspect ") is { Length: > 0 } inspect)
             return new(inspect);
         if (Strip("Describe ") is { Length: > 0 } describe)
@@ -150,10 +181,29 @@ public sealed class SceneQuestionHost(TimeProvider? clock = null)
         if (Strip("What state is ") is { Length: > 0 } state)
             return new(state);
         if (Strip("Move ") is { } move && Split(move, " to ") is { } movement &&
-            movement.Value.Split(',', StringSplitOptions.TrimEntries) is [var x, var y] &&
-            double.TryParse(x, NumberStyles.Float, CultureInfo.InvariantCulture, out var dx) && dx is >= 0 and <= 1 &&
-            double.TryParse(y, NumberStyles.Float, CultureInfo.InvariantCulture, out var dy) && dy is >= 0 and <= 1)
-            return new(movement.Name, new(SceneProposalKind.Move, X: dx, Y: dy));
+            Pair(movement.Value, 0) is { } point)
+            return new(movement.Name, new(SceneProposalKind.Move, X: point.X, Y: point.Y));
+        if (Strip("Resize ") is { } resize && Split(resize, " to ") is { } dimensions &&
+            Pair(dimensions.Value, .025) is { } size)
+            return new(dimensions.Name, new(SceneProposalKind.Resize, X: size.X, Y: size.Y));
+        if (Strip("Rotate ") is { } rotate && Split(rotate, " to ") is { } angle &&
+            Number(angle.Value, -360, 360, out var degrees))
+            return new(angle.Name, new(SceneProposalKind.Rotate, X: degrees));
+        if (Strip("Wire ") is { } wire && Split(wire, " to ") is { } link)
+            return new(link.Name, new(SceneProposalKind.Wire, Name: link.Value));
+        if (Strip("Unlink ") is { Length: > 0 } unlink)
+            return new(unlink, new(SceneProposalKind.Unlink));
+        if (Strip("Duplicate ") is { Length: > 0 } duplicate)
+            return new(duplicate, new(SceneProposalKind.Duplicate));
+        if (Strip("Add ") is { } add && Split(add, " at ") is { } placement &&
+            Split(placement.Name, " named ") is { } named && named.Value is { Length: <= 96 } &&
+            !named.Value.Any(char.IsControl) &&
+            Enum.TryParse<SceneSourceKind>(named.Name, true, out var kind) &&
+            kind is SceneSourceKind.Wall or SceneSourceKind.Lamp or SceneSourceKind.Door or SceneSourceKind.Switch
+                or SceneSourceKind.Spawn or SceneSourceKind.Key or SceneSourceKind.Goal &&
+            string.Equals(named.Name, kind.ToString(), StringComparison.OrdinalIgnoreCase) &&
+            Pair(placement.Value, 0) is { } position)
+            return new("", new SceneProposal(SceneProposalKind.Add, named.Value, position.X, position.Y) { ObjectKind = kind });
         if (Strip("Rename ") is { } rename && Split(rename, " to ") is { } newName &&
             newName.Value is { Length: > 0 and <= 96 } && !newName.Value.Any(char.IsControl))
             return new(newName.Name, new(SceneProposalKind.Rename, Name: newName.Value));
@@ -173,6 +223,14 @@ public sealed class SceneQuestionHost(TimeProvider? clock = null)
         string? Strip(string prefix) => input.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
             ? input[prefix.Length..].Trim() : null;
     }
+
+    private static (double X, double Y)? Pair(string input, double minimum) =>
+        input.Split(',', StringSplitOptions.TrimEntries) is [var x, var y] &&
+        Number(x, minimum, 1, out var first) && Number(y, minimum, 1, out var second)
+            ? (first, second) : null;
+
+    private static bool Number(string text, double minimum, double maximum, out double number) =>
+        double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out number) && number >= minimum && number <= maximum;
 
     private static (string Name, string Value)? Split(string input, string separator)
     {

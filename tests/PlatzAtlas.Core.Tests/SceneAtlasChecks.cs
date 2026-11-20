@@ -44,9 +44,9 @@ internal static class SceneAtlasChecks
                 "incomplete rename never requests evidence or creates a proposal");
         Require(host.Ask(grant, 2, null, "Inspect Gate").Status == QuestionStatus.EvidenceUnavailable, "ambiguous name denied");
         var answer = host.Ask(grant, 2, lamp.Id, "Inspect selection").Answer!;
-        Require(answer.Source.Id == lamp.Id && answer.Source.Active == true && answer.Scope == scope, "selected lamp by stable identity");
+        Require(answer.Source is { Active: true } selected && selected.Id == lamp.Id && answer.Scope == scope, "selected lamp by stable identity");
         answer = host.Ask(grant, 2, null, "What does Reader control?").Answer!;
-        Require(answer.Source.Id == control.Id && answer.Target?.Id == door.Id && answer.Sha256.Length == 64,
+        Require(answer.Source?.Id == control.Id && answer.Target?.Id == door.Id && answer.Sha256.Length == 64,
             "resolved switch target with evidence digest");
         Reject<InvalidDataException>(() => SceneEvidenceProfile.Open(Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(profile)
             .Replace("Reader", "Editor"))));

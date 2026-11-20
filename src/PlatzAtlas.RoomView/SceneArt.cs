@@ -129,6 +129,17 @@ public static class SceneArt
                 AtLocal(t, 0, .31, .83, .14, edge);
             }
         }
+        if (grid && entities.FirstOrDefault(item => item.Id == selected) is { Component: SceneSwitch links } source)
+        {
+            surface = foreground;
+            foreach (var target in entities.Where(item => links.Targets(item.Id)))
+            {
+                var dx = target.Transform.X - source.Transform.X;
+                var dy = target.Transform.Y - source.Transform.Y;
+                Quad(new Transform2D(source.Transform.X + dx / 2, source.Transform.Y + dy / 2,
+                    Math.Sqrt(dx * dx + dy * dy), .004, Math.Atan2(dy, dx) * 180 / Math.PI), Rgb(117, 194, 202));
+            }
+        }
         if (play?.Visitor is { } actor)
         {
             surface = foreground;

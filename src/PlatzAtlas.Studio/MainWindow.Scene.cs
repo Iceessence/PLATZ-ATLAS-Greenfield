@@ -86,7 +86,8 @@ public partial class MainWindow
         var play = _play?.Current;
         var entities = play?.Entities ?? current.Scene!.Entities;
         if (play is null && _sceneAtlasDraft is { } draft)
-            entities = entities.Select(entity => entity.Id == draft.Preview.After.Id ? draft.Preview.After : entity).ToArray();
+            entities = draft.Preview.Before is null ? entities.Append(draft.Preview.After).ToArray() :
+                entities.Select(entity => entity.Id == draft.Preview.After.Id ? draft.Preview.After : entity).ToArray();
         if (play is null && _sceneDrag is { } drag)
             entities = entities.Select(entity => entity.Id == drag.Id ? entity with { Transform = drag.Preview } : entity).ToArray();
         AtlasPreviewBanner.Visibility = WestCard.Visibility = EastCard.Visibility = Visibility.Collapsed;
@@ -104,20 +105,9 @@ public partial class MainWindow
     {
         if (_play is not null || _session.Current.Scene is not { } scene || sender is not Button { Tag: string kind })
             return;
-        var (component, width, height, rotation) = kind switch
-        {
-            "Lamp" => ((SceneComponent)new SceneLamp(true), .10, .16, 0),
-            "Door" => (new SceneDoor(false), .18, .09, 0),
-            "Switch" => (new SceneSwitch(null, SwitchBehavior.Toggle), .045, .077, 45),
-            "Spawn" => (new SceneSpawn(), .065, .105, 0),
-            "Key" => (new SceneKey(), .056, .096, 0),
-            "Goal" => (new SceneGoal(0), .15, .15, 0),
-            _ => (new WallPanel(PanelColor.Slate), .36, .105, 0)
-        };
         var offset = .035 * (scene.Entities.Count % 5);
         var position = kind switch { "Spawn" => (.50, .90), "Goal" => (.50, .16), _ => (.45 + offset, .46 + offset) };
-        var entity = new SceneEntity(Guid.NewGuid(), kind,
-            new Transform2D(position.Item1, position.Item2, width, height, rotation), component);
+        var entity = SceneObjectFactory.Create(Guid.NewGuid(), Enum.Parse<SceneObjectKind>(kind), kind, position.Item1, position.Item2);
         ApplyScene(new AddSceneEntity(_session.Current.ProjectId, _session.Current.Revision, entity),
             $"Added {entity.Name.ToLowerInvariant()}. Drag it on the canvas or edit its transform.");
     }

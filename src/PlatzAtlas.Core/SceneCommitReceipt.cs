@@ -1,6 +1,6 @@
 namespace PlatzAtlas.Core;
 
-public sealed record ScenePreview(SceneOperation Operation, SceneEntity Before, SceneEntity After);
+public sealed record ScenePreview(SceneOperation Operation, SceneEntity? Before, SceneEntity After);
 public sealed record SceneCommitStamp(Guid OperationId, string PayloadSha256);
 public sealed record SceneCommitReceipt(Guid OperationId, Guid ProjectId, Guid SceneId, Guid EntityId,
     long BaseRevision, long Revision, string PayloadSha256);
@@ -13,14 +13,15 @@ public sealed partial class ProjectSession
 
     public ScenePreview PreviewSavedScene(SceneOperation operation)
     {
-        if (operation is not (RenameSceneEntity or TransformSceneEntity or SetSceneLamp or SetSceneDoor))
+        if (operation is not (RenameSceneEntity or TransformSceneEntity or SetSceneLamp or SetSceneDoor or ConfigureSceneSwitch
+            or AddSceneEntity or DuplicateSceneEntity))
             throw new ProjectEditException(EditRejection.WrongTarget, "This operation is outside the scene proposal profile.");
         CheckEditBase(operation.ProjectId, operation.BaseRevision);
         var project = ReadSavedSnapshot();
         var scene = project.Scene ?? throw new ProjectEditException(EditRejection.WrongTarget, "Open a saved original room.");
         var edit = PlanSceneEdit(scene, operation) ?? throw new ProjectEditException(EditRejection.StaleValue, "The object already has that value.");
         WithSceneEdit(scene, edit);
-        return new ScenePreview(operation, edit.Before!, edit.After!);
+        return new ScenePreview(operation, edit.Before, edit.After!);
     }
 
     // Studio owns the revocable approval and rechecks it inside the project writer.
@@ -42,7 +43,7 @@ public sealed partial class ProjectSession
                 var scene = Current.Scene!;
                 if (scene.History.Any(edit => edit.AtlasCommit?.OperationId == operationId))
                     throw new ProjectEditException(EditRejection.OperationIdConflict, "This proposal has already been used.");
-                var edit = new SceneEdit(Current.Revision + 1, preview.Before.Id, preview.Before, preview.After, LightEditKind.Edit, null);
+                var edit = new SceneEdit(Current.Revision + 1, preview.After.Id, preview.Before, preview.After, LightEditKind.Edit, null);
                 edit = edit with { AtlasCommit = new SceneCommitStamp(operationId,
                     ProjectFormat.SceneEditDigest(Current.ProjectId, Current.SceneId, edit)) };
                 var next = WithSceneEdit(scene, edit);

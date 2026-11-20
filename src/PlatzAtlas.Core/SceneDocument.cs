@@ -234,7 +234,7 @@ internal sealed class SceneJournal
             journal.Record(edit);
             history.Add(edit);
             if (edit.AtlasCommit is { } stamp &&
-                (edit.Kind != LightEditKind.Edit || edit.AssetChange is not null || edit.Before is null || edit.After is null ||
+                (edit.Kind != LightEditKind.Edit || edit.AssetChange is not null || edit.After is null ||
                     stamp.OperationId == Guid.Empty || !approvedIds.Add(stamp.OperationId) ||
                     stamp.PayloadSha256 != ProjectFormat.SceneEditDigest(projectId, sceneId, edit)))
                 throw new InvalidDataException("The saved ATLAS scene receipt does not match its edit.");

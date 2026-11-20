@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using PlatzAtlas.Atlas;
 using PlatzAtlas.Core;
+using PlatzAtlas.Runtime;
 
 namespace PlatzAtlas.Studio;
 
@@ -46,11 +47,15 @@ public partial class MainWindow
         SceneAtlasAccess.IsEnabled = saved;
         SceneAtlasAccess.Content = _sceneAtlasGrant is null ? "Allow scene read" : "Revoke scene read";
         SceneAtlasAsk.IsEnabled = _sceneAtlasGrant is not null;
+        SceneAtlasHealth.IsEnabled = SceneAtlasAsk.IsEnabled;
         SceneAtlasScope.Text = !saved ? "Save the room to ask about this revision." : _sceneAtlasGrant is null
             ? $"Allow a read of saved revision {current.Revision}."
             : $"Reading saved revision {current.Revision}. Apply changes through a separate confirmation.";
         SceneAtlasAnswerCard.Visibility = _sceneAtlasAnswer is null ? Visibility.Collapsed : Visibility.Visible;
-        SceneAtlasTarget.Visibility = _sceneAtlasAnswer?.Target is null ? Visibility.Collapsed : Visibility.Visible;
+        SceneAtlasShow.Visibility = _sceneAtlasAnswer?.Source is null ? Visibility.Collapsed : Visibility.Visible;
+        SceneAtlasTarget.Visibility = (_sceneAtlasAnswer?.ProposedTarget ?? _sceneAtlasAnswer?.Target) is null
+            ? Visibility.Collapsed : Visibility.Visible;
+        SceneAtlasTarget.Content = _sceneAtlasAnswer?.ProposedTarget is null ? "Show linked target" : "Show proposed target";
         SceneAtlasPreview.Visibility = _sceneAtlasAnswer?.Proposal is null ? Visibility.Collapsed : Visibility.Visible;
         var receipt = _session.LatestSceneCommit;
         SceneAtlasReceipt.Visibility = receipt is null ? Visibility.Collapsed : Visibility.Visible;
@@ -91,26 +96,43 @@ public partial class MainWindow
             SceneAtlasResult.Text = FormatAnswer(answer);
             var source = answer.Source;
             SceneAtlasSource.Text = $"Project {answer.Scope.ProjectId:D}\nScene {answer.Scope.SceneId:D}\nSaved revision {answer.Scope.Revision}" +
+                (source is null ? "\n\nNew object proposal for this saved scene" :
                 $"\n\nscene.entities[{source.Id:D}].transform\nX {source.X:G17} · Y {source.Y:G17}" +
                 $"\nWidth {source.Width:G17} · Height {source.Height:G17} · Rotation {source.Rotation:G17}" +
                 $"\n\nscene.entities[{source.Id:D}].component\n{source.Kind}" +
                 (source.TargetId is { } target ? $"\ntargetId {target:D}" : "") +
                 (source.SecondTargetId is { } second ? $"\nsecondTargetId {second:D}" : "") +
-                (source.AssetId is { } asset ? $"\nassetId {asset:D}" : "") +
+                (source.AssetId is { } asset ? $"\nassetId {asset:D}" : "")) +
+                (answer.ProposedTarget is { } proposed ? $"\n\nProposed target\n{proposed.Name}\n{proposed.Id:D}" : "") +
                 $"\n\nEvidence SHA-256\n{answer.Sha256}";
+        }
+        else if (result.Health is { } health)
+        {
+            var issues = health.Issues.Count == 0 ? "No listed scene issues." : string.Join("\n\n",
+                health.Issues.Select(issue => issue.Message + "\n" + string.Join("\n", issue.ObjectIds)));
+            SceneAtlasResult.Text = $"Scene health · Saved r{health.Scope.Revision}\n\n{issues}\n\nEvidence SHA-256\n{health.Sha256}";
+            SceneAtlasSource.Text = "";
         }
         else
         {
             SceneAtlasResult.Text = result.Message ?? "Scene evidence is unavailable. Check read access and try again.";
             SceneAtlasSource.Text = "";
         }
-        _diagnostics.Log("scene-atlas-read", new { status = result.Status.ToString(), revision = grant.Scope.Revision, objectId = result.Answer?.Source.Id });
+        _diagnostics.Log("scene-atlas-read", new { status = result.Status.ToString(), revision = grant.Scope.Revision,
+            objectId = result.Answer?.Source?.Id, healthIssues = result.Health?.Issues.Count });
         UpdateSceneAtlas();
         UpdateScenePresentation();
     });
 
-    private void SceneAtlasShowClicked(object sender, RoutedEventArgs e) => ShowSceneAtlasObject(_sceneAtlasAnswer?.Source.Id);
-    private void SceneAtlasTargetClicked(object sender, RoutedEventArgs e) => ShowSceneAtlasObject(_sceneAtlasAnswer?.Target?.Id);
+    private void SceneAtlasHealthClicked(object sender, RoutedEventArgs e)
+    {
+        SceneAtlasQuestion.Text = "Check scene";
+        SceneAtlasAskClicked(sender, e);
+    }
+
+    private void SceneAtlasShowClicked(object sender, RoutedEventArgs e) => ShowSceneAtlasObject(_sceneAtlasAnswer?.Source?.Id);
+    private void SceneAtlasTargetClicked(object sender, RoutedEventArgs e) =>
+        ShowSceneAtlasObject((_sceneAtlasAnswer?.ProposedTarget ?? _sceneAtlasAnswer?.Target)?.Id);
 
     private void ShowSceneAtlasObject(Guid? id) => WithSceneAtlas(() =>
     {
@@ -126,26 +148,48 @@ public partial class MainWindow
     {
         if (_sceneAtlasGrant is not { } grant || _sceneAtlasAnswer is not { Proposal: { } proposal } answer)
             return;
-        var source = answer.Source;
         var scope = grant.Scope;
-        SceneOperation operation = proposal.Kind switch
-        {
-            SceneProposalKind.Rename => new RenameSceneEntity(scope.ProjectId, scope.Revision, source.Id, proposal.Name!),
-            SceneProposalKind.Move => new TransformSceneEntity(scope.ProjectId, scope.Revision, source.Id,
-                new Transform2D(proposal.X, proposal.Y, source.Width, source.Height, source.Rotation)),
-            SceneProposalKind.SetState when source.Kind == SceneSourceKind.Door =>
-                new SetSceneDoor(scope.ProjectId, scope.Revision, source.Id, proposal.State),
-            _ => new SetSceneLamp(scope.ProjectId, scope.Revision, source.Id, proposal.State)
-        };
-        var preview = _session.PreviewSavedScene(operation);
+        var preview = _session.PreviewSavedScene(SceneOperationFor(answer, proposal));
         var review = _sceneAtlasHost.BeginReview(grant, answer, ScopeOf(_session.Current));
         _sceneAtlasDraft = new SceneAtlasDraft(preview, review);
-        SceneAtlasDraftText.Text = $"{ProposalText(answer)}. Save to {Path.GetFileName(_session.FilePath)} as r{scope.Revision + 1}?";
+        var action = preview.Before is null ? $"Create {preview.After.Name} at ({preview.After.Transform.X:G}, {preview.After.Transform.Y:G})"
+            : ProposalText(answer);
+        SceneAtlasDraftText.Text = $"{action}. Save to {Path.GetFileName(_session.FilePath)} as r{scope.Revision + 1}?";
         SceneAtlasDraftText.ToolTip = _session.FilePath;
         UpdateScenePresentation();
         SceneAtlasCancel.Focus();
-        _diagnostics.Log("scene-atlas-preview", new { objectId = source.Id, scope.Revision, operationId = review.Id });
+        _diagnostics.Log("scene-atlas-preview", new { objectId = preview.After.Id, scope.Revision, operationId = review.Id });
     });
+
+    private static SceneOperation SceneOperationFor(SceneAnswer answer, SceneProposal proposal)
+    {
+        var scope = answer.Scope;
+        if (proposal.Kind == SceneProposalKind.Add && proposal.ObjectKind is { } kind)
+            return new AddSceneEntity(scope.ProjectId, scope.Revision,
+                SceneObjectFactory.Create(Guid.NewGuid(), Enum.Parse<SceneObjectKind>(kind.ToString()), proposal.Name!, proposal.X, proposal.Y));
+        var source = answer.Source ?? throw new InvalidDataException("The proposed edit needs a saved object.");
+        var transform = new Transform2D(source.X, source.Y, source.Width, source.Height, source.Rotation);
+        return proposal.Kind switch
+        {
+            SceneProposalKind.Rename => new RenameSceneEntity(scope.ProjectId, scope.Revision, source.Id, proposal.Name!),
+            SceneProposalKind.Move => new TransformSceneEntity(scope.ProjectId, scope.Revision, source.Id,
+                transform with { X = proposal.X, Y = proposal.Y }),
+            SceneProposalKind.Resize => new TransformSceneEntity(scope.ProjectId, scope.Revision, source.Id,
+                transform with { Width = proposal.X, Height = proposal.Y }),
+            SceneProposalKind.Rotate => new TransformSceneEntity(scope.ProjectId, scope.Revision, source.Id,
+                transform with { Rotation = proposal.X }),
+            SceneProposalKind.Wire or SceneProposalKind.Unlink => new ConfigureSceneSwitch(scope.ProjectId, scope.Revision,
+                source.Id, proposal.TargetId, Enum.Parse<SwitchBehavior>(source.Behavior!))
+            {
+                SecondTargetId = proposal.TargetId is Guid target && target != source.SecondTargetId ? source.SecondTargetId : null
+            },
+            SceneProposalKind.Duplicate => new DuplicateSceneEntity(scope.ProjectId, scope.Revision, Guid.NewGuid(), source.Id),
+            SceneProposalKind.SetState when source.Kind == SceneSourceKind.Door =>
+                new SetSceneDoor(scope.ProjectId, scope.Revision, source.Id, proposal.State),
+            SceneProposalKind.SetState => new SetSceneLamp(scope.ProjectId, scope.Revision, source.Id, proposal.State),
+            _ => throw new InvalidDataException("The proposed operation is outside the scene profile.")
+        };
+    }
 
     private void SceneAtlasCancelClicked(object sender, RoutedEventArgs e)
     {
@@ -207,7 +251,9 @@ public partial class MainWindow
                 active, target, behavior, assetId, assetName, color)
             {
                 SecondTargetId = (item.Component as SceneSwitch)?.SecondTargetId,
-                RequiredKeys = (item.Component as SceneGoal)?.RequiredKeys
+                RequiredKeys = (item.Component as SceneGoal)?.RequiredKeys,
+                SpawnBlocked = item.Component is SceneSpawn
+                    ? MuseumPlaySession.SpawnBlocked(saved.Scene!.Entities, new RoomPosition(t.X, t.Y)) : null
             };
         }).ToArray();
         return SceneEvidenceProfile.Publish(ScopeOf(saved), sources);
@@ -215,7 +261,8 @@ public partial class MainWindow
 
     private static string FormatAnswer(SceneAnswer answer)
     {
-        var item = answer.Source;
+        if (answer.Source is not { } item)
+            return $"Saved r{answer.Scope.Revision}\n\nProposed: {ProposalText(answer)}";
         var details = item.Kind switch
         {
             SceneSourceKind.Switch => answer.Target is { } target ? (answer.AdditionalTarget is { } second
@@ -234,12 +281,19 @@ public partial class MainWindow
 
     private static string ProposalText(SceneAnswer answer)
     {
-        var item = answer.Source;
         var proposal = answer.Proposal!;
+        if (proposal.Kind == SceneProposalKind.Add)
+            return $"Add {proposal.ObjectKind?.ToString().ToLowerInvariant()} {proposal.Name} at ({proposal.X:G}, {proposal.Y:G})";
+        var item = answer.Source!;
         var summary = proposal.Kind switch
         {
             SceneProposalKind.Rename => $"name → {proposal.Name}",
             SceneProposalKind.Move => $"({item.X:G}, {item.Y:G}) → ({proposal.X:G}, {proposal.Y:G})",
+            SceneProposalKind.Resize => $"size ({item.Width:G}, {item.Height:G}) → ({proposal.X:G}, {proposal.Y:G})",
+            SceneProposalKind.Rotate => $"rotation {item.Rotation:G}° → {proposal.X:G}°",
+            SceneProposalKind.Wire => $"primary target → {answer.ProposedTarget?.Name}",
+            SceneProposalKind.Unlink => "disconnect all targets",
+            SceneProposalKind.Duplicate => "duplicate with a new object ID",
             _ => $"{FormatObjectState(item.Kind, item.Active == true)} → {FormatObjectState(item.Kind, proposal.State)}"
         };
         return $"{item.Name} · {summary}";
