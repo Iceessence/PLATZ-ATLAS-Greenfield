@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -5,16 +6,18 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using PlatzAtlas.Studio;
 
-internal static class Program
+internal static partial class Program
 {
     [STAThread]
-    private static int Main()
+    private static int Main(string[] args)
     {
         var app = new App { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         app.InitializeComponent();
         try
         {
             PixelInput();
+            if (args is [var evidenceDirectory])
+                WorkingRoom(Directory.CreateDirectory(evidenceDirectory).FullName);
             return 0;
         }
         catch (Exception error)

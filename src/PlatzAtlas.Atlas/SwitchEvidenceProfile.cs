@@ -8,7 +8,9 @@ namespace PlatzAtlas.Atlas;
 
 public readonly record struct ProjectReadScope(Guid ProjectId, Guid SceneId, long Revision)
 {
-    internal bool IsValid => ProjectId != Guid.Empty && SceneId != Guid.Empty && Revision > 0;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? WorkspaceId { get; init; }
+    internal bool IsValid => ProjectId != Guid.Empty && SceneId != Guid.Empty && Revision > 0 && WorkspaceId != Guid.Empty;
 }
 
 public sealed record SwitchSource(Guid Id, string Name, Guid TargetId)

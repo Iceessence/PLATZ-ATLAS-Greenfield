@@ -360,7 +360,7 @@ public partial class MainWindow : Window
         if (_session.Current.Scene is not null)
             UpdateSceneAtlas();
         PlayToggle.ToolTip = _play is not null ? "Stop Play (F5)"
-            : CanStartPlay ? "Play the saved revision (F5)" : "Save the current revision to start Play.";
+            : "Play a copy of the working revision (F5).";
     }
 
     private void UpdatePreviewCard(Border card, TextBlock location, TextBlock state, Lantern? lantern, Guid? selection)

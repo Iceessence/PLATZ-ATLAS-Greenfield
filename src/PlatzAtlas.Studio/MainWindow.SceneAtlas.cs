@@ -34,23 +34,27 @@ public partial class MainWindow
     private void UpdateSceneAtlas()
     {
         var current = _session.Current;
-        var saved = current.Scene is not null && _play is null && HasSavedRevision;
+        var available = current.Scene is not null && _play is null;
         if (_sceneAtlasGrant is { } grant &&
-            (!saved || grant.Scope != ScopeOf(current) || !string.Equals(_sceneAtlasPath, _session.FilePath, StringComparison.OrdinalIgnoreCase)))
+            (!available || grant.Scope != WorkingScope(_session.FreezeWorkingSnapshot()) ||
+                !string.Equals(_sceneAtlasPath, _session.FilePath, StringComparison.OrdinalIgnoreCase)))
         {
             var wasPreviewing = _sceneAtlasDraft is not null;
             RevokeSceneAtlas();
             if (wasPreviewing)
+            {
+                SceneAtlasResult.Text = "The working room changed. Allow a new read to preview an updated change.";
                 UpdateScenePresentation();
+            }
         }
 
-        SceneAtlasAccess.IsEnabled = saved;
+        SceneAtlasAccess.IsEnabled = available;
         SceneAtlasAccess.Content = _sceneAtlasGrant is null ? "Allow scene read" : "Revoke scene read";
         SceneAtlasAsk.IsEnabled = _sceneAtlasGrant is not null;
         SceneAtlasHealth.IsEnabled = SceneAtlasAsk.IsEnabled;
-        SceneAtlasScope.Text = !saved ? "Save the room to ask about this revision." : _sceneAtlasGrant is null
-            ? $"Allow a read of saved revision {current.Revision}."
-            : $"Reading saved revision {current.Revision}. Apply changes through a separate confirmation.";
+        SceneAtlasScope.Text = !available ? "Return to Edit to ask about your room." : _sceneAtlasGrant is null
+            ? $"Allow a read of working revision {current.Revision}."
+            : $"Reading working revision {current.Revision}. Proposed changes require your approval.";
         SceneAtlasAnswerCard.Visibility = _sceneAtlasAnswer is null ? Visibility.Collapsed : Visibility.Visible;
         SceneAtlasShow.Visibility = _sceneAtlasAnswer?.Source is null ? Visibility.Collapsed : Visibility.Visible;
         SceneAtlasTarget.Visibility = (_sceneAtlasAnswer?.ProposedTarget ?? _sceneAtlasAnswer?.Target) is null
@@ -60,7 +64,7 @@ public partial class MainWindow
         var receipt = _session.LatestSceneCommit;
         SceneAtlasReceipt.Visibility = receipt is null ? Visibility.Collapsed : Visibility.Visible;
         SceneAtlasReceiptText.Text = receipt is null ? "" :
-            $"Saved r{receipt.Revision}\nObject {receipt.EntityId:D}\n\nOperation {receipt.OperationId:D}\n\nSHA-256 {receipt.PayloadSha256}";
+            $"{(_session.SavedRevision >= receipt.Revision ? "Saved" : "Applied to working room")} r{receipt.Revision}\nObject {receipt.EntityId:D}\n\nOperation {receipt.OperationId:D}\n\nSHA-256 {receipt.PayloadSha256}";
     }
 
     private void SceneAtlasAccessClicked(object sender, RoutedEventArgs e) => WithSceneAtlas(() =>
@@ -75,8 +79,14 @@ public partial class MainWindow
             if (_play is not null || _session.Current.Scene is null)
                 return;
             var session = _session;
-            var saved = session.ReadSavedSnapshot();
-            _sceneAtlasGrant = _sceneAtlasHost.Allow(ScopeOf(saved), () => PublishSceneEvidence(session.ReadSavedSnapshot()));
+            var snapshot = session.FreezeWorkingSnapshot();
+            var scope = WorkingScope(snapshot);
+            _sceneAtlasGrant = _sceneAtlasHost.Allow(scope, () =>
+            {
+                if (!ReferenceEquals(_session, session) || !ReferenceEquals(session.Current, snapshot.Project))
+                    throw new InvalidDataException("The room changed. Allow a new read.");
+                return PublishSceneEvidence(snapshot.Project, scope);
+            });
             _sceneAtlasPath = session.FilePath;
             SceneAtlasResult.Text = "";
         }
@@ -95,8 +105,8 @@ public partial class MainWindow
         {
             SceneAtlasResult.Text = FormatAnswer(answer);
             var source = answer.Source;
-            SceneAtlasSource.Text = $"Project {answer.Scope.ProjectId:D}\nScene {answer.Scope.SceneId:D}\nSaved revision {answer.Scope.Revision}" +
-                (source is null ? "\n\nNew object proposal for this saved scene" :
+            SceneAtlasSource.Text = $"Project {answer.Scope.ProjectId:D}\nScene {answer.Scope.SceneId:D}\nWorkspace {answer.Scope.WorkspaceId:D}\nWorking revision {answer.Scope.Revision}" +
+                (source is null ? "\n\nNew object proposal for this working scene" :
                 $"\n\nscene.entities[{source.Id:D}].transform\nX {source.X:G17} · Y {source.Y:G17}" +
                 $"\nWidth {source.Width:G17} · Height {source.Height:G17} · Rotation {source.Rotation:G17}" +
                 $"\n\nscene.entities[{source.Id:D}].component\n{source.Kind}" +
@@ -110,7 +120,7 @@ public partial class MainWindow
         {
             var issues = health.Issues.Count == 0 ? "No listed scene issues." : string.Join("\n\n",
                 health.Issues.Select(issue => issue.Message + "\n" + string.Join("\n", issue.ObjectIds)));
-            SceneAtlasResult.Text = $"Scene health · Saved r{health.Scope.Revision}\n\n{issues}\n\nEvidence SHA-256\n{health.Sha256}";
+            SceneAtlasResult.Text = $"Scene health · Working r{health.Scope.Revision}\n\n{issues}\n\nEvidence SHA-256\n{health.Sha256}";
             SceneAtlasSource.Text = "";
         }
         else
@@ -136,9 +146,9 @@ public partial class MainWindow
 
     private void ShowSceneAtlasObject(Guid? id) => WithSceneAtlas(() =>
     {
-        if (_sceneAtlasGrant is null || id is null)
+        if (_sceneAtlasGrant is not { } grant || id is null ||
+            grant.Scope != WorkingScope(_session.FreezeWorkingSnapshot()))
             return;
-        _session.ReadSavedSnapshot();
         Objects.SelectedItem = Objects.Items.OfType<SceneObjectItem>().Single(item => item.Id == id);
         Objects.ScrollIntoView(Objects.SelectedItem);
         SideTabs.SelectedItem = InspectorTab;
@@ -149,13 +159,12 @@ public partial class MainWindow
         if (_sceneAtlasGrant is not { } grant || _sceneAtlasAnswer is not { Proposal: { } proposal } answer)
             return;
         var scope = grant.Scope;
-        var preview = _session.PreviewSavedScene(SceneOperationFor(answer, proposal));
-        var review = _sceneAtlasHost.BeginReview(grant, answer, ScopeOf(_session.Current));
+        var preview = _session.PreviewWorkingScene(SceneOperationFor(answer, proposal));
+        var review = _sceneAtlasHost.BeginReview(grant, answer, WorkingScope(_session.FreezeWorkingSnapshot()));
         _sceneAtlasDraft = new SceneAtlasDraft(preview, review);
         var action = preview.Before is null ? $"Create {preview.After.Name} at ({preview.After.Transform.X:G}, {preview.After.Transform.Y:G})"
             : ProposalText(answer);
-        SceneAtlasDraftText.Text = $"{action}. Save to {Path.GetFileName(_session.FilePath)} as r{scope.Revision + 1}?";
-        SceneAtlasDraftText.ToolTip = _session.FilePath;
+        SceneAtlasDraftText.Text = $"{action}. Apply to the working room as r{scope.Revision + 1}?";
         UpdateScenePresentation();
         SceneAtlasCancel.Focus();
         _diagnostics.Log("scene-atlas-preview", new { objectId = preview.After.Id, scope.Revision, operationId = review.Id });
@@ -167,7 +176,7 @@ public partial class MainWindow
         if (proposal.Kind == SceneProposalKind.Add && proposal.ObjectKind is { } kind)
             return new AddSceneEntity(scope.ProjectId, scope.Revision,
                 SceneObjectFactory.Create(Guid.NewGuid(), Enum.Parse<SceneObjectKind>(kind.ToString()), proposal.Name!, proposal.X, proposal.Y));
-        var source = answer.Source ?? throw new InvalidDataException("The proposed edit needs a saved object.");
+        var source = answer.Source ?? throw new InvalidDataException("The proposed edit needs an object in this working room.");
         var transform = new Transform2D(source.X, source.Y, source.Width, source.Height, source.Rotation);
         return proposal.Kind switch
         {
@@ -204,13 +213,13 @@ public partial class MainWindow
             return;
         if (!string.Equals(_sceneAtlasPath, _session.FilePath, StringComparison.OrdinalIgnoreCase))
             throw new ProjectEditException(EditRejection.StaleRevision, "The project path changed. Reopen the intended project.");
-        var receipt = _sceneAtlasHost.Confirm(draft.Review, ScopeOf(_session.Current), (operationId, requireApproval) =>
-            _session.CommitApprovedScene(operationId, draft.Preview, requireApproval));
+        var receipt = _sceneAtlasHost.Confirm(draft.Review, WorkingScope(_session.FreezeWorkingSnapshot()), (operationId, requireApproval) =>
+            _session.ApplyApprovedWorkingScene(operationId, draft.Preview, requireApproval));
         RevokeSceneAtlas();
         RefreshSceneList(receipt.EntityId);
         UpdateStudio();
         SceneAtlasReceipt.IsExpanded = true;
-        ShowStatus($"Saved ATLAS edit at revision {receipt.Revision}. Use Undo to reverse it.");
+        ShowStatus($"Applied ATLAS edit to working revision {receipt.Revision}. Use Undo to reverse it or Save to keep it.");
         _diagnostics.Log("scene-atlas-commit", receipt);
     });
 
@@ -229,7 +238,10 @@ public partial class MainWindow
         }
     }
 
-    private static ReadOnlyMemory<byte> PublishSceneEvidence(MuseumProject saved)
+    private static ProjectReadScope WorkingScope(WorkingDocumentSnapshot snapshot) =>
+        ScopeOf(snapshot.Project) with { WorkspaceId = snapshot.WorkspaceId };
+
+    private static ReadOnlyMemory<byte> PublishSceneEvidence(MuseumProject saved, ProjectReadScope scope)
     {
         var sources = saved.Scene!.Entities.Select(item =>
         {
@@ -256,13 +268,13 @@ public partial class MainWindow
                     ? MuseumPlaySession.SpawnBlocked(saved.Scene!.Entities, new RoomPosition(t.X, t.Y)) : null
             };
         }).ToArray();
-        return SceneEvidenceProfile.Publish(ScopeOf(saved), sources);
+        return SceneEvidenceProfile.Publish(scope, sources);
     }
 
     private static string FormatAnswer(SceneAnswer answer)
     {
         if (answer.Source is not { } item)
-            return $"Saved r{answer.Scope.Revision}\n\nProposed: {ProposalText(answer)}";
+            return $"Working r{answer.Scope.Revision}\n\nProposed: {ProposalText(answer)}";
         var details = item.Kind switch
         {
             SceneSourceKind.Switch => answer.Target is { } target ? (answer.AdditionalTarget is { } second
@@ -275,7 +287,7 @@ public partial class MainWindow
             SceneSourceKind.Goal => $"Win condition requires {item.RequiredKeys} {(item.RequiredKeys == 1 ? "key" : "keys")}.",
             _ => $"Wall color is {item.Color}."
         };
-        return $"{item.Name} · {item.Kind}\nX {item.X:G}, Y {item.Y:G} · Saved r{answer.Scope.Revision}\n{details}" +
+        return $"{item.Name} · {item.Kind}\nX {item.X:G}, Y {item.Y:G} · Working r{answer.Scope.Revision}\n{details}" +
             (answer.Proposal is null ? "" : $"\n\nProposed: {ProposalText(answer)}");
     }
 

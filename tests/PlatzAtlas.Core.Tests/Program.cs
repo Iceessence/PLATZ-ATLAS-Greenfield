@@ -108,6 +108,7 @@ try
     PixelDraftChecks.Run(scratch.FullName);
     SceneAtlasChecks.Run(scratch.FullName);
     SceneActionChecks.Run(scratch.FullName);
+    WorkingDocumentChecks.Run(scratch.FullName);
 }
 finally
 {

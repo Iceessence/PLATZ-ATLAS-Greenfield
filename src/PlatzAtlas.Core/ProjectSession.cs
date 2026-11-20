@@ -1,5 +1,7 @@
 namespace PlatzAtlas.Core;
 
+public sealed record WorkingDocumentSnapshot(Guid WorkspaceId, MuseumProject Project);
+
 // Studio owns a session on its dispatcher. ProjectStore serializes saves across editor processes.
 public sealed partial class ProjectSession
 {
@@ -24,6 +26,7 @@ public sealed partial class ProjectSession
     }
 
     public MuseumProject Current { get; private set; }
+    public Guid WorkspaceId { get; } = Guid.NewGuid();
     public string? FilePath { get; private set; }
     public long? SavedRevision { get; private set; }
     public bool IsDirty => Current.Revision != SavedRevision;
@@ -116,6 +119,10 @@ public sealed partial class ProjectSession
             throw new ProjectEditException(EditRejection.StaleRevision, "The saved project changed on disk. Reopen it.");
         return Current;
     }
+
+    // Open normalizes collections to read-only copies. Edits replace records and collections.
+    // A captured project therefore remains immutable as this workspace advances.
+    public WorkingDocumentSnapshot FreezeWorkingSnapshot() => new(WorkspaceId, Current);
 
     // Only the trusted Studio host supplies the approval check. It runs again immediately before replacement.
     public LightCommitReceipt CommitApprovedLight(Guid operationId, SetLight request, Action requireApproval)

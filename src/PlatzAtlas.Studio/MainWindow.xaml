@@ -129,6 +129,9 @@
             <Button x:Name="PlayToggle" DockPanel.Dock="Right" Command="{x:Static local:MainWindow.TogglePlayCommand}"
                     Content="Play" Margin="8,0,0,0" Padding="13,5" MinHeight="32" VerticalAlignment="Center"
                     BorderBrush="{StaticResource PlayAccent}" ToolTipService.ShowOnDisabled="True"/>
+            <Button x:Name="RestartPlay" DockPanel.Dock="Right" Content="Restart" Visibility="Collapsed"
+                    Click="RestartPlayClicked" Padding="10,5" MinHeight="32"
+                    ToolTip="Restart from the frozen copy of the working room."/>
             <TextBlock x:Name="RoomTitle" FontSize="28" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
           </DockPanel>
           <DockPanel Margin="0,3,0,0">
@@ -184,7 +187,7 @@
                          AutomationProperties.LiveSetting="Polite"/>
               <WrapPanel Margin="0,6,0,0">
                 <Button x:Name="SceneAtlasCancel" Content="Cancel preview" Click="SceneAtlasCancelClicked" Margin="0,0,6,0"/>
-                <Button x:Name="SceneAtlasConfirm" Content="Confirm and save" Click="SceneAtlasConfirmClicked"
+                <Button x:Name="SceneAtlasConfirm" Content="Apply to room" Click="SceneAtlasConfirmClicked"
                         Style="{StaticResource PrimaryButton}"/>
               </WrapPanel>
             </StackPanel>
@@ -418,11 +421,11 @@
                   <Button x:Name="SceneAtlasShow" Content="Show object" Click="SceneAtlasShowClicked" Margin="0,0,0,5"/>
                   <Button x:Name="SceneAtlasTarget" Content="Show linked target" Click="SceneAtlasTargetClicked" Margin="0,0,0,5"/>
                   <Button x:Name="SceneAtlasPreview" Content="Preview change" Click="SceneAtlasPreviewClicked" Margin="0,0,0,5"/>
-                  <Expander Header="Saved source details">
+                  <Expander Header="Working source details">
                     <TextBlock x:Name="SceneAtlasSource" TextWrapping="Wrap" FontSize="11" FontFamily="Consolas"/>
                   </Expander>
                 </StackPanel>
-                <Expander x:Name="SceneAtlasReceipt" Header="Latest saved ATLAS edit" Visibility="Collapsed" Margin="0,14,0,0">
+                <Expander x:Name="SceneAtlasReceipt" Header="Latest ATLAS edit" Visibility="Collapsed" Margin="0,14,0,0">
                   <TextBlock x:Name="SceneAtlasReceiptText" TextWrapping="Wrap" FontSize="11" FontFamily="Consolas"/>
                 </Expander>
               </StackPanel>
