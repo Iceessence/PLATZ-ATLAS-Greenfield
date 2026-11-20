@@ -14,6 +14,9 @@ internal sealed record ViewportFrame(
     double DrawMilliseconds, double? GpuMilliseconds, double? EditToDrawMilliseconds,
     long PeakWorkingSetBytes, int? FixedCameraSample);
 
+internal sealed record VulkanValidationSummary(
+    bool ValidationEnabled, int ErrorCount, int WarningCount, IReadOnlyList<string> Messages);
+
 public sealed class RoomViewport : Grid
 {
     private const double RoomAspect = 12d / 7;
@@ -21,10 +24,13 @@ public sealed class RoomViewport : Grid
     private long? _editStarted;
     private NativeSurface? _native;
     private VulkanViewport? _vulkan;
+    private OpenGlViewport? _openGl;
     private CpuPreview? _cpu;
+    private RendererPreference _preference = RendererPreference.Auto;
     private bool _drawQueued;
     private bool _closed;
-    private string? _fallbackReason;
+    private string? _vulkanFallbackReason;
+    private string? _openGlFallbackReason;
     private int _sampleCount;
 
     public RoomViewport()
@@ -40,11 +46,32 @@ public sealed class RoomViewport : Grid
         };
     }
 
-    public bool UseCpu { get; set; }
+    public RendererPreference Preference => _preference;
+
+    public bool UseCpu
+    {
+        get => _preference == RendererPreference.CpuReference;
+        set => SetPreference(value ? RendererPreference.CpuReference : RendererPreference.Auto);
+    }
+
     internal bool SimulateDeviceLoss { get; set; }
     internal bool MeasureFrames { get; set; }
     internal event Action<ViewportFrame>? FrameCompleted;
+    internal event Action<VulkanValidationSummary>? VulkanValidated;
     internal event Action<double, double>? LanternClicked;
+
+    public void SetPreference(RendererPreference preference)
+    {
+        if (_preference == preference && _vulkanFallbackReason is null && _openGlFallbackReason is null)
+            return;
+
+        _preference = preference;
+        _vulkanFallbackReason = null;
+        _openGlFallbackReason = null;
+        ReleaseNative();
+        ReleaseCpu();
+        QueueDraw();
+    }
 
     internal void Show(RenderSnapshot snapshot, long? editStarted)
     {
@@ -57,6 +84,7 @@ public sealed class RoomViewport : Grid
     {
         _closed = true;
         ReleaseNative();
+        ReleaseCpu();
     }
 
     internal void Refresh() => QueueDraw();
@@ -77,26 +105,36 @@ public sealed class RoomViewport : Grid
             || Window.GetWindow(this)?.WindowState == WindowState.Minimized)
             return;
 
-        if (UseCpu || _fallbackReason is not null)
+        bool useCpuOnly = _preference == RendererPreference.CpuReference
+            || (_preference == RendererPreference.OpenGl && _openGlFallbackReason is not null)
+            || (_vulkanFallbackReason is not null && _openGlFallbackReason is not null);
+        if (useCpuOnly)
         {
             DrawCpu(snapshot);
             return;
         }
 
+        if (_preference is RendererPreference.Auto or RendererPreference.Vulkan && _vulkanFallbackReason is null)
+        {
+            if (TryDrawVulkan(snapshot))
+                return;
+        }
+
+        if (_openGlFallbackReason is null && (_preference == RendererPreference.OpenGl || _vulkanFallbackReason is not null))
+        {
+            if (TryDrawOpenGl(snapshot))
+                return;
+        }
+
+        DrawCpu(snapshot);
+    }
+
+    private bool TryDrawVulkan(RenderSnapshot snapshot)
+    {
         try
         {
-            if (_native is null)
-            {
-                _native = new NativeSurface(QueueDraw, ReleaseVulkan, (x, y) => LanternClicked?.Invoke(x, y));
-                Fit(_native);
-                Children.Add(_native);
-                return;
-            }
-
-            var window = _native.Handle;
-            var size = _native.PixelSize;
-            if (window == 0 || size.Width == 0 || size.Height == 0)
-                return;
+            if (!EnsureNativeSurface(out var window, out var size))
+                return true;
 
             _vulkan ??= new VulkanViewport(window);
             var frame = _vulkan.Present(snapshot, size.Width, size.Height);
@@ -108,15 +146,67 @@ public sealed class RoomViewport : Grid
                 _vulkan.SimulateDeviceLoss();
                 QueueDraw();
             }
+            return true;
         }
-        catch (Exception error) when (error is VulkanViewportException or DllNotFoundException
-            or EntryPointNotFoundException or BadImageFormatException or System.ComponentModel.Win32Exception)
+        catch (Exception error) when (IsGpuViewportFailure(error))
         {
-            _fallbackReason = error.Message;
+            _vulkanFallbackReason = error.Message;
             ReleaseNative();
-            DrawCpu(snapshot);
+            QueueDraw();
+            return true;
         }
     }
+
+    private bool TryDrawOpenGl(RenderSnapshot snapshot)
+    {
+        try
+        {
+            if (!EnsureNativeSurface(out var window, out var size))
+                return true;
+
+            _openGl ??= new OpenGlViewport(window);
+            var frame = _openGl.Present(snapshot, size.Width, size.Height);
+            string detail = _vulkanFallbackReason is null
+                ? _openGl.Diagnostics
+                : $"Vulkan unavailable. {_vulkanFallbackReason}; {_openGl.Diagnostics}";
+            Report("OpenGL", detail, snapshot,
+                frame.Width, frame.Height, frame.ElapsedMilliseconds, frame.GpuMilliseconds);
+            if (SimulateDeviceLoss)
+            {
+                SimulateDeviceLoss = false;
+                _openGl.SimulateDeviceLoss();
+                QueueDraw();
+            }
+            return true;
+        }
+        catch (Exception error) when (IsGpuViewportFailure(error))
+        {
+            _openGlFallbackReason = error.Message;
+            ReleaseNative();
+            return false;
+        }
+    }
+
+    private bool EnsureNativeSurface(out nint window, out (int Width, int Height) size)
+    {
+        if (_native is null)
+        {
+            _native = new NativeSurface(QueueDraw, ReleaseBackends, (x, y) => LanternClicked?.Invoke(x, y));
+            Fit(_native);
+            Children.Add(_native);
+            window = 0;
+            size = (0, 0);
+            return false;
+        }
+
+        window = _native.Handle;
+        size = _native.PixelSize;
+        return window != 0 && size.Width > 0 && size.Height > 0;
+    }
+
+    private static bool IsGpuViewportFailure(Exception error) =>
+        error is VulkanViewportException or OpenGlViewportException or DllNotFoundException
+            or EntryPointNotFoundException or BadImageFormatException or System.ComponentModel.Win32Exception;
 
     private void DrawCpu(RenderSnapshot snapshot)
     {
@@ -150,9 +240,17 @@ public sealed class RoomViewport : Grid
 
     private void OnCpuDrawn(RenderSnapshot snapshot, int width, int height, double elapsed)
     {
-        if (!_closed && ReferenceEquals(_snapshot, snapshot))
-            Report("CPU Reference", _fallbackReason is null ? "Software preview selected."
-                : $"Vulkan unavailable. {_fallbackReason}", snapshot, width, height, elapsed);
+        if (_closed || !ReferenceEquals(_snapshot, snapshot))
+            return;
+
+        string detail = (_vulkanFallbackReason, _openGlFallbackReason) switch
+        {
+            (null, null) => "Software preview selected.",
+            (string vk, null) => $"Vulkan unavailable. {vk}",
+            (null, string gl) => $"OpenGL unavailable. {gl}",
+            (string vk, string gl) => $"Vulkan unavailable. {vk}; OpenGL unavailable. {gl}"
+        };
+        Report("CPU Reference", detail, snapshot, width, height, elapsed);
     }
 
     private void Report(string label, string detail, RenderSnapshot snapshot, int width, int height,
@@ -169,20 +267,45 @@ public sealed class RoomViewport : Grid
             Dispatcher.InvokeAsync(QueueDraw, DispatcherPriority.Background);
     }
 
-    private void ReleaseVulkan()
+    private void ReleaseBackends()
     {
-        _vulkan?.Dispose();
-        _vulkan = null;
+        if (_vulkan is { } vulkan)
+        {
+            _vulkan = null;
+            vulkan.Dispose();
+            if (vulkan.ValidationEnabled)
+            {
+                VulkanValidated?.Invoke(new VulkanValidationSummary(
+                    vulkan.ValidationEnabled,
+                    vulkan.ValidationErrorCount,
+                    vulkan.ValidationWarningCount,
+                    vulkan.ValidationMessages));
+            }
+        }
+
+        _openGl?.Dispose();
+        _openGl = null;
     }
 
     private void ReleaseNative()
     {
-        ReleaseVulkan();
+        ReleaseBackends();
         if (_native is { } native)
         {
             _native = null;
             Children.Remove(native);
             native.Dispose();
+        }
+    }
+
+    private void ReleaseCpu()
+    {
+        if (_cpu is { } cpu)
+        {
+            _cpu = null;
+            Children.Remove(cpu);
+            if (PresentationSource.FromVisual(this) is HwndSource source)
+                source.CompositionTarget.RenderMode = RenderMode.Default;
         }
     }
 

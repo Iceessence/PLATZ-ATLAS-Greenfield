@@ -145,6 +145,21 @@
             <TextBlock x:Name="ObjectId" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>
             <TextBlock Text="Project ID" Style="{StaticResource Caption}" Margin="0,15,0,4"/>
             <TextBlock x:Name="ProjectId" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>
+            <TextBlock Text="Renderer" Style="{StaticResource Caption}" Margin="0,15,0,6"/>
+            <UniformGrid Columns="2">
+              <Button x:Name="RendererAuto" Content="Auto" Tag="Auto" Click="RendererClicked" Margin="0,0,4,4"
+                      Padding="6,5" MinHeight="30" FontSize="12" AutomationProperties.Name="Renderer: Auto"
+                      ToolTip="Prefer Vulkan with OpenGL and CPU Reference fallback"/>
+              <Button x:Name="RendererVulkan" Content="Vulkan" Tag="Vulkan" Click="RendererClicked" Margin="0,0,0,4"
+                      Padding="6,5" MinHeight="30" FontSize="12" AutomationProperties.Name="Renderer: Vulkan"
+                      ToolTip="Use Vulkan GPU renderer"/>
+              <Button x:Name="RendererOpenGl" Content="OpenGL" Tag="OpenGl" Click="RendererClicked" Margin="0,0,4,0"
+                      Padding="6,5" MinHeight="30" FontSize="12" AutomationProperties.Name="Renderer: OpenGL"
+                      ToolTip="Use OpenGL compatibility renderer"/>
+              <Button x:Name="RendererCpu" Content="CPU" Tag="CpuReference" Click="RendererClicked" Margin="0"
+                      Padding="6,5" MinHeight="30" FontSize="12" AutomationProperties.Name="Renderer: CPU Reference"
+                      ToolTip="Use CPU software reference renderer"/>
+            </UniformGrid>
           </StackPanel>
         </ScrollViewer>
       </Border>

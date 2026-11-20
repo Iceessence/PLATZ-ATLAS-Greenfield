@@ -14,7 +14,7 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\Build.ps1 -Test
 & '.\artifacts\bin\PlatzAtlas.Studio\release\PlatzAtlas.Studio.exe'
 ```
 
-`Build.ps1` defaults to Release. Add `-Run` to launch after the build. Add `-Run -Cpu` to force the CPU Reference viewport, or `-Run -Project 'C:\path\NightMuseum.platz'` to open a particular file. The Studio executable also accepts `--cpu` and `--project 'C:\path\NightMuseum.platz'`. It can be launched by absolute path from another working directory.
+`Build.ps1` defaults to Release. Add `-Run` to launch after the build. Add `-Run -Cpu`, `-Run -OpenGl`, or `-Run -Vulkan` to choose a renderer backend, or `-Run -Project 'C:\path\NightMuseum.platz'` to open a particular file. The Studio executable accepts `--renderer <auto|vulkan|opengl|cpu>`, `--vulkan`, `--opengl`, `--cpu`, and `--project 'C:\path\NightMuseum.platz'`. It can be launched by absolute path from another working directory.
 
 The first restore uses public NuGet packages and checks the versions and content hashes recorded in the lockfiles. Reuse that cache with `-Offline`. To prepare a transferable cache, set `$env:NUGET_PACKAGES` to an empty writable directory outside the checkout and run the build once with access to NuGet.org. Copy that directory to the offline machine, point `$env:NUGET_PACKAGES` at the copy, and run the build command with `-Offline -Test`. Offline restore uses only the specified cache and omits the online NuGet advisory lookup. The executable opens local project files without a package restore. [NuGet package cache](https://learn.microsoft.com/en-us/nuget/consume-packages/managing-the-global-packages-and-cache-folders), [Locked restore and NuGet Audit](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-restore)
 
@@ -22,7 +22,7 @@ The first restore uses public NuGet packages and checks the versions and content
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\Build.ps1 -Offline -Test
 ```
 
-Vulkan presentation uses the machine's Vulkan loader and compatible display driver. Studio reports the active renderer and can show the scene with CPU Reference when Vulkan is unavailable. The source build uses checked-in SPIR-V, so the editor build needs no Vulkan SDK.
+Vulkan presentation uses the machine's Vulkan loader and compatible display driver, with OpenGL 3.3 Core compatibility and CPU Reference fallbacks. The Inspector includes a **Renderer** selector (**Auto**, **Vulkan**, **OpenGL**, **CPU**) and Studio reports the active backend in the status bar. The source build uses checked-in SPIR-V, so the editor build needs no Vulkan SDK. Set `PLATZ_ATLAS_VK_VALIDATION=1` in the environment to enable `VK_LAYER_KHRONOS_validation` diagnostics when the Khronos validation layer is available on the host.
 
 ## Try the museum
 
@@ -35,7 +35,7 @@ Vulkan presentation uses the machine's Vulkan loader and compatible display driv
 
 [WORKING.md](WORKING.md) records which paths were exercised, the evidence and the next milestone.
 
-For local verification, launch Studio with `--diagnostics 'C:\path\studio.ndjson'` to record startup, open, save and render events. Choose a new filename in an existing directory. Add `--measure-frames` to warm the stationary viewport for 10 frames and log 120 measured redraws. Add `--simulate-device-loss` in a separate run to exercise CPU fallback after the first Vulkan presentation.
+For local verification, launch Studio with `--diagnostics 'C:\path\studio.ndjson'` to record startup, open, save, validation, and render events. Choose a new filename in an existing directory. Add `--measure-frames` to warm the stationary viewport for 10 frames and log 120 measured redraws. Add `--simulate-device-loss` in a separate run to exercise automatic fallback (`Vulkan -> OpenGL` or `OpenGL -> CPU Reference`) after the first frame. Pass `--save-target 'C:\path\copy.platz'` when testing automated Save/Save As flows without opening the file dialog.
 
 ## Dependencies and provenance
 

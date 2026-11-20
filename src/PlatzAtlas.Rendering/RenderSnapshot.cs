@@ -1,5 +1,14 @@
 namespace PlatzAtlas.Rendering;
 
+/// <summary>Requested presentation backend for a viewport.</summary>
+public enum RendererPreference
+{
+    Auto,
+    Vulkan,
+    OpenGl,
+    CpuReference
+}
+
 /// <summary>An sRGB display color. Components range from zero to one.</summary>
 public readonly record struct RenderColor(float R, float G, float B)
 {

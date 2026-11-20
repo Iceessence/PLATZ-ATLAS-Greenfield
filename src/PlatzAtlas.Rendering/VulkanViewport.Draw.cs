@@ -12,6 +12,11 @@ public sealed unsafe partial class VulkanViewport
     private GpuVertex* _mappedVertices;
     private int _vertexCapacity;
 
+    private Buffer _readbackBuffer;
+    private DeviceMemory _readbackMemory;
+    private byte* _mappedReadback;
+    private ulong _readbackCapacity;
+
     [StructLayout(LayoutKind.Sequential)]
     private readonly struct GpuVertex(RenderVertex vertex, RenderColor color)
     {
@@ -148,9 +153,14 @@ public sealed unsafe partial class VulkanViewport
         Check(created, "create graphics pipeline");
     }
 
-    private bool TryPresent(RenderSnapshot snapshot)
+    private bool TryPresent(RenderSnapshot snapshot, Span<byte> bgraReadback)
     {
         uint vertexCount = UploadTriangles(snapshot.Triangles);
+        bool captureReadback = !bgraReadback.IsEmpty;
+        ulong requiredReadbackBytes = captureReadback ? (ulong)_extent.Width * _extent.Height * 4UL : 0UL;
+        if (captureReadback && requiredReadbackBytes > _readbackCapacity)
+            CreateReadbackBuffer(requiredReadbackBytes);
+
         uint image = 0;
         Result acquire = _swapchainApi.AcquireNextImage(_device, _swapchain, AcquireTimeout, _imageAcquired, default, &image);
         if (acquire == Result.ErrorOutOfDateKhr)
@@ -158,7 +168,7 @@ public sealed unsafe partial class VulkanViewport
         if (acquire != Result.SuboptimalKhr)
             Check(acquire, "acquire a swapchain image");
 
-        RecordDraw(snapshot.Background, image, vertexCount);
+        RecordDraw(snapshot.Background, image, vertexCount, captureReadback);
         CommandBuffer commandBuffer = _commands;
         Semaphore acquired = _imageAcquired;
         Semaphore drawn = _renderComplete[image];
@@ -196,10 +206,13 @@ public sealed unsafe partial class VulkanViewport
             return false;
         if (presented != Result.SuboptimalKhr)
             Check(presented, "present a frame to the window");
+
+        if (captureReadback)
+            CopyReadbackPixels(bgraReadback, checked((int)requiredReadbackBytes));
         return true;
     }
 
-    private void RecordDraw(RenderColor background, uint image, uint vertexCount)
+    private void RecordDraw(RenderColor background, uint image, uint vertexCount, bool captureReadback)
     {
         Check(_vk.ResetCommandBuffer(_commands, 0), "reset the draw commands");
         var begin = new CommandBufferBeginInfo
@@ -239,9 +252,78 @@ public sealed unsafe partial class VulkanViewport
             _vk.CmdDraw(_commands, vertexCount, 1, 0, 0);
         }
         _vk.CmdEndRenderPass(_commands);
+
+        if (captureReadback)
+            RecordReadbackCopy(_swapchainImages[image]);
+
         if (_timestamps.Handle != 0)
             _vk.CmdWriteTimestamp(_commands, PipelineStageFlags.BottomOfPipeBit, _timestamps, 1);
         Check(_vk.EndCommandBuffer(_commands), "finish draw commands");
+    }
+
+    private void RecordReadbackCopy(Image swapchainImage)
+    {
+        var range = new ImageSubresourceRange(ImageAspectFlags.ColorBit, 0, 1, 0, 1);
+        var toTransfer = new ImageMemoryBarrier
+        {
+            SType = StructureType.ImageMemoryBarrier,
+            SrcAccessMask = AccessFlags.ColorAttachmentWriteBit,
+            DstAccessMask = AccessFlags.TransferReadBit,
+            OldLayout = ImageLayout.PresentSrcKhr,
+            NewLayout = ImageLayout.TransferSrcOptimal,
+            SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            Image = swapchainImage,
+            SubresourceRange = range
+        };
+        _vk.CmdPipelineBarrier(_commands, PipelineStageFlags.ColorAttachmentOutputBit, PipelineStageFlags.TransferBit,
+            0, 0, null, 0, null, 1, &toTransfer);
+
+        var region = new BufferImageCopy(0, 0, 0,
+            new ImageSubresourceLayers(ImageAspectFlags.ColorBit, 0, 0, 1),
+            new Offset3D(0, 0, 0),
+            new Extent3D(_extent.Width, _extent.Height, 1));
+        _vk.CmdCopyImageToBuffer(_commands, swapchainImage, ImageLayout.TransferSrcOptimal, _readbackBuffer, 1, &region);
+
+        var hostFlush = new MemoryBarrier
+        {
+            SType = StructureType.MemoryBarrier,
+            SrcAccessMask = AccessFlags.TransferWriteBit,
+            DstAccessMask = AccessFlags.HostReadBit
+        };
+        var toPresent = new ImageMemoryBarrier
+        {
+            SType = StructureType.ImageMemoryBarrier,
+            SrcAccessMask = AccessFlags.TransferReadBit,
+            DstAccessMask = 0,
+            OldLayout = ImageLayout.TransferSrcOptimal,
+            NewLayout = ImageLayout.PresentSrcKhr,
+            SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            Image = swapchainImage,
+            SubresourceRange = range
+        };
+        _vk.CmdPipelineBarrier(_commands, PipelineStageFlags.TransferBit,
+            PipelineStageFlags.HostBit | PipelineStageFlags.BottomOfPipeBit,
+            0, 1, &hostFlush, 0, null, 1, &toPresent);
+    }
+
+    private void CopyReadbackPixels(Span<byte> destination, int byteCount)
+    {
+        var source = new ReadOnlySpan<byte>(_mappedReadback, byteCount);
+        if (_surfaceFormat.Format is Format.R8G8B8A8Unorm or Format.R8G8B8A8Srgb)
+        {
+            for (int i = 0; i < byteCount; i += 4)
+            {
+                destination[i] = source[i + 2];
+                destination[i + 1] = source[i + 1];
+                destination[i + 2] = source[i];
+                destination[i + 3] = source[i + 3];
+            }
+            return;
+        }
+
+        source.CopyTo(destination);
     }
 
     private double? ReadGpuTime()
@@ -304,6 +386,32 @@ public sealed unsafe partial class VulkanViewport
         _vertexCapacity = capacity;
     }
 
+    private void CreateReadbackBuffer(ulong capacity)
+    {
+        DestroyReadbackBuffer();
+        var create = new BufferCreateInfo
+        {
+            SType = StructureType.BufferCreateInfo,
+            Size = capacity,
+            Usage = BufferUsageFlags.TransferDstBit,
+            SharingMode = SharingMode.Exclusive
+        };
+        Check(_vk.CreateBuffer(_device, &create, null, out _readbackBuffer), "create the readback buffer");
+        _vk.GetBufferMemoryRequirements(_device, _readbackBuffer, out var requirements);
+        var allocate = new MemoryAllocateInfo
+        {
+            SType = StructureType.MemoryAllocateInfo,
+            AllocationSize = requirements.Size,
+            MemoryTypeIndex = FindVertexMemoryType(requirements.MemoryTypeBits)
+        };
+        Check(_vk.AllocateMemory(_device, &allocate, null, out _readbackMemory), "allocate readback memory");
+        Check(_vk.BindBufferMemory(_device, _readbackBuffer, _readbackMemory, 0), "bind readback memory");
+        void* mapped = null;
+        Check(_vk.MapMemory(_device, _readbackMemory, 0, allocate.AllocationSize, 0, &mapped), "map readback memory");
+        _mappedReadback = (byte*)mapped;
+        _readbackCapacity = capacity;
+    }
+
     private uint FindVertexMemoryType(uint compatibleTypes)
     {
         const MemoryPropertyFlags required = MemoryPropertyFlags.HostVisibleBit | MemoryPropertyFlags.HostCoherentBit;
@@ -328,6 +436,20 @@ public sealed unsafe partial class VulkanViewport
         _vertices = default;
         _vertexMemory = default;
         _vertexCapacity = 0;
+    }
+
+    private void DestroyReadbackBuffer()
+    {
+        if (_mappedReadback != null)
+            _vk.UnmapMemory(_device, _readbackMemory);
+        if (_readbackBuffer.Handle != 0)
+            _vk.DestroyBuffer(_device, _readbackBuffer, null);
+        if (_readbackMemory.Handle != 0)
+            _vk.FreeMemory(_device, _readbackMemory, null);
+        _mappedReadback = null;
+        _readbackBuffer = default;
+        _readbackMemory = default;
+        _readbackCapacity = 0;
     }
 
     private RenderColor AttachmentColor(RenderColor color) => UsesSrgbAttachment

@@ -8,6 +8,8 @@ public sealed unsafe partial class VulkanViewport
     private SwapchainKHR _swapchain;
     private Extent2D _extent;
     private SurfaceFormatKHR _surfaceFormat;
+    private bool _supportsTransferSrc;
+    private Image[] _swapchainImages = [];
     private ImageView[] _imageViews = [];
     private Framebuffer[] _framebuffers = [];
     private Semaphore[] _renderComplete = [];
@@ -26,6 +28,7 @@ public sealed unsafe partial class VulkanViewport
         if (!capabilities.SupportedUsageFlags.HasFlag(ImageUsageFlags.ColorAttachmentBit))
             throw new VulkanViewportException("The Vulkan surface cannot accept rendered color images.");
 
+        _supportsTransferSrc = capabilities.SupportedUsageFlags.HasFlag(ImageUsageFlags.TransferSrcBit);
         _extent = capabilities.CurrentExtent.Width != uint.MaxValue ? capabilities.CurrentExtent : new Extent2D(
             Math.Clamp((uint)pixelWidth, capabilities.MinImageExtent.Width, capabilities.MaxImageExtent.Width),
             Math.Clamp((uint)pixelHeight, capabilities.MinImageExtent.Height, capabilities.MaxImageExtent.Height));
@@ -37,6 +40,10 @@ public sealed unsafe partial class VulkanViewport
         if (capabilities.MaxImageCount > 0)
             desiredImages = Math.Min(desiredImages, capabilities.MaxImageCount);
 
+        var imageUsage = ImageUsageFlags.ColorAttachmentBit;
+        if (_supportsTransferSrc)
+            imageUsage |= ImageUsageFlags.TransferSrcBit;
+
         var request = new SwapchainCreateInfoKHR
         {
             SType = StructureType.SwapchainCreateInfoKhr,
@@ -46,7 +53,7 @@ public sealed unsafe partial class VulkanViewport
             ImageColorSpace = _surfaceFormat.ColorSpace,
             ImageExtent = _extent,
             ImageArrayLayers = 1,
-            ImageUsage = ImageUsageFlags.ColorAttachmentBit,
+            ImageUsage = imageUsage,
             ImageSharingMode = SharingMode.Exclusive,
             PreTransform = capabilities.CurrentTransform,
             CompositeAlpha = ChooseCompositeAlpha(capabilities.SupportedCompositeAlpha),
@@ -137,8 +144,8 @@ public sealed unsafe partial class VulkanViewport
     {
         uint count = 0;
         Check(_swapchainApi.GetSwapchainImages(_device, _swapchain, &count, null), "enumerate swapchain images");
-        var images = new Image[count];
-        fixed (Image* first = images)
+        _swapchainImages = new Image[count];
+        fixed (Image* first = _swapchainImages)
             Check(_swapchainApi.GetSwapchainImages(_device, _swapchain, &count, first), "read swapchain images");
 
         _imageViews = new ImageView[count];
@@ -149,7 +156,7 @@ public sealed unsafe partial class VulkanViewport
             var view = new ImageViewCreateInfo
             {
                 SType = StructureType.ImageViewCreateInfo,
-                Image = images[i],
+                Image = _swapchainImages[i],
                 ViewType = ImageViewType.Type2D,
                 Format = _surfaceFormat.Format,
                 SubresourceRange = new ImageSubresourceRange(ImageAspectFlags.ColorBit, 0, 1, 0, 1)
@@ -204,6 +211,7 @@ public sealed unsafe partial class VulkanViewport
         _renderComplete = [];
         _framebuffers = [];
         _imageViews = [];
+        _swapchainImages = [];
         _pipeline = default;
         _pipelineLayout = default;
         _renderPass = default;

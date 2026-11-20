@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using PlatzAtlas.Rendering;
 
 namespace PlatzAtlas.Studio;
 
@@ -9,19 +10,15 @@ public partial class App : Application
     {
         base.OnStartup(e);
         var args = e.Args;
-        var diagnosticsIndex = Array.IndexOf(args, "--diagnostics");
-        var diagnosticsPath = diagnosticsIndex >= 0 && diagnosticsIndex + 1 < args.Length
-            ? args[diagnosticsIndex + 1]
-            : null;
-        var projectIndex = Array.IndexOf(args, "--project");
-        var projectPath = projectIndex >= 0 && projectIndex + 1 < args.Length
-            ? args[projectIndex + 1]
-            : null;
         try
         {
+            var diagnosticsPath = ReadOption(args, "--diagnostics");
+            var projectPath = ReadOption(args, "--project");
+            var saveTargetPath = ReadOption(args, "--save-target");
+            var preference = ParseRendererPreference(args);
             var diagnostics = new StudioDiagnostics(diagnosticsPath);
-            var window = new MainWindow(args.Contains("--cpu"), args.Contains("--simulate-device-loss"),
-                args.Contains("--measure-frames") && diagnostics.Enabled, projectPath, diagnostics);
+            var window = new MainWindow(preference, args.Contains("--simulate-device-loss"),
+                args.Contains("--measure-frames") && diagnostics.Enabled, projectPath, saveTargetPath, diagnostics);
             MainWindow = window;
             window.Show();
         }
@@ -31,5 +28,38 @@ public partial class App : Application
                 MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
+    }
+
+    private static string? ReadOption(string[] args, string flag)
+    {
+        int index = Array.IndexOf(args, flag);
+        if (index < 0)
+            return null;
+        if (index + 1 >= args.Length)
+            throw new ArgumentException($"Missing value after {flag}.");
+        return args[index + 1];
+    }
+
+    private static RendererPreference ParseRendererPreference(string[] args)
+    {
+        if (ReadOption(args, "--renderer") is { } value)
+        {
+            return value.ToLowerInvariant() switch
+            {
+                "auto" => RendererPreference.Auto,
+                "vulkan" => RendererPreference.Vulkan,
+                "opengl" or "gl" => RendererPreference.OpenGl,
+                "cpu" or "cpureference" or "cpu-reference" => RendererPreference.CpuReference,
+                _ => throw new ArgumentException($"Unsupported renderer preference \"{value}\". Use auto, vulkan, opengl, or cpu.")
+            };
+        }
+
+        if (args.Contains("--cpu"))
+            return RendererPreference.CpuReference;
+        if (args.Contains("--opengl"))
+            return RendererPreference.OpenGl;
+        if (args.Contains("--vulkan"))
+            return RendererPreference.Vulkan;
+        return RendererPreference.Auto;
     }
 }

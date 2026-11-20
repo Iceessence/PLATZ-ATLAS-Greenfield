@@ -6,12 +6,18 @@ param(
     [switch] $Run,
     [switch] $Offline,
     [switch] $Cpu,
+    [switch] $OpenGl,
+    [switch] $Vulkan,
     [string] $Project
 )
 
 $ErrorActionPreference = 'Stop'
-if (($Cpu -or $Project) -and -not $Run) {
-    throw 'Use -Run with -Cpu or -Project.'
+if (($Cpu -or $OpenGl -or $Vulkan -or $Project) -and -not $Run) {
+    throw 'Use -Run with -Cpu, -OpenGl, -Vulkan, or -Project.'
+}
+$modeCount = @($Cpu, $OpenGl, $Vulkan | Where-Object { $_ }).Count
+if ($modeCount -gt 1) {
+    throw 'Choose at most one of -Cpu, -OpenGl, or -Vulkan.'
 }
 
 $dotnet = Get-Command dotnet -CommandType Application -ErrorAction SilentlyContinue
@@ -73,6 +79,12 @@ if ($Run) {
     $studioOptions = @()
     if ($Cpu) {
         $studioOptions += '--cpu'
+    }
+    elseif ($OpenGl) {
+        $studioOptions += '--opengl'
+    }
+    elseif ($Vulkan) {
+        $studioOptions += '--vulkan'
     }
     if ($Project) {
         $studioOptions += @('--project', $Project)

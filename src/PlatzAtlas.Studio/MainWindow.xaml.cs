@@ -9,29 +9,34 @@ using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.Win32;
 using PlatzAtlas.Core;
+using PlatzAtlas.Rendering;
 
 namespace PlatzAtlas.Studio;
 
 public partial class MainWindow : Window
 {
     private readonly StudioDiagnostics _diagnostics;
+    private readonly string? _saveTargetPath;
     private ProjectSession _session;
     private long _openedRevision;
     private bool _changingProject;
 
-    internal MainWindow(bool useCpu, bool simulateDeviceLoss, bool measureFrames, string? projectPath,
-        StudioDiagnostics diagnostics)
+    internal MainWindow(RendererPreference rendererPreference, bool simulateDeviceLoss, bool measureFrames,
+        string? projectPath, string? saveTargetPath, StudioDiagnostics diagnostics)
     {
         _diagnostics = diagnostics;
+        _saveTargetPath = saveTargetPath;
         _session = ProjectSession.NewMuseum();
         InitializeComponent();
-        Viewport.UseCpu = useCpu;
+        Viewport.SetPreference(rendererPreference);
         Viewport.SimulateDeviceLoss = simulateDeviceLoss;
         Viewport.MeasureFrames = measureFrames;
         Viewport.FrameCompleted += FrameCompleted;
+        Viewport.VulkanValidated += summary => _diagnostics.Log("vulkan-validation", summary);
         Viewport.LanternClicked += SelectAt;
         StateChanged += (_, _) => Viewport.Refresh();
 
+        UpdateRendererButtons();
         SetSession(_session, "Select a lantern in the scene to inspect its light.");
         if (projectPath is not null)
             OpenProject(projectPath);
@@ -136,18 +141,25 @@ public partial class MainWindow : Window
         var chosePath = saveAs || path is null;
         if (chosePath)
         {
-            var dialog = new SaveFileDialog
+            if (_saveTargetPath is not null)
             {
-                Title = "Save museum project",
-                Filter = "PLATZ project (*.platz)|*.platz",
-                DefaultExt = ".platz",
-                AddExtension = true,
-                OverwritePrompt = true,
-                FileName = path is not null ? Path.GetFileName(path) : "Night Museum.platz"
-            };
-            if (dialog.ShowDialog(this) != true)
-                return false;
-            path = dialog.FileName;
+                path = _saveTargetPath;
+            }
+            else
+            {
+                var dialog = new SaveFileDialog
+                {
+                    Title = "Save museum project",
+                    Filter = "PLATZ project (*.platz)|*.platz",
+                    DefaultExt = ".platz",
+                    AddExtension = true,
+                    OverwritePrompt = true,
+                    FileName = path is not null ? Path.GetFileName(path) : "Night Museum.platz"
+                };
+                if (dialog.ShowDialog(this) != true)
+                    return false;
+                path = dialog.FileName;
+            }
         }
 
         var started = Stopwatch.GetTimestamp();
@@ -300,6 +312,42 @@ public partial class MainWindow : Window
         BackendText.ToolTip = frame.Detail;
         AutomationProperties.SetName(BackendText, $"{frame.Label}. {frame.Detail}");
         _diagnostics.Log("frame", frame);
+    }
+
+    private void RendererClicked(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string tag } || !Enum.TryParse<RendererPreference>(tag, out var preference))
+            return;
+
+        Viewport.SetPreference(preference);
+        UpdateRendererButtons();
+        string display = preference switch
+        {
+            RendererPreference.Auto => "Auto",
+            RendererPreference.Vulkan => "Vulkan",
+            RendererPreference.OpenGl => "OpenGL",
+            RendererPreference.CpuReference => "CPU Reference",
+            _ => preference.ToString()
+        };
+        ShowStatus($"Renderer preference set to {display}.");
+        _diagnostics.Log("renderer-changed", new { preference = preference.ToString() });
+    }
+
+    private void UpdateRendererButtons()
+    {
+        var active = Viewport.Preference;
+        UpdateRendererButton(RendererAuto, RendererPreference.Auto, active);
+        UpdateRendererButton(RendererVulkan, RendererPreference.Vulkan, active);
+        UpdateRendererButton(RendererOpenGl, RendererPreference.OpenGl, active);
+        UpdateRendererButton(RendererCpu, RendererPreference.CpuReference, active);
+    }
+
+    private void UpdateRendererButton(Button button, RendererPreference option, RendererPreference active)
+    {
+        bool selected = option == active;
+        button.Background = (Brush)FindResource(selected ? "Selection" : "Surface");
+        button.BorderBrush = (Brush)FindResource(selected ? "Accent" : "Border");
+        button.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
     }
 
     private sealed record SceneObjectItem(Guid Id, string Name, string Location)
