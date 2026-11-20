@@ -1,5 +1,119 @@
 # PLATZ ATLAS Greenfield — Independent Audit & Persistent Agent Handoff
 
+## Authoritative Independent Audit — Step 0 Repairs (`e77ef40`) & GF-017 through GF-021 (`3435833`)
+
+> **Audit role notice:** This audit section was authored independently by Gemini Neon against the frozen repository through `3435833bf5f1c282f5bd25e9e74e121b1b4bd708` (`main`, tag `gf-021` at `29e9fbf`). Product source code, tests, lockfiles, and `WORKING.md` were not modified during this audit, and nothing was pushed to `origin`.
+
+### 1. Provenance & Reference Environment
+
+- **Repository root:** `C:\PLATZ ATLAS\PLATZ-ATLAS-Greenfield`
+- **Audited `HEAD` / branch / tag:** `3435833bf5f1c282f5bd25e9e74e121b1b4bd708` (`main`, tag `gf-021` at `29e9fbf`)
+- **Commits audited:** Step 0 repairs (`1f751b0`, `78d15f8`, `e77ef40`), `gf-017` (`76360f4`), `gf-018` (`37fe49c`), `gf-019` (`9e8ee31`), `gf-020` (`a596fa8`), `gf-021` (`29e9fbf`), and walkthrough/handoff commit `3435833`.
+- **Master specification:** `docs/Ultimate_PLATZ_ATLAS_MASTER_Version_1.docx` (SHA-256: `ee95a50f205f85a3867488d7fc4a5e066b694b291f5657764eda8b35a2b32ebc`)
+- **Independent audit evidence directory (outside checkout):** `C:\PLATZ ATLAS\.platz-atlas-verification\audit-gf017-021` (`raw-results.md`, `logs\build-run{1,2}.log`, `logs\probe-{default,noimplicit}.log`, `logs\audit-adversarial.log`, `logs\audit-gui.log`, `logs\audit-specialist.log`, `specialist-audit-report.json`, `player-dist\`, `clean-checkout\`).
+- **Execution isolation note:** Because an external owner `PlatzAtlas.Studio.exe` process (PID `29960`) initially held locks on main-checkout release binaries, all clean offline rebuilds, Rendering Probe runs, `AuditHarness` runs, and specialist reproductions were executed against an isolated local clone of `HEAD` (`audit-gf017-021\clean-checkout`); the external process and main checkout working tree were never modified.
+- **Reference host:** Windows 11 x64 (`26300.9974`), `.NET SDK 10.0.401`, Desktop Runtime `10.0.12`, NVIDIA GeForce RTX 5080 (driver `617.42.0.0`, Vulkan `1.4.351`, OpenGL `3.3.0 NVIDIA 617.42`), Khronos Vulkan validation layer enabled (`0` errors, `0` warnings).
+
+---
+
+### 2. Accepted Baseline Decision
+
+- **Independently Accepted Greenfield Baseline:** advances from `da4cfb1` (`gf-013`) to **`e77ef40`**
+  - Encompasses GF-001 through GF-016 product scope plus Step 0 Repairs (`1f751b0`, `78d15f8`, `e77ef40`), which cleanly resolved GF-015 Defect 1 (`Save as…` retiring `SceneAtlasPreviewBanner` and revoking grant while same-path `Save` preserves valid open previews), GF-015 incomplete rename parser hygiene (`0` evidence reads), and GF-013 OpenGL translucent sprite alpha parity (`#1a5a7fff` matching Vulkan and CPU `A=255`). The offline GF-016 model remains `NOT PROMOTED`. Acceptance is bounded to the tested Windows 11 x64 RTX 5080 host scope (see Section 5 for unverified matrices).
+- **Current `HEAD` (`3435833`, tag `gf-021`) status:** **`REPAIRS_REQUIRED`** *(cannot advance the linear accepted baseline past `e77ef40` until the two unhandled crash defects in GF-017 `PixelEditorWindow` are fixed and re-verified; GF-018, GF-019, and GF-020 all independently passed)*.
+- **GF-021 Model Candidate (`grounded-scene-router/0.2`) status:** **`FAILED_QUALIFICATION` — DO NOT PROMOTE** *(remains strictly quarantined outside Studio and Player)*.
+
+---
+
+### 3. Per-Milestone Verdicts
+
+| Checkpoint | Scope | Independent Verdict | Key Empirical Findings & Notes |
+| --- | --- | --- | --- |
+| **Step 0 Repairs** (`1f751b0`, `78d15f8`, `e77ef40`) + Prior **GF-015** (`57b887a`) & **GF-016** Studio/Bundle (`158587d`) | `Save as…` preview/grant retirement, blank-rename parse guard, `glBlendFuncSeparate` alpha parity | **ACCEPTED** | Live Studio `Save as…` retires `SceneAtlasConfirm`/`SceneAtlasPreviewBanner` and revokes grant while same-path `Save` keeps valid preview; blank rename fails with `0` evidence reads; Vulkan & OpenGL both output `#1a5a7fff` (`a=255`) at `(0.7, 0.34)` and `#f783d2ff` at `(0.928, 0.36)`; 3-backend mixed parity passes (`a=255`, RGB delta `<= 1`). |
+| **GF-017** (`76360f4`, tag `gf-017`) | Built-in `PixelDraft` & `PixelEditorWindow` (Draw/Erase/Fill/Eyedropper, Undo/Redo, 16×16 & 32×32, PNG export, non-destructive `Edit image copy…`) | **REPAIRS_REQUIRED** | Core `PixelDraft` logic, PNG export pixel accuracy (`(0,0)=0x00000000`, `(3,2)=0xAED58FFF`, `(10,10)=0x78B5EA80`), non-destructive 32×32 copy, and live Studio `SaveFileDialog`/`OpenFileDialog` PNG flows pass. **Blocked by 2 unhandled crashes** on mid-stroke Undo/Redo/Resize + drag and mid-stroke `Space` (plus 1 status-message overwrite on invalid hex + `Space`). |
+| **GF-018** (`37fe49c`, tag `gf-018`) | Schema 5 & `.platzroom` v3 (`room-game/3`), `Spawn`, `Key`, `Goal`, two-target `Switch`, Studio Play & Extracted Player win/reset, Schema 1–4 & v1/v2 compat | **ACCEPTED** | Passed adversarial Schema 1–4 compat, forged Schema 4 rejection, two-target toggle/trap checks, full Studio Play and extracted `player-dist\PlatzAtlas.Player.exe` playthrough + `Restart room` across Vulkan (`validation=0`), OpenGL, and CPU, plus `--check-room` on v3/v1/v2/tampered. *(Non-blocking note: Spawn-only room with 0 keys/goals shows `Keys 0/0`.)* |
+| **GF-019** (`9e8ee31`, tag `gf-019`) | Direct viewport resize/rotate drag handles, Snap-to-grid, Duplicate (`Ctrl+D`), `BringForward`/`SendBackward` paint order, room name & `#RRGGBB` floor color | **ACCEPTED** | Passed adversarial bounds, paint-order boundaries, duplicate naming, forged history rejection, plus live Win32 canvas handle drag + Snap-to-grid + Undo/Redo, `DuplicateObject`, `BringForward`, `#213342` floor color, reopen Undo/Redo, and 3-backend rendering parity. *(Non-blocking note: `SceneAssetList` uses `DisplayMemberPath="Label"` without `AutomationProperties.Name`, exposing `AssetItem { ... }` to UIA.)* |
+| **GF-020** (`a596fa8`, tag `gf-020`) | Scoped `SceneHealth`, grounded `Wire`/`Unlink`/`Add`/`Resize`/`Rotate`/`Duplicate`, detached preview/confirm/expiry/receipts, durable Undo | **ACCEPTED** | Passed `SceneHealth` (4 codes + clean), `Add` guard, 60s expiry, `OperationId` replay, 20-iteration Confirm/Revoke concurrency race, and live GUI `Health` -> `Add` -> `Wire` (preserving 2nd target) -> `Unlink` preview/cancel -> `Resize`/`Rotate` commits -> `.previous` & reopen receipt survival. |
+| **GF-021** (`29e9fbf`, tag `gf-021`) | Quarantined two-stage `tools/AtlasSpecialist` (`grounded-scene-router/0.2`) | **VERIFIED** *(Tooling & Stage 1 Grounding)* / **FAILED_QUALIFICATION — DO NOT PROMOTE** *(Model)* | Reproduces byte-for-byte offline (`0` Studio/Player leakage). Stage 1 grounding stress tests passed (`110/110` supported IDs resolved), **but Stage 2 calibration collapsed to `minimumRead = 1.01`** (`108/218` overall, `0/110` supported), scoring `30/60` (`0/30` supported) on the 60-prompt auditor holdout vs `56/60` for `Bigram MNB`. |
+
+---
+
+### 4. Confirmed Defects & Exact Fixes Required (Pre-Expansion Gate)
+
+1. **[High — GF-017 Unhandled Crash on Mid-Stroke Undo / Redo / Resize (`REPAIRS_REQUIRED`)]**
+   - **Locations:** `src/PlatzAtlas.Studio/PixelEditorWindow.xaml.cs:63,111-116,125-126` (`PixelMove`, `SizeClicked`, `UndoClicked`, `RedoClicked`) and `src/PlatzAtlas.Core/PixelDraft.cs:45` (`PaintLine`).
+   - **Observed (`probe-pixel-ctrlz`, `exitCode=1`):** When the user invokes `Undo` (`Ctrl+Z` / `UndoClicked`), `Redo`, or `Resize` while `_last` is active (dragging with mouse captured), `PixelDraft.Undo()`/`Redo()`/`Resize()` clears `_draft._stroke` while `PixelEditorWindow._last` stays non-null and mouse capture remains held. The next `PixelMove` calls `_draft.PaintLine(...)` and crashes the application with `System.InvalidOperationException: Begin a stroke before painting.`.
+   - **Fix:** Call `FinishStroke()` and `PixelSurface.ReleaseMouseCapture()` (plus clear `_last`) at the start of `UndoClicked`, `RedoClicked`, and `SizeClicked`, and guard `PixelMove` cleanly if no stroke is active. Add a Studio/UI regression test exercising drag + `Ctrl+Z` + move.
+
+2. **[High — GF-017 Unhandled Crash on Mid-Stroke `Space` (`REPAIRS_REQUIRED`)]**
+   - **Locations:** `src/PlatzAtlas.Studio/PixelEditorWindow.xaml.cs:98,145-148` (`StartAt`, `EditorKeyDown`) and `src/PlatzAtlas.Core/PixelDraft.cs:38` (`BeginStroke`).
+   - **Observed (`probe-pixel-space`, `exitCode=1`):** Pressing `Space` on `PixelSurface` while a pointer drag stroke is active calls `StartAt(_x, _y)` -> `_draft.BeginStroke()` while `_stroke` is already open, crashing Studio with `System.InvalidOperationException: Finish the active stroke first.`.
+   - **Fix:** Commit/close any open stroke (`FinishStroke(); PixelSurface.ReleaseMouseCapture();`) before starting a keyboard stroke in `EditorKeyDown` (or ignore `Key.Space` while `_last is not null`), and add a regression test.
+
+3. **[Low — GF-017 Invalid Hex Status Overwritten on `Space`]**
+   - **Locations:** `src/PlatzAtlas.Studio/PixelEditorWindow.xaml.cs:88-89,145-151`.
+   - **Observed:** When `PixelColor` contains invalid hex (e.g. `"ZZZZ"`) and the user presses `Space` on `PixelSurface`, `StartAt` writes `"Use eight hex digits for color, for example 78B5EA80."` and returns `false`, but `EditorKeyDown` unconditionally calls `RefreshPixels()` at line `151`, immediately overwriting `PixelStatus.Text` with `"Paint · Pixel 1, 1"`.
+   - **Fix:** Skip overwriting `PixelStatus.Text` (or only call `RefreshPixels()` after `Key.Space` if `StartAt` succeeded / tool changed state).
+
+- **Non-blocking polish notes (optional, NOT baseline blockers):**
+  1. GF-018: Hide `"Keys 0/0"` from the Play summary banner when a room defines zero keys and zero goals (`OBSERVED_SPAWN_ONLY_PROGRESS_SUMMARY='Keys 0/0'`).
+  2. GF-019: Add `<Setter Property="AutomationProperties.Name" Value="{Binding Label}"/>` to `SceneAssetList`'s `ItemContainerStyle` in `MainWindow.xaml` (matching `Objects`) so screen readers/UIA announce clean sprite labels instead of `AssetItem { ... }`.
+
+---
+
+### 5. Unverified Scope Matrix (`UNVERIFIED`)
+
+The following environments/modalities were not exercised on this locked workstation and remain **UNVERIFIED**:
+1. Unlocked-desktop physical keyboard/mouse session (`SendInput`/`SendKeys`, novice unscripted usability, physical `Ctrl+Z/Y/S`, `WASD`/`E`).
+2. High-DPI monitor scaling (`> 100%` / `> 96 DPI`) (`src/PlatzAtlas.Player/app.manifest` `PerMonitorV2` verified in manifest only).
+3. Live Narrator / NVDA screen-reader speech output.
+4. Clean second Windows 11 x64 machine with `.NET 10 Windows Desktop Runtime` only (no `.NET SDK`).
+5. Real OS hardware GPU TDR/device-loss recovery and non-NVIDIA OpenGL 3.3 Core drivers (Intel/AMD).
+
+---
+
+### 6. GF-021 Specialist Reproduction, Calibration Diagnosis & 60-Prompt Auditor Holdout
+
+- **Offline reproduction verified byte-for-byte:**
+  - GF-021 `model.json` SHA-256: `1079992b7e388b2371d0effec12dab68527ee69d7a2acea395886c6aa33dcfe2`
+  - GF-021 `evaluation.json` SHA-256: `9965e570334eccda93c4a77cbcaae50bcc2dff05b55a3d33d56a70ca6e27ee92` (`392` train / `102` calibration / `218` test across `8/3/5` disjoint families; `108/218 correct; 0/110 supported; 0/108 deny cases routed`).
+  - GF-016 reference reproduced byte-for-byte (`model.json` `f46fb2506b1fbf5a7213a3086f4db8f5803dcbe79e47e98e53b3c959c88fb000`, `evaluation.json` `a14f0a6cfe9f22439f9fe13561898b9fe74a9f255abba3db236f3daa71ea0e9f`, `17/42 correct`).
+- **Root cause of calibration collapse:** In `evaluation.json` (`calibrationSweep`, lines 1584–1593), even `minimumRead: 0.99, minimumIntent: 0.85, minimumMargin: 0.5` produced `exact: 30, unsafe: 3, wrong: 3` on `calibration.tsv`, failing `maximumUnsafeAccepts: 0` and forcing the linear softmax gate to select `minimumRead: 1.01` (abstain on all inputs).
+- **Untouched Auditor Holdout (`60` prompts across `3` unseen rooms: `clocktower`, `substation`, `observatory`):**
+
+| Method | Total / 60 | Supported / 30 | Unsafe Accepts / 30 |
+| --- | ---: | ---: | ---: |
+| Studio exact read syntax | 34/60 | 4/30 | 0/30 |
+| Keyword rules (with grounding) | 43/60 | 19/30 | 6/30 |
+| Unigram MNB (trained on `train.tsv`) | 55/60 | 27/30 | 2/30 |
+| Bigram MNB (trained on `train.tsv`) | 56/60 | 28/30 | 2/30 |
+| TF-IDF Centroid (trained on `train.tsv`) | 55/60 | 28/30 | 3/30 |
+| GF-021 Intent only (safety bypassed, diag) | 43/60 | 27/30 | 14/30 |
+| GF-021 Safety@0.50 + Intent (diag) | 49/60 | 21/30 | 2/30 |
+| GF-021 Safety@0.80 + Intent (diag) | 49/60 | 20/30 | 1/30 |
+| GF-021 Safety@0.95 + Intent (diag) | 47/60 | 17/30 | 0/30 |
+| **GF-021 Calibrated Gate (`minRead=1.01`)** | **30/60** | **0/30** | **0/30** |
+
+Verdict stands: **DO NOT PROMOTE** (`grounded-scene-router/0.2` remains strictly offline/quarantined).
+
+---
+
+### 7. Next GPT Development Assignment
+
+**Safest Starting Point:** Current `HEAD` (`3435833`) + this audit commit. Preserve Schemas 1–5 compatibility, `.platzroom` v1–v3 loading/export determinism, atomic `ProjectStore`, native Vulkan/OpenGL/CPU lifecycle isolation + alpha parity, and `BundlePlayer.ps1` offline/quarantine guarantees.
+
+#### Step 0 — Mandatory Pre-Expansion Repair Gate (do first and verify)
+1. Fix GF-017 Defects 1–3 in `src/PlatzAtlas.Studio/PixelEditorWindow.xaml.cs` (`FinishStroke()` + `ReleaseMouseCapture()` on `UndoClicked`/`RedoClicked`/`SizeClicked`/`EditorKeyDown` `Key.Space`, plus not clobbering invalid hex status text on `Key.Space`) so `gf-017..gf-020` can advance cleanly onto the accepted baseline in a fast re-check.
+
+#### Five Substantial, User-Visible Milestones (GF-022 through GF-026)
+1. **GF-022 — Multi-Room Projects, Portals & Persistent Progression (Schema 6 / `.platzroom` v4 lossless compat):** Allow authoring multiple named rooms in one project, linking `Portal`/door transitions between rooms with authored arrival spawns, carrying collected keys/switch states across transitions, and packaging multi-room adventures into standalone `.platzroom` v4 bundles while keeping schemas 1–5 and `.platzroom` v1–v3 compatible.
+2. **GF-023 — Real-Time Gameplay Loop: Held-Key Movement, Pressure Plates / Triggers, Hazards/Checkpoints & Play HUD:** Upgrade Play Mode and Standalone Player with smooth held-key (`WASD`/Arrow) movement + dt-bounded wall slide, touch/pressure-plate triggers, resettable hazards/checkpoints, and clear on-screen objective/inventory/interaction HUD while maintaining deterministic step APIs and source isolation.
+3. **GF-024 — Richer Visual Authoring: Multi-Frame Animated Sprites, Tile/Backdrop Styling & Asset Management:** Extend `PixelEditorWindow` and `ProjectAsset` to author multi-frame sprite animations (with frame preview and Undo/Redo), delete/rename unused project assets safely, and support textured/tiled floor or ambient lighting tints rendered identically across Vulkan, OpenGL, and CPU Reference.
+4. **GF-025 — Multi-Step Scoped ATLAS Authoring Plans & Cross-Room Diagnostics:** Extend `SceneEvidenceProfile` and `SceneQuestionHost` to inspect cross-room connectivity (unreachable rooms/goals, unlinked portals, missing keys) and propose bounded multi-step scene plans (e.g., create door + switch + wire together) behind a single atomic detached preview, 1-minute confirmation, durable receipt, and single-Undo group.
+5. **GF-026 — High-Safety Local ATLAS Specialist v0.3 (Clause/Hard-Negative Safety Architecture, Quarantined):** Address GF-021's bag-of-words calibration collapse on mixed read/write, conditional/exfiltration, and prompt-injection requests (e.g., clause segmentation / sequence or calibrated pair/char-ngram + hard-negative margin training evaluated strictly on unseen multi-room holdouts including the 60-prompt auditor holdout archetype), keeping `tools/AtlasSpecialist` strictly quarantined until reaching `>=90%` exact supported routing with `0` unsafe accepts.
+
+---
+
 ## GPT implementation handoff · Step 0 and GF-017 through GF-021
 
 The owner assigned this session the primary GPT implementation role. Work started at `882b05c7c809064d090415c31f86a5bacc1bb700` on `main`. The independently accepted baseline remains **`da4cfb1` (`gf-013`)**. The GF-015 repairs are ready for independent re-verification. This entry records author testing. The master specification still hashes to `ee95a50f205f85a3867488d7fc4a5e066b694b291f5657764eda8b35a2b32ebc`.
