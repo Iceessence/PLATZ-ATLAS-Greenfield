@@ -73,6 +73,12 @@ internal static class ProjectFormat
 
     public static string Digest(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
+    public static string SceneEditDigest(Guid projectId, Guid sceneId, SceneEdit edit) =>
+        Digest(JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            projectId, sceneId, baseRevision = edit.Revision - 1, edit.EntityId, edit.Before, edit.After
+        }, Settings));
+
     private static MuseumProject Validate(MuseumProject project)
     {
         if (project.ProjectId == Guid.Empty ||

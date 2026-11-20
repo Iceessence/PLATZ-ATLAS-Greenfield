@@ -166,6 +166,19 @@
               </Border>
             </StackPanel>
           </Border>
+          <Border x:Name="SceneAtlasPreviewBanner" Visibility="Collapsed" Margin="0,10,0,0" Padding="9,7"
+                  Background="{StaticResource PreviewSurface}" BorderBrush="{StaticResource PreviewAccent}"
+                  BorderThickness="1" CornerRadius="5">
+            <StackPanel>
+              <TextBlock x:Name="SceneAtlasDraftText" TextWrapping="Wrap" Foreground="{StaticResource PreviewAccent}"
+                         AutomationProperties.LiveSetting="Polite"/>
+              <WrapPanel Margin="0,6,0,0">
+                <Button x:Name="SceneAtlasCancel" Content="Cancel preview" Click="SceneAtlasCancelClicked" Margin="0,0,6,0"/>
+                <Button x:Name="SceneAtlasConfirm" Content="Confirm and save" Click="SceneAtlasConfirmClicked"
+                        Style="{StaticResource PrimaryButton}"/>
+              </WrapPanel>
+            </StackPanel>
+          </Border>
         </StackPanel>
         <Border Grid.Row="1" BorderBrush="{StaticResource Border}" BorderThickness="1"
                 Background="#101A20">
@@ -347,6 +360,33 @@
                        Background="{StaticResource Page}" Foreground="{StaticResource Text}" BorderBrush="{StaticResource Border}"
                        SelectionChanged="SceneAssetSelectionChanged" />
             </DockPanel>
+          </TabItem>
+          <TabItem x:Name="SceneAtlasTab" Header="ATLAS" Visibility="Collapsed">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <StackPanel Margin="15,17,15,14">
+                <TextBlock Text="Local deterministic scene lookup" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                <TextBlock x:Name="SceneAtlasScope" TextWrapping="Wrap" Style="{StaticResource Caption}" Margin="0,5,0,8"/>
+                <Button x:Name="SceneAtlasAccess" Click="SceneAtlasAccessClicked" Content="Allow scene read"/>
+                <TextBlock Text="Question or proposed change" Style="{StaticResource Caption}" Margin="0,15,0,5"/>
+                <TextBox x:Name="SceneAtlasQuestion" AutomationProperties.Name="Scene question" MaxLength="220"
+                         Text="Inspect selection" MinHeight="62" TextWrapping="Wrap" Padding="6"
+                         Background="{StaticResource Page}" Foreground="{StaticResource Text}"
+                         BorderBrush="{StaticResource Border}" CaretBrush="{StaticResource Accent}"/>
+                <Button x:Name="SceneAtlasAsk" Content="Ask ATLAS" Click="SceneAtlasAskClicked" Margin="0,7,0,10"/>
+                <TextBlock x:Name="SceneAtlasResult" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+                <StackPanel x:Name="SceneAtlasAnswerCard" Visibility="Collapsed" Margin="0,8,0,0">
+                  <Button x:Name="SceneAtlasShow" Content="Show object" Click="SceneAtlasShowClicked" Margin="0,0,0,5"/>
+                  <Button x:Name="SceneAtlasTarget" Content="Show linked target" Click="SceneAtlasTargetClicked" Margin="0,0,0,5"/>
+                  <Button x:Name="SceneAtlasPreview" Content="Preview change" Click="SceneAtlasPreviewClicked" Margin="0,0,0,5"/>
+                  <Expander Header="Saved source details">
+                    <TextBlock x:Name="SceneAtlasSource" TextWrapping="Wrap" FontSize="11" FontFamily="Consolas"/>
+                  </Expander>
+                </StackPanel>
+                <Expander x:Name="SceneAtlasReceipt" Header="Latest saved ATLAS edit" Visibility="Collapsed" Margin="0,14,0,0">
+                  <TextBlock x:Name="SceneAtlasReceiptText" TextWrapping="Wrap" FontSize="11" FontFamily="Consolas"/>
+                </Expander>
+              </StackPanel>
+            </ScrollViewer>
           </TabItem>
           <TabItem x:Name="MuseumAtlasTab" Header="ATLAS">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">

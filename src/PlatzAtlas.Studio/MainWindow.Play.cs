@@ -41,6 +41,7 @@ public partial class MainWindow
         {
             var session = new MuseumPlaySession(_session.ReadSavedSnapshot());
             ClearAtlasAccess();
+            ResetSceneAtlas();
             _sceneDrag = null;
             _play = session;
             var snapshot = session.Current;

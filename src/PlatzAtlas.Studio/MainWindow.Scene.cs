@@ -73,13 +73,16 @@ public partial class MainWindow
         var current = _session.Current;
         var play = _play?.Current;
         var entities = play?.Entities ?? current.Scene!.Entities;
+        if (play is null && _sceneAtlasDraft is { } draft)
+            entities = entities.Select(entity => entity.Id == draft.Preview.After.Id ? draft.Preview.After : entity).ToArray();
         if (play is null && _sceneDrag is { } drag)
             entities = entities.Select(entity => entity.Id == drag.Id ? entity with { Transform = drag.Preview } : entity).ToArray();
         AtlasPreviewBanner.Visibility = WestCard.Visibility = EastCard.Visibility = Visibility.Collapsed;
         UpdatePlayControls();
+        SceneAtlasPreviewBanner.Visibility = _sceneAtlasDraft is null ? Visibility.Collapsed : Visibility.Visible;
         AutomationProperties.SetName(Viewport, play is null ? "Room canvas" : "Playable room canvas");
         Viewport.Show(SceneArt.Create(current.ProjectId, current.Revision, entities,
-            play is null ? SelectedEntityId : _lastPlaySwitch?.TargetId,
+            play is null ? _sceneAtlasDraft?.Preview.After.Id ?? SelectedEntityId : _lastPlaySwitch?.TargetId,
             grid: play is null, play: play, nearbySwitch: _play?.NearbySwitch?.SwitchId, assets: current.Assets), editStarted);
     }
 

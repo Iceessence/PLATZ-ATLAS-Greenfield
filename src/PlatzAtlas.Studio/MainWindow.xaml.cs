@@ -30,6 +30,17 @@ public partial class MainWindow : Window
         _session = ProjectSession.NewMuseum();
         InitializeComponent();
         InitializeAtlas();
+        SceneAtlasQuestion.TextChanged += (_, _) =>
+        {
+            if (_sceneAtlasAnswer is null)
+                return;
+            _sceneAtlasHost.DiscardReview();
+            _sceneAtlasDraft = null;
+            _sceneAtlasAnswer = null;
+            SceneAtlasResult.Text = "";
+            UpdateSceneAtlas();
+            UpdateScenePresentation();
+        };
         Viewport.SetPreference(rendererPreference);
         Viewport.SimulateDeviceLoss = simulateDeviceLoss;
         Viewport.MeasureFrames = measureFrames;
@@ -69,6 +80,7 @@ public partial class MainWindow : Window
     {
         StopPlay("window-closed");
         _atlasHost.Revoke();
+        _sceneAtlasHost.Revoke();
         Viewport.Shutdown();
         base.OnClosed(e);
     }
@@ -82,6 +94,7 @@ public partial class MainWindow : Window
         _changingProject = true;
         _session = session;
         ResetAtlasSession();
+        ResetSceneAtlas();
         _openedRevision = session.Current.Revision;
         _sceneDrag = null;
         RefreshSceneList(null);
@@ -277,7 +290,8 @@ public partial class MainWindow : Window
     {
         var project = _session.Current;
         var general = project.Scene is not null;
-        SceneActions.Visibility = SceneAssetsTab.Visibility = general ? Visibility.Visible : Visibility.Collapsed;
+        SceneActions.Visibility = SceneAssetsTab.Visibility = SceneAtlasTab.Visibility =
+            general ? Visibility.Visible : Visibility.Collapsed;
         MuseumAtlasTab.Visibility = MuseumInspector.Visibility = general ? Visibility.Collapsed : Visibility.Visible;
         if (general)
         {
@@ -285,6 +299,7 @@ public partial class MainWindow : Window
             return;
         }
         SceneInspector.Visibility = Visibility.Collapsed;
+        SceneAtlasPreviewBanner.Visibility = Visibility.Collapsed;
         PlayToggle.Visibility = Visibility.Visible;
         var selected = Selection;
         var control = project.Switches.FirstOrDefault(item => item.TargetId == selected?.Id);
@@ -340,6 +355,8 @@ public partial class MainWindow : Window
         RevisionLabel.Text = $"Revision {_session.Current.Revision} · Original r{MuseumProject.InitialRevision} · {saved}{dirty}";
         RevisionLabel.ToolTip = _session.FilePath ?? "Choose a file with Save";
         UpdateAtlasAccess();
+        if (_session.Current.Scene is not null)
+            UpdateSceneAtlas();
         PlayToggle.ToolTip = _play is not null ? "Stop Play (F5)"
             : CanStartPlay ? "Play the saved revision (F5)" : "Save the current revision to start Play.";
     }

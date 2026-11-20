@@ -1,0 +1,235 @@
+using System.IO;
+using System.Windows;
+using PlatzAtlas.Atlas;
+using PlatzAtlas.Core;
+
+namespace PlatzAtlas.Studio;
+
+public partial class MainWindow
+{
+    private readonly SceneQuestionHost _sceneAtlasHost = new();
+    private ProjectReadGrant? _sceneAtlasGrant;
+    private string? _sceneAtlasPath;
+    private SceneAnswer? _sceneAtlasAnswer;
+    private SceneAtlasDraft? _sceneAtlasDraft;
+
+    private void ResetSceneAtlas()
+    {
+        RevokeSceneAtlas();
+        SceneAtlasQuestion.Text = "Inspect selection";
+    }
+
+    private void RevokeSceneAtlas()
+    {
+        _sceneAtlasHost.Revoke();
+        _sceneAtlasGrant = null;
+        _sceneAtlasPath = null;
+        _sceneAtlasAnswer = null;
+        _sceneAtlasDraft = null;
+        SceneAtlasResult.Text = "";
+        SceneAtlasSource.Text = "";
+    }
+
+    private void UpdateSceneAtlas()
+    {
+        var current = _session.Current;
+        var saved = current.Scene is not null && _play is null && HasSavedRevision;
+        if (_sceneAtlasGrant is { } grant &&
+            (!saved || grant.Scope != ScopeOf(current) || !string.Equals(_sceneAtlasPath, _session.FilePath, StringComparison.OrdinalIgnoreCase)))
+            RevokeSceneAtlas();
+
+        SceneAtlasAccess.IsEnabled = saved;
+        SceneAtlasAccess.Content = _sceneAtlasGrant is null ? "Allow scene read" : "Revoke scene read";
+        SceneAtlasAsk.IsEnabled = _sceneAtlasGrant is not null;
+        SceneAtlasScope.Text = !saved ? "Save the room to ask about this revision." : _sceneAtlasGrant is null
+            ? $"Allow a read of saved revision {current.Revision}."
+            : $"Reading saved revision {current.Revision}. Apply changes through a separate confirmation.";
+        SceneAtlasAnswerCard.Visibility = _sceneAtlasAnswer is null ? Visibility.Collapsed : Visibility.Visible;
+        SceneAtlasTarget.Visibility = _sceneAtlasAnswer?.Target is null ? Visibility.Collapsed : Visibility.Visible;
+        SceneAtlasPreview.Visibility = _sceneAtlasAnswer?.Proposal is null ? Visibility.Collapsed : Visibility.Visible;
+        var receipt = _session.LatestSceneCommit;
+        SceneAtlasReceipt.Visibility = receipt is null ? Visibility.Collapsed : Visibility.Visible;
+        SceneAtlasReceiptText.Text = receipt is null ? "" :
+            $"Saved r{receipt.Revision}\nObject {receipt.EntityId:D}\n\nOperation {receipt.OperationId:D}\n\nSHA-256 {receipt.PayloadSha256}";
+    }
+
+    private void SceneAtlasAccessClicked(object sender, RoutedEventArgs e) => WithSceneAtlas(() =>
+    {
+        if (_sceneAtlasGrant is not null)
+        {
+            RevokeSceneAtlas();
+            SceneAtlasResult.Text = "Scene access revoked.";
+        }
+        else
+        {
+            if (_play is not null || _session.Current.Scene is null)
+                return;
+            var session = _session;
+            var saved = session.ReadSavedSnapshot();
+            _sceneAtlasGrant = _sceneAtlasHost.Allow(ScopeOf(saved), () => PublishSceneEvidence(session.ReadSavedSnapshot()));
+            _sceneAtlasPath = session.FilePath;
+            SceneAtlasResult.Text = "";
+        }
+        UpdateSceneAtlas();
+        UpdateScenePresentation();
+    });
+
+    private void SceneAtlasAskClicked(object sender, RoutedEventArgs e) => WithSceneAtlas(() =>
+    {
+        if (_sceneAtlasGrant is not { } grant)
+            return;
+        var result = _sceneAtlasHost.Ask(grant, SceneEvidenceProfile.Version, SelectedEntityId, SceneAtlasQuestion.Text);
+        _sceneAtlasDraft = null;
+        _sceneAtlasAnswer = result.Answer;
+        if (result.Answer is { } answer)
+        {
+            SceneAtlasResult.Text = FormatAnswer(answer);
+            var source = answer.Source;
+            SceneAtlasSource.Text = $"Project {answer.Scope.ProjectId:D}\nScene {answer.Scope.SceneId:D}\nSaved revision {answer.Scope.Revision}" +
+                $"\n\nscene.entities[{source.Id:D}].transform\nX {source.X:G17} · Y {source.Y:G17}" +
+                $"\nWidth {source.Width:G17} · Height {source.Height:G17} · Rotation {source.Rotation:G17}" +
+                $"\n\nscene.entities[{source.Id:D}].component\n{source.Kind}" +
+                (source.TargetId is { } target ? $"\ntargetId {target:D}" : "") +
+                (source.AssetId is { } asset ? $"\nassetId {asset:D}" : "") +
+                $"\n\nEvidence SHA-256\n{answer.Sha256}";
+        }
+        else
+        {
+            SceneAtlasResult.Text = result.Message ?? "Scene evidence is unavailable. Check read access and try again.";
+            SceneAtlasSource.Text = "";
+        }
+        _diagnostics.Log("scene-atlas-read", new { status = result.Status.ToString(), revision = grant.Scope.Revision, objectId = result.Answer?.Source.Id });
+        UpdateSceneAtlas();
+        UpdateScenePresentation();
+    });
+
+    private void SceneAtlasShowClicked(object sender, RoutedEventArgs e) => ShowSceneAtlasObject(_sceneAtlasAnswer?.Source.Id);
+    private void SceneAtlasTargetClicked(object sender, RoutedEventArgs e) => ShowSceneAtlasObject(_sceneAtlasAnswer?.Target?.Id);
+
+    private void ShowSceneAtlasObject(Guid? id) => WithSceneAtlas(() =>
+    {
+        if (_sceneAtlasGrant is null || id is null)
+            return;
+        _session.ReadSavedSnapshot();
+        Objects.SelectedItem = Objects.Items.OfType<SceneObjectItem>().Single(item => item.Id == id);
+        Objects.ScrollIntoView(Objects.SelectedItem);
+        SideTabs.SelectedItem = InspectorTab;
+    });
+
+    private void SceneAtlasPreviewClicked(object sender, RoutedEventArgs e) => WithSceneAtlas(() =>
+    {
+        if (_sceneAtlasGrant is not { } grant || _sceneAtlasAnswer is not { Proposal: { } proposal } answer)
+            return;
+        var source = answer.Source;
+        var scope = grant.Scope;
+        SceneOperation operation = proposal.Kind switch
+        {
+            SceneProposalKind.Rename => new RenameSceneEntity(scope.ProjectId, scope.Revision, source.Id, proposal.Name!),
+            SceneProposalKind.Move => new TransformSceneEntity(scope.ProjectId, scope.Revision, source.Id,
+                new Transform2D(proposal.X, proposal.Y, source.Width, source.Height, source.Rotation)),
+            SceneProposalKind.SetState when source.Kind == SceneSourceKind.Door =>
+                new SetSceneDoor(scope.ProjectId, scope.Revision, source.Id, proposal.State),
+            _ => new SetSceneLamp(scope.ProjectId, scope.Revision, source.Id, proposal.State)
+        };
+        var preview = _session.PreviewSavedScene(operation);
+        var review = _sceneAtlasHost.BeginReview(grant, answer, ScopeOf(_session.Current));
+        _sceneAtlasDraft = new SceneAtlasDraft(preview, review);
+        SceneAtlasDraftText.Text = $"{ProposalText(answer)}. Save to {Path.GetFileName(_session.FilePath)} as r{scope.Revision + 1}?";
+        SceneAtlasDraftText.ToolTip = _session.FilePath;
+        UpdateScenePresentation();
+        SceneAtlasCancel.Focus();
+        _diagnostics.Log("scene-atlas-preview", new { objectId = source.Id, scope.Revision, operationId = review.Id });
+    });
+
+    private void SceneAtlasCancelClicked(object sender, RoutedEventArgs e)
+    {
+        _sceneAtlasHost.DiscardReview();
+        _sceneAtlasDraft = null;
+        UpdateScenePresentation();
+    }
+
+    private void SceneAtlasConfirmClicked(object sender, RoutedEventArgs e) => WithSceneAtlas(() =>
+    {
+        if (_sceneAtlasDraft is not { } draft)
+            return;
+        if (!string.Equals(_sceneAtlasPath, _session.FilePath, StringComparison.OrdinalIgnoreCase))
+            throw new ProjectEditException(EditRejection.StaleRevision, "The project path changed. Reopen the intended project.");
+        var receipt = _sceneAtlasHost.Confirm(draft.Review, ScopeOf(_session.Current), (operationId, requireApproval) =>
+            _session.CommitApprovedScene(operationId, draft.Preview, requireApproval));
+        RevokeSceneAtlas();
+        RefreshSceneList(receipt.EntityId);
+        UpdateStudio();
+        SceneAtlasReceipt.IsExpanded = true;
+        ShowStatus($"Saved ATLAS edit at revision {receipt.Revision}. Use Undo to reverse it.");
+        _diagnostics.Log("scene-atlas-commit", receipt);
+    });
+
+    private void WithSceneAtlas(Action action)
+    {
+        try { action(); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException)
+        {
+            if (error is ProjectEditException { Reason: EditRejection.StaleRevision })
+                RevokeSceneAtlas();
+            SceneAtlasResult.Text = error.Message;
+            ShowStatus(error.Message, error: true);
+            UpdateSceneAtlas();
+            UpdateScenePresentation();
+            _diagnostics.Log("scene-atlas-rejected", new { error = error.GetType().Name });
+        }
+    }
+
+    private static ReadOnlyMemory<byte> PublishSceneEvidence(MuseumProject saved)
+    {
+        var sources = saved.Scene!.Entities.Select(item =>
+        {
+            var t = item.Transform;
+            var (kind, active, target, behavior, assetId, assetName, color) = item.Component switch
+            {
+                SceneLamp lamp => (SceneSourceKind.Lamp, (bool?)lamp.IsOn, (Guid?)null, (string?)null, (Guid?)null, (string?)null, (string?)null),
+                SceneDoor door => (SceneSourceKind.Door, (bool?)door.IsOpen, null, null, null, null, null),
+                SceneSwitch control => (SceneSourceKind.Switch, null, control.TargetId, control.Behavior.ToString(), null, null, null),
+                SceneSprite image => (SceneSourceKind.Image, null, null, null, (Guid?)image.AssetId,
+                    saved.Assets.Single(asset => asset.Id == image.AssetId).Name, null),
+                WallPanel wall => (SceneSourceKind.Wall, null, null, null, null, null, wall.Color.ToString()),
+                _ => throw new InvalidDataException("An object type is unavailable in the evidence profile.")
+            };
+            return new SceneSource(item.Id, item.Name, kind, t.X, t.Y, t.Width, t.Height, t.Rotation,
+                active, target, behavior, assetId, assetName, color);
+        }).ToArray();
+        return SceneEvidenceProfile.Publish(ScopeOf(saved), sources);
+    }
+
+    private static string FormatAnswer(SceneAnswer answer)
+    {
+        var item = answer.Source;
+        var details = item.Kind switch
+        {
+            SceneSourceKind.Switch => answer.Target is { } target ? $"Controls {target.Name}. {item.Behavior}."
+                : "The switch is unconnected.",
+            SceneSourceKind.Door or SceneSourceKind.Lamp => $"State is {FormatObjectState(item.Kind, item.Active == true)}.",
+            SceneSourceKind.Image => $"Uses image {item.AssetName}.",
+            _ => $"Wall color is {item.Color}."
+        };
+        return $"{item.Name} · {item.Kind}\nX {item.X:G}, Y {item.Y:G} · Saved r{answer.Scope.Revision}\n{details}" +
+            (answer.Proposal is null ? "" : $"\n\nProposed: {ProposalText(answer)}");
+    }
+
+    private static string ProposalText(SceneAnswer answer)
+    {
+        var item = answer.Source;
+        var proposal = answer.Proposal!;
+        var summary = proposal.Kind switch
+        {
+            SceneProposalKind.Rename => $"name → {proposal.Name}",
+            SceneProposalKind.Move => $"({item.X:G}, {item.Y:G}) → ({proposal.X:G}, {proposal.Y:G})",
+            _ => $"{FormatObjectState(item.Kind, item.Active == true)} → {FormatObjectState(item.Kind, proposal.State)}"
+        };
+        return $"{item.Name} · {summary}";
+    }
+
+    private static string FormatObjectState(SceneSourceKind kind, bool active) =>
+        kind == SceneSourceKind.Door ? (active ? "open" : "closed") : (active ? "on" : "off");
+
+    private sealed record SceneAtlasDraft(ScenePreview Preview, SceneWriteReview Review);
+}

@@ -19,6 +19,14 @@ public sealed partial class ProjectSession
             "Create a blank project to edit scene objects.");
         if (operation is ImportSceneAsset import)
             return ApplyAssetImport(scene, import);
+        if (PlanSceneEdit(scene, operation) is not { } edit)
+            return false;
+        CommitScene(scene, edit);
+        return true;
+    }
+
+    private SceneEdit? PlanSceneEdit(SceneDocument scene, SceneOperation operation)
+    {
         var prior = scene.Entities.SingleOrDefault(entity => entity.Id == operation.EntityId);
         if (operation is AddSceneEntity && (prior is not null || operation.EntityId == Current.ProjectId ||
             operation.EntityId == Current.SceneId || scene.History.Any(edit => edit.EntityId == operation.EntityId)))
@@ -41,10 +49,7 @@ public sealed partial class ProjectSession
                 prior with { Component = new SceneSwitch(control.TargetId, control.Behavior) },
             _ => throw new ProjectEditException(EditRejection.WrongTarget, "This edit does not apply to the object.")
         };
-        if (prior == next)
-            return false;
-        CommitScene(scene, new SceneEdit(Current.Revision + 1, operation.EntityId, prior, next, LightEditKind.Edit, null));
-        return true;
+        return prior == next ? null : new SceneEdit(Current.Revision + 1, operation.EntityId, prior, next, LightEditKind.Edit, null);
     }
 
     private bool ReverseScene(SceneEdit? prior, LightEditKind kind)
@@ -70,6 +75,13 @@ public sealed partial class ProjectSession
 
     private void CommitScene(SceneDocument scene, SceneEdit edit, IReadOnlyList<ProjectAsset>? catalog = null)
     {
+        var next = WithSceneEdit(scene, edit, catalog);
+        sceneJournal.Record(edit);
+        Current = next;
+    }
+
+    private MuseumProject WithSceneEdit(SceneDocument scene, SceneEdit edit, IReadOnlyList<ProjectAsset>? catalog = null)
+    {
         if (scene.History.Count == SceneValidation.MaxEdits)
             throw new InvalidDataException("This scene has reached its edit history limit.");
         var entities = scene.Entities.Where(item => item.Id != edit.EntityId);
@@ -90,7 +102,6 @@ public sealed partial class ProjectSession
         {
             ActiveAssetIds = active.Count == 0 ? null : Array.AsReadOnly(active.Order().ToArray())
         };
-        sceneJournal.Record(edit);
-        Current = Current with { Revision = edit.Revision, Scene = next, Assets = catalog ?? Current.Assets };
+        return Current with { Revision = edit.Revision, Scene = next, Assets = catalog ?? Current.Assets };
     }
 }

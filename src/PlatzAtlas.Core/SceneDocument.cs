@@ -66,6 +66,8 @@ public sealed record SceneEdit(long Revision, Guid EntityId, SceneEntity? Before
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AssetPresence? AssetChange { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SceneCommitStamp? AtlasCommit { get; init; }
 }
 public sealed record AssetPresence(bool IsPresent);
 
@@ -165,6 +167,7 @@ internal sealed class SceneJournal
         var catalog = assets.Select(item => item.Id).ToHashSet();
         var imported = new HashSet<Guid>();
         var activeAssets = new HashSet<Guid>();
+        var approvedIds = new HashSet<Guid>();
         var journal = new SceneJournal();
         var expected = MuseumProject.InitialRevision;
         foreach (var edit in scene.History)
@@ -172,6 +175,11 @@ internal sealed class SceneJournal
             if (edit is null || edit.Revision != ++expected || edit.EntityId == projectId || edit.EntityId == sceneId)
                 throw new InvalidDataException("The saved scene edit has an invalid revision or ID.");
             journal.Record(edit);
+            if (edit.AtlasCommit is { } stamp &&
+                (edit.Kind != LightEditKind.Edit || edit.AssetChange is not null || edit.Before is null || edit.After is null ||
+                    stamp.OperationId == Guid.Empty || !approvedIds.Add(stamp.OperationId) ||
+                    stamp.PayloadSha256 != ProjectFormat.SceneEditDigest(projectId, sceneId, edit)))
+                throw new InvalidDataException("The saved ATLAS scene receipt does not match its edit.");
             if (edit.AssetChange is { } presence)
             {
                 if (edit.Before is not null || edit.After is not null || !catalog.Contains(edit.EntityId) ||
