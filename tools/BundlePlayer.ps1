@@ -34,7 +34,8 @@ try {
         'Use Windows x64 with the .NET 10 Windows Desktop Runtime installed.'
         'Open PlatzAtlas.Player.exe and select a .platzroom package exported by Studio.'
         'Move with the arrow keys or WASD. Use E when in range of a switch.'
-        'The executable also accepts --room <path> and --cpu.'
+        'Use --room <path> to open a room or --check-room <path> to validate one.'
+        'Renderers: --renderer <auto|vulkan|opengl|cpu>, --vulkan, --opengl, or --cpu.'
     )
     [IO.File]::WriteAllLines((Join-Path $stage 'START-HERE.txt'), $requirements)
     $names = [string[]]@(

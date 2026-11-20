@@ -28,6 +28,7 @@ public partial class PlayerWindow : Window
         }
         InitializeComponent();
         Viewport.SetPreference(renderer);
+        Viewport.VulkanValidated += summary => Log("vulkan-validation", summary);
         Viewport.FrameCompleted += frame =>
         {
             BackendLabel.Text = frame.Label;

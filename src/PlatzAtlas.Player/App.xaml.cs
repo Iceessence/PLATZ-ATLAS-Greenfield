@@ -12,35 +12,25 @@ public partial class App : Application
         base.OnStartup(e);
         try
         {
-            if (Option("--check-room") is { } check)
+            var renderer = ViewportArguments.ParseRenderer(e.Args);
+            if (ViewportArguments.ReadOption(e.Args, "--check-room") is { } check)
             {
                 RoomPackage.Open(check);
                 Shutdown(0);
                 return;
             }
-            var renderer = e.Args.Contains("--cpu") ? RendererPreference.CpuReference :
-                e.Args.Contains("--opengl") ? RendererPreference.OpenGl :
-                e.Args.Contains("--vulkan") ? RendererPreference.Vulkan : RendererPreference.Auto;
-            var window = new PlayerWindow(renderer, Option("--room"), Option("--diagnostics"));
+            var window = new PlayerWindow(renderer, ViewportArguments.ReadOption(e.Args, "--room"),
+                ViewportArguments.ReadOption(e.Args, "--diagnostics"));
             MainWindow = window;
             window.Show();
         }
         catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
         {
             Console.Error.WriteLine(error.Message);
-            if (!e.Args.Contains("--check-room"))
+            if (e.Args.Length == 0)
                 MessageBox.Show(error.Message, "PLATZ Player", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
 
-        string? Option(string key)
-        {
-            var index = Array.IndexOf(e.Args, key);
-            if (index < 0)
-                return null;
-            if (index + 1 == e.Args.Length || e.Args[index + 1].StartsWith("--", StringComparison.Ordinal))
-                throw new ArgumentException($"Missing filename after {key}.");
-            return e.Args[index + 1];
-        }
     }
 }
