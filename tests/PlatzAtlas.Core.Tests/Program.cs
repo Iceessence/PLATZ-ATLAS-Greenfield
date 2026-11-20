@@ -89,7 +89,7 @@ try
     ExpectInvalid(() => ProjectSession.Open(altered));
     using var envelope = JsonDocument.Parse(saved);
     var payload = envelope.RootElement.GetProperty("project").GetRawText();
-    WriteWithDigest(altered, payload.Replace("\"schemaVersion\": 1", "\"schemaVersion\": 2", StringComparison.Ordinal));
+    WriteWithDigest(altered, payload.Replace("\"schemaVersion\": 1", "\"schemaVersion\": 99", StringComparison.Ordinal));
     ExpectInvalid(() => ProjectSession.Open(altered));
     WriteWithDigest(altered, payload.Replace("\"isOn\": true", "\"isOn\": null", StringComparison.Ordinal));
     ExpectInvalid(() => ProjectSession.Open(altered));
@@ -97,6 +97,7 @@ try
 
     AtlasReadChecks.Run(scratch.FullName);
     LightPreviewChecks.Run(scratch.FullName);
+    ApprovedCommitChecks.Run(scratch.FullName);
 }
 finally
 {

@@ -1,6 +1,6 @@
 # PLATZ ATLAS Studio
 
-PLATZ ATLAS Studio is a local Windows editor for the Night Museum scene. Studio identifies its two identically named lanterns by gallery and stable object ID. ATLAS can answer a question about the saved museum and show a temporary preview of a proposed light change.
+PLATZ ATLAS Studio is a local Windows editor for the Night Museum scene. Studio identifies its two identically named lanterns by gallery and stable object ID. ATLAS can answer a question about the saved museum, preview a proposed light change and save it after you approve it.
 
 ## Build and launch
 
@@ -46,7 +46,10 @@ This first version uses a deterministic local lookup for the supplied question. 
 
 1. With the saved museum answer visible, check **Proposed light change** and choose **Preview light change**. The viewport highlights the cited lantern in teal and shows its proposed state. The label below the scene shows both the preview state and the saved state.
 2. Choose **Exit preview** to restore the saved view. You can also revoke access in **ATLAS**, or make an edit with the normal Inspector controls. An edit clears the preview and retires the grant.
-3. If another Studio instance saved a newer revision, reopen the project before staging a new preview. The preview belongs to the saved revision cited in the answer. **Save** always writes the actual project state.
+3. While previewing, choose **Review save…** in **ATLAS**. Check the named file and light change, then choose **Confirm and save** within one minute. Studio saves a new revision, preserves the previous file and displays **Latest saved ATLAS edit** with the operation ID and payload checksum.
+4. Reopen the saved project to inspect the receipt or choose **Undo** to reverse the light change. Save the reversal to keep it. **Cancel review** returns to the preview. If another window has saved a newer revision, reopen that revision before starting a new review.
+
+**Save** writes the actual scene when a preview is open. Approved edits add their receipt to project schema 2. Current Studio opens schemas 1 and 2. After the first approved edit on a schema 1 file, its adjacent previous revision still uses schema 1.
 
 [WORKING.md](WORKING.md) records which paths were exercised, the evidence and the next milestone.
 

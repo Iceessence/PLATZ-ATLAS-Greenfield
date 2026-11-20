@@ -13,7 +13,8 @@ public sealed record MuseumProject(
     IReadOnlyList<ProjectAsset> Assets,
     IReadOnlyList<LightEdit> History)
 {
-    public const int FormatVersion = 1;
+    public const int LegacyFormatVersion = 1;
+    public const int FormatVersion = 2;
     public const long InitialRevision = 1;
     public const string CoordinateUnits = "room-fraction";
     public const string CoordinateOrigin = "top-left, x-right, y-down";
@@ -46,7 +47,11 @@ public sealed record LightEdit(
     bool IsOn,
     LightEditKind Kind,
     long? ReversesRevision,
-    Guid? SwitchId);
+    Guid? SwitchId)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public AtlasCommitStamp? AtlasCommit { get; init; }
+}
 
 public enum EditRejection
 {
@@ -54,7 +59,8 @@ public enum EditRejection
     StaleRevision,
     WrongTarget,
     MissingObject,
-    StaleValue
+    StaleValue,
+    OperationIdConflict
 }
 
 public sealed class ProjectEditException(EditRejection reason, string message) : InvalidOperationException(message)

@@ -14,7 +14,9 @@ public partial class MainWindow
     private readonly ProjectQuestionHost _atlasHost = new();
     private ProjectReadGrant? _atlasGrant;
     private SwitchAnswer? _atlasAnswer;
-    private LightPreview? _atlasPreview;
+    private AtlasLightDraft? _atlasDraft;
+    private LightPreview? _atlasPreview => _atlasDraft?.Preview;
+    private LightCommitReview? _atlasCommitReview;
 
     private void InitializeAtlas()
     {
@@ -26,6 +28,7 @@ public partial class MainWindow
     {
         ClearAtlasAccess();
         AtlasQuestion.Text = ProjectQuestionHost.SupportedQuestion;
+        AtlasReceiptCard.IsExpanded = false;
     }
 
     private void ClearAtlasAccess()
@@ -43,6 +46,8 @@ public partial class MainWindow
             ClearAtlasAccess();
             _diagnostics.Log("atlas-access", new { status = "revision-or-project-changed" });
         }
+        else if (_atlasDraft is { } draft && !string.Equals(draft.Path, _session.FilePath, StringComparison.OrdinalIgnoreCase))
+            ExitAtlasPreview();
 
         AtlasAccess.IsEnabled = scope.HasValue;
         AtlasAccess.Content = _atlasGrant.HasValue ? "Revoke access" : "Allow project read";
@@ -55,6 +60,7 @@ public partial class MainWindow
             { Revision: var revision } when _atlasGrant.HasValue => $"Read access for saved revision {revision}.",
             { Revision: var revision } => $"Allow ATLAS to read switch links and lantern details from saved revision {revision}."
         };
+        UpdateAtlasReceipt();
     }
 
     private ProjectReadScope? CurrentSavedScope()
@@ -180,8 +186,10 @@ public partial class MainWindow
         try
         {
             var (status, draft) = _atlasHost.StagePreview(grant, ScopeOf(_session.Current), answer, proposal =>
-                _session.PreviewSavedLight(new SetLight(proposal.Scope.ProjectId, proposal.Scope.Revision,
-                    proposal.ObjectId, proposal.IsOn, proposal.SwitchId) { ExpectedIsOn = proposal.ExpectedIsOn }));
+                new AtlasLightDraft(proposal,
+                    _session.PreviewSavedLight(new SetLight(proposal.Scope.ProjectId, proposal.Scope.Revision,
+                        proposal.ObjectId, proposal.IsOn, proposal.SwitchId) { ExpectedIsOn = proposal.ExpectedIsOn }),
+                    _session.FilePath!));
 
             if (draft is null)
             {
@@ -191,14 +199,14 @@ public partial class MainWindow
                 return;
             }
 
-            _atlasPreview = draft;
+            _atlasDraft = draft;
             UpdateScenePresentation();
             UIElementAutomationPeer.FromElement(AtlasPreviewLabel)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
-            AtlasPreviewExit.Focus();
+            AtlasCommitReviewStart.Focus();
             _diagnostics.Log("atlas-preview", new
             {
                 status = "staged",
-                revision = draft.Operation.BaseRevision,
+                revision = draft.Preview.Operation.BaseRevision,
                 durationMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds
             });
         }
@@ -230,12 +238,16 @@ public partial class MainWindow
         if (_atlasPreview is null)
             return;
 
-        _atlasPreview = null;
+        _atlasDraft = null;
+        _atlasCommitReview = null;
+        _atlasHost.DiscardPreview();
         UpdateScenePresentation();
         _diagnostics.Log("atlas-preview", new { status = "closed" });
     }
 
     private static string LightState(bool isOn) => isOn ? "On" : "Off";
+
+    private sealed record AtlasLightDraft(SwitchLightProposal Proposal, LightPreview Preview, string Path);
 
     private void ClearAtlasAnswer()
     {

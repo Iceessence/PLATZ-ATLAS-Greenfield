@@ -17,7 +17,10 @@ public sealed record SwitchAnswer(ProjectReadScope Scope, SwitchSource Switch, L
 public sealed record SwitchQuestionResult(QuestionStatus Status, SwitchAnswer? Answer = null);
 
 public sealed record SwitchLightProposal(
-    ProjectReadScope Scope, Guid SwitchId, Guid ObjectId, bool ExpectedIsOn, bool IsOn);
+    ProjectReadScope Scope, Guid SwitchId, Guid ObjectId, bool ExpectedIsOn, bool IsOn)
+{
+    public Guid OperationId { get; init; }
+}
 
 public enum PreviewStatus
 {
@@ -27,16 +30,32 @@ public enum PreviewStatus
     EvidenceUnavailable
 }
 
-// The trusted host owns the grant and the evidence used for a detached preview.
-public sealed class ProjectQuestionHost
+public sealed record LightCommitReview(Guid OperationId, DateTimeOffset ExpiresAt);
+
+public enum CommitStatus
+{
+    ReviewReady,
+    Committed,
+    AccessDenied,
+    StaleBase,
+    Expired
+}
+
+// The trusted host serializes grant changes with preview and commit decisions.
+public sealed class ProjectQuestionHost(TimeProvider? clock = null)
 {
     public const string SupportedQuestion = "Which lantern does the west switch control?";
     public const int MaxQuestionLength = 160;
+    public static readonly TimeSpan ReviewLifetime = TimeSpan.FromMinutes(1);
 
     private readonly object _sync = new();
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
     private ProjectReadGrant? _grant;
     private Func<ReadOnlyMemory<byte>>? _readSnapshot;
     private SwitchAnswer? _latestAnswer;
+    private SwitchLightProposal? _stagedProposal;
+    private LightCommitReview? _review;
+    private long _reviewStarted;
 
     public ProjectReadGrant Allow(ProjectReadScope scope, Func<ReadOnlyMemory<byte>> readSnapshot)
     {
@@ -48,6 +67,7 @@ public sealed class ProjectQuestionHost
         {
             _readSnapshot = readSnapshot;
             _latestAnswer = null;
+            ClearPreview();
             var grant = new ProjectReadGrant(Guid.NewGuid(), scope);
             _grant = grant;
             return grant;
@@ -61,6 +81,7 @@ public sealed class ProjectQuestionHost
             _grant = null;
             _readSnapshot = null;
             _latestAnswer = null;
+            ClearPreview();
         }
     }
 
@@ -72,6 +93,7 @@ public sealed class ProjectQuestionHost
             if (_grant != request.Grant || _readSnapshot is null)
                 return new(QuestionStatus.AccessDenied);
             _latestAnswer = null;
+            ClearPreview();
             if (request.ProfileVersion != SwitchEvidenceProfile.Version)
                 return new(QuestionStatus.IncompatibleProfile);
             if (request.Text is not { Length: <= MaxQuestionLength } text
@@ -101,13 +123,94 @@ public sealed class ProjectQuestionHost
             if (_latestAnswer is null || !ReferenceEquals(_latestAnswer, answer))
                 return (PreviewStatus.EvidenceUnavailable, null);
 
+            ClearPreview();
             var proposal = new SwitchLightProposal(current, answer.Switch.Id, answer.Lantern.Id,
-                answer.Lantern.IsOn, !answer.Lantern.IsOn);
+                answer.Lantern.IsOn, !answer.Lantern.IsOn) { OperationId = Guid.NewGuid() };
             var draft = stage(proposal);
-            return _grant == grant && ReferenceEquals(_latestAnswer, answer)
-                ? (PreviewStatus.Staged, draft)
-                : (PreviewStatus.AccessDenied, null);
+            if (_grant != grant || !ReferenceEquals(_latestAnswer, answer))
+                return (PreviewStatus.AccessDenied, null);
+            _stagedProposal = proposal;
+            return (PreviewStatus.Staged, draft);
         }
+    }
+
+    public void DiscardPreview()
+    {
+        lock (_sync)
+            ClearPreview();
+    }
+
+    public (CommitStatus Status, LightCommitReview? Review) BeginCommitReview(
+        ProjectReadGrant grant, ProjectReadScope current, SwitchLightProposal proposal)
+    {
+        lock (_sync)
+        {
+            if (_grant != grant || _stagedProposal is null || !ReferenceEquals(_stagedProposal, proposal)
+                || current.ProjectId != grant.Scope.ProjectId || current.SceneId != grant.Scope.SceneId)
+                return (CommitStatus.AccessDenied, null);
+            if (current.Revision != grant.Scope.Revision)
+                return (CommitStatus.StaleBase, null);
+
+            _reviewStarted = _clock.GetTimestamp();
+            _review = new LightCommitReview(proposal.OperationId, _clock.GetUtcNow() + ReviewLifetime);
+            return (CommitStatus.ReviewReady, _review);
+        }
+    }
+
+    public void CancelCommitReview(LightCommitReview review)
+    {
+        lock (_sync)
+        {
+            if (ReferenceEquals(_review, review))
+                _review = null;
+        }
+    }
+
+    public (CommitStatus Status, T? Receipt) CommitConfirmed<T>(ProjectReadGrant grant, ProjectReadScope current,
+        LightCommitReview review, Func<SwitchLightProposal, Action, T> publish) where T : class
+    {
+        ArgumentNullException.ThrowIfNull(publish);
+        lock (_sync)
+        {
+            if (_grant != grant || _review is null || !ReferenceEquals(_review, review) || _stagedProposal is not { } proposal
+                || current.ProjectId != grant.Scope.ProjectId || current.SceneId != grant.Scope.SceneId)
+                return (CommitStatus.AccessDenied, null);
+            if (current.Revision != grant.Scope.Revision)
+                return (CommitStatus.StaleBase, null);
+
+            try
+            {
+                RequireApproval();
+                var receipt = publish(proposal, RequireApproval);
+                ClearPreview();
+                return (CommitStatus.Committed, receipt);
+            }
+            catch (CommitAuthorizationException denied)
+            {
+                if (ReferenceEquals(_review, review))
+                    _review = null;
+                return (denied.Status, null);
+            }
+        }
+
+        void RequireApproval()
+        {
+            if (_grant != grant || !ReferenceEquals(_review, review))
+                throw new CommitAuthorizationException(CommitStatus.AccessDenied);
+            if (_clock.GetUtcNow() >= review.ExpiresAt || _clock.GetElapsedTime(_reviewStarted) >= ReviewLifetime)
+                throw new CommitAuthorizationException(CommitStatus.Expired);
+        }
+    }
+
+    private void ClearPreview()
+    {
+        _stagedProposal = null;
+        _review = null;
+    }
+
+    private sealed class CommitAuthorizationException(CommitStatus status) : InvalidOperationException
+    {
+        public CommitStatus Status { get; } = status;
     }
 
     private static SwitchQuestionResult ReadAuthorizedAnswer(

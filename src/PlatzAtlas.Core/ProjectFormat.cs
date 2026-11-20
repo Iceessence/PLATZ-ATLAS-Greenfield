@@ -43,9 +43,9 @@ internal static class ProjectFormat
                 !project.TryGetProperty("schemaVersion", out var schema) ||
                 schema.ValueKind != JsonValueKind.Number ||
                 !schema.TryGetInt32(out var version) ||
-                version != MuseumProject.FormatVersion)
+                version is not (MuseumProject.LegacyFormatVersion or MuseumProject.FormatVersion))
             {
-                throw new InvalidDataException("This editor supports PLATZ project schema 1.");
+                throw new InvalidDataException("This editor supports PLATZ project schemas 1 and 2.");
             }
 
             var snapshot = JsonSerializer.Deserialize<MuseumProject>(payload, Settings)
@@ -157,6 +157,7 @@ internal static class ProjectFormat
         }
 
         var expectedRevision = project.Revision;
+        var operationIds = new HashSet<Guid>();
         foreach (var edit in project.History.Reverse())
         {
             if (edit is null || edit.Revision != expectedRevision ||
@@ -166,6 +167,16 @@ internal static class ProjectFormat
                     (!switchTargets.TryGetValue(switchId, out var target) || target != edit.ObjectId)))
             {
                 throw new InvalidDataException("The saved light history does not match the room.");
+            }
+
+            if (edit.AtlasCommit is { } stamp &&
+                (project.SchemaVersion != MuseumProject.FormatVersion || edit.Kind != LightEditKind.Edit ||
+                 stamp.OperationId == Guid.Empty || !operationIds.Add(stamp.OperationId) ||
+                 edit.SwitchId is not Guid receiptSwitchId ||
+                 stamp.PayloadSha256 != LightCommitReceipt.Digest(project.ProjectId, project.SceneId,
+                     edit.Revision - 1, edit.ObjectId, receiptSwitchId, edit.WasOn, edit.IsOn)))
+            {
+                throw new InvalidDataException("The saved ATLAS commit receipt does not match the light edit.");
             }
 
             lights[edit.ObjectId] = edit.WasOn;

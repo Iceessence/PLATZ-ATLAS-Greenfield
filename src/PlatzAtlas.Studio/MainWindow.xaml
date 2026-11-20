@@ -98,14 +98,30 @@
           <Border x:Name="AtlasPreviewBanner" Visibility="Collapsed" Margin="0,10,0,0" Padding="9,6"
                   Background="{StaticResource PreviewSurface}" BorderBrush="{StaticResource PreviewAccent}"
                   BorderThickness="1" CornerRadius="5">
-            <DockPanel>
-              <Button x:Name="AtlasPreviewExit" DockPanel.Dock="Right" Content="Exit preview"
-                      Click="AtlasPreviewExitClicked" Margin="9,0,0,0" Padding="7,4" MinHeight="30"
-                      VerticalAlignment="Center"/>
-              <TextBlock x:Name="AtlasPreviewLabel" Foreground="{StaticResource PreviewAccent}"
-                         FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center"
-                         AutomationProperties.LiveSetting="Polite"/>
-            </DockPanel>
+            <StackPanel>
+              <DockPanel>
+                <Button x:Name="AtlasPreviewExit" DockPanel.Dock="Right" Content="Exit preview"
+                        Click="AtlasPreviewExitClicked" Margin="9,0,0,0" Padding="7,4" MinHeight="30"
+                        VerticalAlignment="Center"/>
+                <TextBlock x:Name="AtlasPreviewLabel" Foreground="{StaticResource PreviewAccent}"
+                           FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center"
+                           AutomationProperties.LiveSetting="Polite"/>
+              </DockPanel>
+              <Border x:Name="AtlasCommitConfirmation" Visibility="Collapsed" Margin="0,7,0,1" Padding="0,7,0,0"
+                      BorderBrush="{StaticResource Border}" BorderThickness="0,1,0,0">
+                <StackPanel>
+                  <TextBlock x:Name="AtlasCommitSummary" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+                  <WrapPanel Margin="0,7,0,1">
+                    <Button x:Name="AtlasCommitCancel" Content="Cancel review" Click="AtlasCommitCancelClicked"
+                            Margin="0,0,7,0" MinHeight="32" Padding="8,5"/>
+                    <Button x:Name="AtlasCommitConfirm" Click="AtlasCommitConfirmClicked" Style="{StaticResource PrimaryButton}"
+                            MinHeight="32" Padding="8,5" AutomationProperties.Name="Confirm and save ATLAS light change">
+                      <TextBlock Text="Confirm and save" Foreground="#221B16"/>
+                    </Button>
+                  </WrapPanel>
+                </StackPanel>
+              </Border>
+            </StackPanel>
           </Border>
         </StackPanel>
         <Border Grid.Row="1" BorderBrush="{StaticResource Border}" BorderThickness="1"
@@ -246,6 +262,8 @@
                                Foreground="{StaticResource PreviewAccent}" FontSize="12"/>
                     <Button x:Name="AtlasPreviewStart" Content="Preview light change" Click="AtlasPreviewClicked"
                             Margin="0,5,0,0"/>
+                    <Button x:Name="AtlasCommitReviewStart" Content="Review save…" Click="AtlasCommitReviewClicked"
+                            Margin="0,5,0,0" Visibility="Collapsed"/>
                     <Expander x:Name="AtlasSourceDetails" Header="Source details" Foreground="{StaticResource Text}"
                               Margin="0,9,0,0">
                       <TextBlock x:Name="AtlasSourceText" TextWrapping="Wrap" FontSize="11" FontFamily="Consolas"
@@ -253,6 +271,10 @@
                     </Expander>
                   </StackPanel>
                 </Border>
+                <Expander x:Name="AtlasReceiptCard" Header="Latest saved ATLAS edit" Visibility="Collapsed"
+                          Foreground="{StaticResource Text}" Margin="0,17,0,0">
+                  <TextBlock x:Name="AtlasReceiptText" TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/>
+                </Expander>
               </StackPanel>
             </ScrollViewer>
           </TabItem>

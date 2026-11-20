@@ -26,6 +26,15 @@ public sealed class ProjectSession
     public bool IsDirty => Current.Revision != SavedRevision;
     public bool CanUndo => history.NextUndo is not null;
     public bool CanRedo => history.NextRedo is not null;
+    public LightCommitReceipt? LatestAtlasCommit =>
+        Current.History.LastOrDefault(edit => edit.AtlasCommit is not null) is { } last
+            ? LightCommitReceipt.FromEdit(Current, last)
+            : null;
+
+    public LightCommitReceipt? FindAtlasCommit(Guid operationId) =>
+        Current.History.FirstOrDefault(edit => edit.AtlasCommit?.OperationId == operationId) is { } match
+            ? LightCommitReceipt.FromEdit(Current, match)
+            : null;
 
     public static ProjectSession NewMuseum()
     {
@@ -81,6 +90,60 @@ public sealed class ProjectSession
             throw new ProjectEditException(EditRejection.StaleRevision, "The saved project changed on disk. Reopen it to preview.");
 
         return new LightPreview(request, target, target with { IsOn = request.IsOn });
+    }
+
+    // Only the trusted Studio host supplies the approval check. It runs again immediately before replacement.
+    public LightCommitReceipt CommitApprovedLight(Guid operationId, SetLight request, Action requireApproval)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(requireApproval);
+        if (operationId == Guid.Empty)
+            throw new ArgumentException("A unique operation ID is required.", nameof(operationId));
+        if (request.ProjectId != Current.ProjectId)
+            throw new ProjectEditException(EditRejection.WrongProject, "This edit belongs to a different project.");
+        if (request.ExpectedIsOn is not bool wasOn || request.SwitchId is not Guid switchId)
+            throw new ProjectEditException(EditRejection.StaleValue, "The proposal needs an expected light state and switch.");
+        if (IsDirty || FilePath is not { } path || diskFingerprint is not { } baseFingerprint)
+            throw new ProjectEditException(EditRejection.StaleRevision, "Save the current revision before applying a proposal.");
+
+        var payload = LightCommitReceipt.Digest(request.ProjectId, Current.SceneId, request.BaseRevision,
+            request.ObjectId, switchId, wasOn, request.IsOn);
+        var publication = ProjectStore.PublishApproved<ApprovedPublication>(path, requireApproval, existing =>
+        {
+            var disk = ProjectFormat.Read(existing);
+            if (disk.ProjectId != Current.ProjectId || disk.SceneId != Current.SceneId)
+                throw new ProjectEditException(EditRejection.WrongProject, "The project on disk has changed. Reopen it.");
+            if (disk.History.FirstOrDefault(edit => edit.AtlasCommit?.OperationId == operationId) is { } prior)
+            {
+                var receipt = LightCommitReceipt.FromEdit(disk, prior);
+                if (receipt.PayloadSha256 != payload)
+                    throw new ProjectEditException(EditRejection.OperationIdConflict,
+                        "This operation ID has already been used for a different light change.");
+                return (new ApprovedPublication(receipt, null, null), null);
+            }
+
+            if (ProjectFormat.Digest(existing) != baseFingerprint)
+                throw new ProjectEditException(EditRejection.StaleRevision, "The saved project changed on disk. Reopen it before applying the change.");
+            var target = ValidateLightTarget(request);
+            if (target.IsOn == request.IsOn)
+                throw new ProjectEditException(EditRejection.StaleValue, "The light already has the proposed state.");
+
+            var edit = new LightEdit(Current.Revision + 1, target.Id, wasOn, request.IsOn,
+                LightEditKind.Edit, null, switchId) { AtlasCommit = new AtlasCommitStamp(operationId, payload) };
+            var candidate = WithEdit(edit) with { SchemaVersion = MuseumProject.FormatVersion };
+            var bytes = ProjectFormat.Write(candidate);
+            return (new ApprovedPublication(LightCommitReceipt.FromEdit(candidate, edit), candidate,
+                ProjectFormat.Digest(bytes)), bytes);
+        });
+
+        if (publication.Project is { } saved)
+        {
+            history.Record(saved.History[^1]);
+            Current = saved;
+            SavedRevision = saved.Revision;
+            diskFingerprint = publication.Fingerprint;
+        }
+        return publication.Receipt;
     }
 
     private Lantern ValidateLightTarget(SetLight request)
@@ -150,16 +213,23 @@ public sealed class ProjectSession
 
     private void Commit(LightEdit edit)
     {
+        var next = WithEdit(edit);
+        history.Record(edit);
+        Current = next;
+    }
+
+    private MuseumProject WithEdit(LightEdit edit)
+    {
         var lights = Current.Objects.Select(item =>
             item.Id == edit.ObjectId ? item with { IsOn = edit.IsOn } : item).ToArray();
         var edits = Current.History.Append(edit).ToArray();
-        var next = Current with
+        return Current with
         {
             Revision = edit.Revision,
             Objects = Array.AsReadOnly(lights),
             History = Array.AsReadOnly(edits)
         };
-        history.Record(edit);
-        Current = next;
     }
+
+    private sealed record ApprovedPublication(LightCommitReceipt Receipt, MuseumProject? Project, string? Fingerprint);
 }

@@ -287,6 +287,8 @@ public partial class MainWindow : Window
         AtlasPreviewLabel.Text = preview is null ? "" :
             $"Preview · {preview.Before.Location} · {LightState(preview.Before.IsOn)} → {LightState(preview.After.IsOn)} · Saved r{preview.Operation.BaseRevision}";
         AtlasPreviewStart.IsEnabled = preview is null;
+        AtlasPreviewStart.Visibility = preview is null ? Visibility.Visible : Visibility.Collapsed;
+        UpdateAtlasCommitControls();
         AutomationProperties.SetName(Viewport, preview is null ? "Museum room preview" : AtlasPreviewLabel.Text);
         var ordered = project.Objects.OrderBy(lantern => lantern.X).ToArray();
         UpdatePreviewCard(WestCard, WestLabel, WestState, ordered.FirstOrDefault(), selection);
