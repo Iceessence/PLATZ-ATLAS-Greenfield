@@ -51,7 +51,10 @@ internal static class AtlasReadChecks
         }
         var uppercase = Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(bytes)
             .Replace(answer.SnapshotSha256, answer.SnapshotSha256.ToUpperInvariant(), StringComparison.Ordinal));
-        Require(SwitchEvidenceProfile.Read(uppercase).Snapshot is not null, "uppercase envelope checksum is accepted");
+        var verifier = new ProjectQuestionHost();
+        var uppercaseGrant = verifier.Allow(scope, () => uppercase);
+        Require(verifier.Ask(question with { Grant = uppercaseGrant }).Status == QuestionStatus.Answered,
+            "uppercase envelope checksum is accepted");
         Require(savedBytes.SequenceEqual(File.ReadAllBytes(savedPath)), "read did not modify the editable project");
         Console.WriteLine("PASS saved snapshot, stable switch target, exact evidence and read-only artifact");
 
