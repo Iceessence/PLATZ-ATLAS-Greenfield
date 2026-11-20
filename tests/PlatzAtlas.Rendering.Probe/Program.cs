@@ -30,8 +30,10 @@ var image = new RasterTexture(2, 2, new byte[]
     224, 81, 39, 255, 255, 0, 255, 0,
     38, 154, 210, 128, 60, 205, 162, 255
 });
-var snapshot = new RenderSnapshot(id, 1, blue, triangles,
-    sprites: [new RenderSprite(image, new(.64f, .10f), new(.94f, .10f), new(.94f, .40f), new(.64f, .40f))]);
+var overlay = RenderColor.FromRgb(247, 131, 210);
+var snapshot = new RenderSnapshot(id, 1, blue,
+    [.. triangles, new RenderTriangle(new(.90f, .33f, overlay), new(.94f, .33f, overlay), new(.94f, .40f, overlay))],
+    sprites: [new RenderSprite(image, new(.64f, .10f), new(.94f, .10f), new(.94f, .40f), new(.64f, .40f), triangles.Length)]);
 
 byte[] vkPixels;
 using (var window = CreateProbeWindow("PLATZ ATLAS Vulkan frame probe"))
@@ -201,6 +203,7 @@ static void CheckTexture(Bitmap bitmap, string backend)
     CheckPixel(bitmap, .88, .16, Color.FromArgb(14, 26, 44), backend);
     CheckPixel(bitmap, .70, .34, Color.FromArgb(26, 90, 127), backend);
     CheckPixel(bitmap, .88, .34, Color.FromArgb(60, 205, 162), backend);
+    CheckPixel(bitmap, .928, .36, Color.FromArgb(247, 131, 210), backend);
 }
 
 static void AssertZeroValidationIssues(VulkanViewport viewport, string phase)

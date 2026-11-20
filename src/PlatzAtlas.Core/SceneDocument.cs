@@ -6,6 +6,8 @@ public sealed record SceneDocument(IReadOnlyList<SceneEntity> Entities, IReadOnl
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<Guid>? ActiveAssetIds { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SceneAppearance? Appearance { get; init; }
 }
 public sealed record SceneEntity(Guid Id, string Name, Transform2D Transform, SceneComponent Component);
 
@@ -58,6 +60,8 @@ public sealed record AddSceneEntity(Guid ProjectId, long BaseRevision, SceneEnti
     : SceneOperation(ProjectId, BaseRevision, Entity.Id);
 public sealed record DeleteSceneEntity(Guid ProjectId, long BaseRevision, Guid EntityId)
     : SceneOperation(ProjectId, BaseRevision, EntityId);
+public sealed record DuplicateSceneEntity(Guid ProjectId, long BaseRevision, Guid EntityId, Guid SourceId)
+    : SceneOperation(ProjectId, BaseRevision, EntityId);
 public sealed record RenameSceneEntity(Guid ProjectId, long BaseRevision, Guid EntityId, string Name)
     : SceneOperation(ProjectId, BaseRevision, EntityId);
 public sealed record TransformSceneEntity(Guid ProjectId, long BaseRevision, Guid EntityId, Transform2D Transform)
@@ -85,6 +89,8 @@ public sealed record SceneEdit(long Revision, Guid EntityId, SceneEntity? Before
     public AssetPresence? AssetChange { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SceneCommitStamp? AtlasCommit { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RoomAppearanceChange? AppearanceChange { get; init; }
 }
 public sealed record AssetPresence(bool IsPresent);
 
@@ -172,7 +178,9 @@ internal sealed class SceneJournal
         };
         if (!source.TryPeek(out var prior) || edit.ReversesRevision != prior.Revision ||
             edit.EntityId != prior.EntityId || edit.Before != prior.After || edit.After != prior.Before ||
-            edit.AssetChange != InvertAssetChange(prior.AssetChange))
+            edit.AssetChange != InvertAssetChange(prior.AssetChange) ||
+            (prior.AppearanceChange is null ? edit.AppearanceChange is not null :
+                edit.AppearanceChange is null || !prior.AppearanceChange.Inverts(edit.AppearanceChange)))
             throw new InvalidDataException("The scene history contains an invalid undo or redo.");
         source.Pop();
         destination.Push(edit);
@@ -186,9 +194,9 @@ internal sealed class SceneJournal
     {
         SceneValidation.ValidateEntities(scene.Entities, projectId, sceneId);
         if (schema < MuseumProject.GameFormatVersion &&
-            (scene.Entities.Any(SceneValidation.RequiresSchemaFive) ||
+            (scene.Appearance is not null || scene.Entities.Any(SceneValidation.RequiresSchemaFive) ||
              scene.History.Any(edit => edit is not null &&
-                (SceneValidation.RequiresSchemaFive(edit.Before) || SceneValidation.RequiresSchemaFive(edit.After)))))
+                (edit.AppearanceChange is not null || SceneValidation.RequiresSchemaFive(edit.Before) || SceneValidation.RequiresSchemaFive(edit.After)))))
             throw new InvalidDataException("These gameplay fields require project schema 5.");
         if (scene.History.Count > SceneValidation.MaxEdits || revision != scene.History.Count + MuseumProject.InitialRevision)
             throw new InvalidDataException("The saved revision does not match its scene history.");
@@ -201,11 +209,30 @@ internal sealed class SceneJournal
         var approvedIds = new HashSet<Guid>();
         var journal = new SceneJournal();
         var expected = MuseumProject.InitialRevision;
+        SceneAppearance? appearance = null;
+        var history = new List<SceneEdit>(scene.History.Count);
         foreach (var edit in scene.History)
         {
-            if (edit is null || edit.Revision != ++expected || edit.EntityId == projectId || edit.EntityId == sceneId)
+            if (edit is null || edit.Revision != ++expected || edit.EntityId == projectId)
                 throw new InvalidDataException("The saved scene edit has an invalid revision or ID.");
+            if (edit.AppearanceChange is { } change)
+            {
+                if (edit.EntityId != sceneId || edit.AssetChange is not null || edit.AtlasCommit is not null ||
+                    edit.Before is not null || edit.After is not null || !SceneAppearance.Same(appearance, change.Before))
+                    throw new InvalidDataException("The saved room appearance does not match its history.");
+                var updated = SceneAppearance.Freeze(change.After, created);
+                if (SceneAppearance.Same(appearance, updated))
+                    throw new InvalidDataException("The room appearance edit changes no values.");
+                var frozen = edit with { AppearanceChange = new RoomAppearanceChange(appearance, updated) };
+                journal.Record(frozen);
+                history.Add(frozen);
+                appearance = updated;
+                continue;
+            }
+            if (edit.EntityId == sceneId)
+                throw new InvalidDataException("An object edit cannot target the room ID.");
             journal.Record(edit);
+            history.Add(edit);
             if (edit.AtlasCommit is { } stamp &&
                 (edit.Kind != LightEditKind.Edit || edit.AssetChange is not null || edit.Before is null || edit.After is null ||
                     stamp.OperationId == Guid.Empty || !approvedIds.Add(stamp.OperationId) ||
@@ -245,10 +272,13 @@ internal sealed class SceneJournal
         var listedAssets = scene.ActiveAssetIds ?? [];
         if (!catalog.SetEquals(imported) || listedAssets.Count != activeAssets.Count || !activeAssets.SetEquals(listedAssets))
             throw new InvalidDataException("The image catalog does not match its history.");
+        if (!SceneAppearance.Same(appearance, scene.Appearance))
+            throw new InvalidDataException("The saved room appearance does not match its history.");
         return new SceneDocument(Array.AsReadOnly(scene.Entities.OrderBy(item => item.Id).ToArray()),
-            Array.AsReadOnly(scene.History.ToArray()))
+            Array.AsReadOnly(history.ToArray()))
         {
-            ActiveAssetIds = activeAssets.Count == 0 ? null : Array.AsReadOnly(activeAssets.Order().ToArray())
+            ActiveAssetIds = activeAssets.Count == 0 ? null : Array.AsReadOnly(activeAssets.Order().ToArray()),
+            Appearance = appearance
         };
     }
 }

@@ -16,11 +16,13 @@
     <CommandBinding Command="ApplicationCommands.Redo" Executed="RedoExecuted" CanExecute="CanRedo"/>
     <CommandBinding Command="{x:Static local:MainWindow.TogglePlayCommand}" Executed="TogglePlayExecuted" CanExecute="CanTogglePlay"/>
     <CommandBinding Command="{x:Static local:MainWindow.ExportRoomCommand}" Executed="ExportRoomExecuted" CanExecute="CanExportRoom"/>
+    <CommandBinding Command="{x:Static local:MainWindow.DuplicateSceneCommand}" Executed="DuplicateSceneExecuted" CanExecute="CanDuplicateScene"/>
   </Window.CommandBindings>
   <Window.InputBindings>
     <KeyBinding Key="S" Modifiers="Control+Shift" Command="ApplicationCommands.SaveAs"/>
     <KeyBinding Key="Z" Modifiers="Control+Shift" Command="ApplicationCommands.Redo"/>
     <KeyBinding Key="F5" Command="{x:Static local:MainWindow.TogglePlayCommand}"/>
+    <KeyBinding Key="D" Modifiers="Control" Command="{x:Static local:MainWindow.DuplicateSceneCommand}"/>
   </Window.InputBindings>
   <Grid>
     <Grid.RowDefinitions>
@@ -76,6 +78,8 @@
             <Button x:Name="AddKey" Content="+ Key" Tag="Key" Click="AddSceneClicked" Margin="0,0,4,4" Padding="6,4"/>
             <Button x:Name="AddGoal" Content="+ Goal" Tag="Goal" Click="AddSceneClicked" Margin="0,0,4,4" Padding="6,4"/>
           </WrapPanel>
+          <CheckBox x:Name="SnapToGrid" Content="Snap to grid" Foreground="{StaticResource Text}"
+                    DockPanel.Dock="Top" Visibility="Collapsed" Margin="2,0,0,10"/>
           <ListBox x:Name="Objects" SelectionChanged="SelectionChanged" Background="Transparent" BorderThickness="0"
                    AutomationProperties.Name="Scene objects" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <ListBox.Template>
@@ -340,8 +344,25 @@
                 <TextBox x:Name="RequiredKeys" AutomationProperties.Name="Keys required to win" MaxLength="2"/>
                 <Button x:Name="ApplyGoal" Content="Apply goal rule" Click="ApplyGoalClicked"/>
               </StackPanel>
+              <Button x:Name="DuplicateObject" Content="Duplicate (Ctrl+D)" Command="{x:Static local:MainWindow.DuplicateSceneCommand}" Margin="2,5,2,0"/>
+              <UniformGrid Columns="2" Margin="2,5,2,0">
+                <Button x:Name="BringForward" Content="Bring forward" Tag="forward" Click="ShiftLayerClicked" Padding="3" Margin="0,0,4,0"/>
+                <Button x:Name="SendBackward" Content="Send backward" Tag="backward" Click="ShiftLayerClicked" Padding="3"/>
+              </UniformGrid>
               <Button x:Name="DeleteObject" Content="Delete object" Click="DeleteSceneClicked" Margin="2,9,2,0"/>
             </StackPanel>
+            <Expander x:Name="RoomAppearanceEditor" Header="Room appearance" Visibility="Collapsed"
+                      Foreground="{StaticResource Text}" Margin="0,15,0,1">
+              <StackPanel Margin="2,6,2,0">
+                <TextBlock Text="Room name" Style="{StaticResource Caption}"/>
+                <TextBox x:Name="RoomNameEdit" AutomationProperties.Name="Room name" MaxLength="96"
+                         Background="{StaticResource Page}" Foreground="{StaticResource Text}" Padding="4" Margin="0,4,0,6"/>
+                <TextBlock Text="Floor color · RRGGBB" Style="{StaticResource Caption}"/>
+                <TextBox x:Name="FloorColorEdit" AutomationProperties.Name="Floor color as RRGGBB" MaxLength="7"
+                         Background="{StaticResource Page}" Foreground="{StaticResource Text}" Padding="4" Margin="0,4,0,6"/>
+                <Button x:Name="ApplyRoomAppearance" Content="Apply room appearance" Click="ApplyRoomAppearanceClicked"/>
+              </StackPanel>
+            </Expander>
             <TextBlock Text="Object ID" Style="{StaticResource Caption}" Margin="0,22,0,4"/>
             <TextBlock x:Name="ObjectId" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>
             <TextBlock Text="Project ID" Style="{StaticResource Caption}" Margin="0,15,0,4"/>

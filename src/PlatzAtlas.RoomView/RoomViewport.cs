@@ -354,9 +354,12 @@ public sealed class RoomViewport : Grid
             var width = ActualWidth;
             var height = ActualHeight;
             drawingContext.DrawRectangle(BrushFor(snapshot.Background), null, new Rect(0, 0, width, height));
-            DrawTriangles(snapshot.Triangles);
+            var consumed = 0;
             foreach (var image in snapshot.Sprites)
             {
+                var cut = Math.Clamp(image.BeforeTriangle, consumed, snapshot.Triangles.Count);
+                DrawTriangles(snapshot.Triangles, consumed, cut);
+                consumed = cut;
                 var a = image.A;
                 var b = image.B;
                 var d = image.D;
@@ -366,7 +369,8 @@ public sealed class RoomViewport : Grid
                 drawingContext.DrawImage(Images.GetValue(image.Image, BuildBitmap), new Rect(0, 0, 1, 1));
                 drawingContext.Pop();
             }
-            DrawTriangles(snapshot.Foreground);
+            DrawTriangles(snapshot.Triangles, consumed, snapshot.Triangles.Count);
+            DrawTriangles(snapshot.Foreground, 0, snapshot.Foreground.Count);
             var elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
             var dpi = VisualTreeHelper.GetDpi(this);
             Dispatcher.InvokeAsync(() => completed(snapshot, (int)Math.Round(width * dpi.DpiScaleX),
@@ -374,10 +378,11 @@ public sealed class RoomViewport : Grid
 
             Point PointFor(RenderVertex vertex) => new(vertex.X * width, vertex.Y * height);
 
-            void DrawTriangles(IReadOnlyList<RenderTriangle> triangles)
+            void DrawTriangles(IReadOnlyList<RenderTriangle> triangles, int start, int end)
             {
-                foreach (var triangle in triangles)
+                for (var index = start; index < end; index++)
                 {
+                    var triangle = triangles[index];
                     var geometry = new StreamGeometry();
                     using (var figure = geometry.Open())
                     {

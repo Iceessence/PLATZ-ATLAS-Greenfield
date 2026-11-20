@@ -175,7 +175,7 @@ public partial class MainWindow : Window
                     DefaultExt = ".platz",
                     AddExtension = true,
                     OverwritePrompt = true,
-                    FileName = path is not null ? Path.GetFileName(path) : _session.Current.Name + ".platz"
+                    FileName = path is not null ? Path.GetFileName(path) : SafeProjectFileName(_session.Current.DisplayName)
                 };
                 if (dialog.ShowDialog(this) != true)
                     return false;
@@ -208,7 +208,7 @@ public partial class MainWindow : Window
         if (!_session.IsDirty || (_session.FilePath is null && _session.Current.Revision == _openedRevision))
             return true;
 
-        var answer = MessageBox.Show(this, $"Save changes to {_session.Current.Name}?", "Unsaved project",
+        var answer = MessageBox.Show(this, $"Save changes to {_session.Current.DisplayName}?", "Unsaved project",
             MessageBoxButton.YesNoCancel, MessageBoxImage.Question, MessageBoxResult.Yes);
         return answer == MessageBoxResult.No || (answer == MessageBoxResult.Yes && SaveProject());
     }
@@ -293,6 +293,7 @@ public partial class MainWindow : Window
         BlankRoomHelp.Visibility = project.Scene is { Entities.Count: 0 } ? Visibility.Visible : Visibility.Collapsed;
         SceneActions.Visibility = SceneAssetsTab.Visibility = SceneAtlasTab.Visibility =
             general ? Visibility.Visible : Visibility.Collapsed;
+        SnapToGrid.Visibility = RoomAppearanceEditor.Visibility = SceneActions.Visibility;
         MuseumAtlasTab.Visibility = MuseumInspector.Visibility = general ? Visibility.Collapsed : Visibility.Visible;
         if (general)
         {

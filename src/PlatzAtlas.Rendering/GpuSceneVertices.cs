@@ -45,9 +45,12 @@ internal sealed class GpuImageStrip
     public void Fill(RenderSnapshot snapshot, Span<GpuSceneVertex> vertices, Func<RenderColor, RenderColor>? convert,
         bool linearTexture)
     {
-        int index = FillTriangles(snapshot.Triangles, vertices, convert);
+        int index = 0, consumed = 0;
         foreach (var item in snapshot.Sprites)
         {
+            var cut = Math.Clamp(item.BeforeTriangle, consumed, snapshot.Triangles.Count);
+            index += FillTriangles(snapshot.Triangles, consumed, cut, vertices[index..], convert);
+            consumed = cut;
             var image = item.Image;
             var offset = _offsets[image];
             var textureColor = new RenderColor(linearTexture ? 1 : 0, 0, 0);
@@ -58,15 +61,17 @@ internal sealed class GpuImageStrip
             vertices[index++] = a; vertices[index++] = b; vertices[index++] = c;
             vertices[index++] = a; vertices[index++] = c; vertices[index++] = d;
         }
-        FillTriangles(snapshot.Foreground, vertices[index..], convert);
+        index += FillTriangles(snapshot.Triangles, consumed, snapshot.Triangles.Count, vertices[index..], convert);
+        FillTriangles(snapshot.Foreground, 0, snapshot.Foreground.Count, vertices[index..], convert);
     }
 
-    private static int FillTriangles(IReadOnlyList<RenderTriangle> triangles, Span<GpuSceneVertex> vertices,
+    private static int FillTriangles(IReadOnlyList<RenderTriangle> triangles, int start, int end, Span<GpuSceneVertex> vertices,
         Func<RenderColor, RenderColor>? convert)
     {
         var index = 0;
-        foreach (var triangle in triangles)
+        for (var i = start; i < end; i++)
         {
+            var triangle = triangles[i];
             vertices[index++] = Vertex(triangle.A, convert);
             vertices[index++] = Vertex(triangle.B, convert);
             vertices[index++] = Vertex(triangle.C, convert);

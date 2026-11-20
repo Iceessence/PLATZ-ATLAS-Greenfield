@@ -24,6 +24,9 @@ public sealed record MuseumProject(
 
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public SceneDocument? Scene { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string DisplayName => Scene?.Appearance?.Title ?? Name;
 }
 
 public sealed record Lantern(Guid Id, string Name, string Location, double X, double Y, bool IsOn, Guid AssetId);

@@ -22,7 +22,8 @@ public readonly record struct RenderTriangle(RenderVertex A, RenderVertex B, Ren
 public readonly record struct RenderPoint(float X, float Y);
 
 public sealed record RasterTexture(int Width, int Height, ReadOnlyMemory<byte> Rgba);
-public sealed record RenderSprite(RasterTexture Image, RenderPoint A, RenderPoint B, RenderPoint C, RenderPoint D);
+public sealed record RenderSprite(RasterTexture Image, RenderPoint A, RenderPoint B, RenderPoint C, RenderPoint D,
+    int BeforeTriangle = int.MaxValue);
 
 /// <summary>Immutable draw data derived from one project revision. Draw triangles in list order.</summary>
 public sealed class RenderSnapshot(

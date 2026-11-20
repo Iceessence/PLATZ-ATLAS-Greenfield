@@ -5,12 +5,14 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using PlatzAtlas.Core;
+using PlatzAtlas.Rendering;
 using PlatzAtlas.RoomView;
 
 namespace PlatzAtlas.Studio;
 
 public partial class MainWindow
 {
+    public static readonly RoutedUICommand DuplicateSceneCommand = new("Duplicate object", nameof(DuplicateSceneCommand), typeof(MainWindow));
     private SceneDrag? _sceneDrag;
     private Guid? SelectedEntityId => (Objects.SelectedItem as SceneObjectItem)?.Id;
     private SceneEntity? SelectedEntity => _session.Current.Scene?.Entities.SingleOrDefault(item => item.Id == SelectedEntityId);
@@ -40,7 +42,9 @@ public partial class MainWindow
     {
         var project = _session.Current;
         var entity = SelectedEntity;
-        RoomTitle.Text = project.Name;
+        RoomTitle.Text = project.DisplayName;
+        RoomNameEdit.Text = project.DisplayName;
+        FloorColorEdit.Text = $"{project.Scene!.Appearance?.BackgroundRgb ?? SceneAppearance.DefaultBackgroundRgb:X6}";
         var count = project.Scene!.Entities.Count;
         ObjectCount.Text = count == 1 ? "1 object" : $"{count} objects";
         SelectedName.Text = entity?.Name ?? "Select an object";
@@ -53,6 +57,10 @@ public partial class MainWindow
         {
             SceneName.Text = entity.Name;
             SetTransformFields(entity.Transform);
+            var order = SceneAppearance.Ordered(project.Scene.Entities, project.Scene.Appearance?.PaintOrder).ToArray();
+            var layer = Array.FindIndex(order, item => item.Id == entity.Id);
+            BringForward.IsEnabled = layer < order.Length - 1;
+            SendBackward.IsEnabled = layer > 0;
             ChangeColor.Visibility = entity.Component is WallPanel ? Visibility.Visible : Visibility.Collapsed;
             if (entity.Component is WallPanel wall)
                 ChangeColor.Content = $"Wall color · {wall.Color}";
@@ -87,7 +95,9 @@ public partial class MainWindow
         AutomationProperties.SetName(Viewport, play is null ? "Room canvas" : "Playable room canvas");
         Viewport.Show(SceneArt.Create(current.ProjectId, current.Revision, entities,
             play is null ? _sceneAtlasDraft?.Preview.After.Id ?? SelectedEntityId : _lastPlaySwitch?.TargetId,
-            grid: play is null, play: play, nearbySwitch: _play?.NearbySwitch?.SwitchId, assets: current.Assets), editStarted);
+            grid: play is null, play: play, nearbySwitch: _play?.NearbySwitch?.SwitchId, assets: current.Assets,
+            backgroundRgb: current.Scene!.Appearance?.BackgroundRgb, paintOrder: current.Scene.Appearance?.PaintOrder,
+            editHandles: play is null && _sceneAtlasDraft is null), editStarted);
     }
 
     private void AddSceneClicked(object sender, RoutedEventArgs e)
@@ -221,7 +231,7 @@ public partial class MainWindow
         {
             if (!_session.Apply(operation))
                 return;
-            RefreshSceneList(operation.EntityId);
+            RefreshSceneList(operation is ConfigureRoomAppearance ? SelectedEntityId : operation.EntityId);
             UpdateStudio();
             ShowStatus(status);
             _diagnostics.Log("scene-edit", new { operation = operation.GetType().Name, operation.EntityId, _session.Current.Revision });
@@ -244,9 +254,19 @@ public partial class MainWindow
         }
         if (phase == PointerPhase.Down)
         {
-            var hit = SceneArt.PaintOrder(scene.Entities).Reverse().FirstOrDefault(item => item.Transform.Contains(x, y));
+            var mode = DragMode.Move;
+            var hit = SelectedEntity;
+            if (hit is not null && _sceneAtlasDraft is null)
+            {
+                var handles = SceneArt.EditHandles(hit.Transform);
+                if (Near(handles.Rotate, x, y)) mode = DragMode.Rotate;
+                else if (Near(handles.Resize, x, y)) mode = DragMode.Resize;
+            }
+            if (mode == DragMode.Move)
+                hit = SceneAppearance.Ordered(scene.Entities, scene.Appearance?.PaintOrder).Reverse()
+                    .FirstOrDefault(item => item.Transform.Contains(x, y));
             Objects.SelectedItem = Objects.Items.OfType<SceneObjectItem>().FirstOrDefault(item => item.Id == hit?.Id);
-            _sceneDrag = hit is null ? null : new SceneDrag(hit.Id, _session.Current.Revision, x, y, hit.Transform, hit.Transform);
+            _sceneDrag = hit is null ? null : new SceneDrag(hit.Id, _session.Current.Revision, x, y, hit.Transform, hit.Transform, mode);
             return;
         }
         if (_sceneDrag is not { } drag)
@@ -257,16 +277,13 @@ public partial class MainWindow
             UpdateGeneralEditor(null);
             return;
         }
-        var moved = drag.Original with
-        {
-            X = Math.Round(Math.Clamp(drag.Original.X + x - drag.X, 0, 1), 6),
-            Y = Math.Round(Math.Clamp(drag.Original.Y + y - drag.Y, 0, 1), 6)
-        };
+        var moved = DragTransform(drag, x, y);
         if (phase == PointerPhase.Up)
         {
             _sceneDrag = null;
             if (moved != drag.Original && Math.Max(Math.Abs(x - drag.X), Math.Abs(y - drag.Y)) >= .002)
-                ApplyScene(new TransformSceneEntity(_session.Current.ProjectId, drag.Revision, drag.Id, moved), "Moved the object.");
+                ApplyScene(new TransformSceneEntity(_session.Current.ProjectId, drag.Revision, drag.Id, moved),
+                    drag.Mode switch { DragMode.Rotate => "Rotated the object.", DragMode.Resize => "Resized the object.", _ => "Moved the object." });
             else
                 UpdateGeneralEditor(null);
             return;
@@ -278,6 +295,67 @@ public partial class MainWindow
             UpdateGeneralPresentation();
         }
     }
+
+    private Transform2D DragTransform(SceneDrag drag, double x, double y)
+    {
+        var t = drag.Original;
+        var dx = x - drag.X;
+        var dy = y - drag.Y;
+        var angle = t.Rotation * Math.PI / 180;
+        return drag.Mode switch
+        {
+            DragMode.Resize => t with
+            {
+                Width = Bound(t.Width + 2 * (dx * Math.Cos(angle) + dy * Math.Sin(angle)), .025, 1),
+                Height = Bound(t.Height + 2 * (dy * Math.Cos(angle) - dx * Math.Sin(angle)), .025, 1)
+            },
+            DragMode.Rotate => t with
+            {
+                Rotation = Bound(Math.IEEERemainder(t.Rotation +
+                    (Math.Atan2(y - t.Y, x - t.X) - Math.Atan2(drag.Y - t.Y, drag.X - t.X)) * (180 / Math.PI), 360), -180, 180, 15)
+            },
+            _ => t with { X = Bound(t.X + dx, 0, 1), Y = Bound(t.Y + dy, 0, 1) }
+        };
+
+        double Bound(double value, double minimum, double maximum, double interval = .05) =>
+            Math.Round(Math.Clamp(SnapToGrid.IsChecked == true
+                ? Math.Round(value / interval, MidpointRounding.AwayFromZero) * interval : value, minimum, maximum), 6);
+    }
+
+    private static bool Near(RenderPoint point, double x, double y) =>
+        Math.Abs(point.X - x) <= .015 && Math.Abs(point.Y - y) <= .025;
+
+    private void CanDuplicateScene(object sender, CanExecuteRoutedEventArgs e) =>
+        e.CanExecute = _play is null && SelectedEntity is { Component: not SceneSpawn };
+
+    private void DuplicateSceneExecuted(object sender, ExecutedRoutedEventArgs e)
+    {
+        if (SelectedEntity is { } entity)
+            ApplyScene(new DuplicateSceneEntity(_session.Current.ProjectId, _session.Current.Revision, Guid.NewGuid(), entity.Id),
+                $"Duplicated {entity.Name}.");
+    }
+
+    private void ShiftLayerClicked(object sender, RoutedEventArgs e)
+    {
+        if (SelectedEntity is { } entity && sender is Button { Tag: string direction })
+            ApplyScene(new ShiftSceneLayer(_session.Current.ProjectId, _session.Current.Revision, entity.Id, direction == "forward"),
+                direction == "forward" ? "Brought the object forward." : "Sent the object backward.");
+    }
+
+    private void ApplyRoomAppearanceClicked(object sender, RoutedEventArgs e)
+    {
+        var hex = FloorColorEdit.Text.Trim().TrimStart('#');
+        if (hex.Length != 6 || !uint.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var rgb))
+        {
+            ShowStatus("Enter a six-digit RGB floor color.", error: true);
+            return;
+        }
+        ApplyScene(new ConfigureRoomAppearance(_session.Current.ProjectId, _session.Current.Revision,
+            _session.Current.SceneId, RoomNameEdit.Text, rgb), "Updated the room name and floor color.");
+    }
+
+    private static string SafeProjectFileName(string name) =>
+        new string(name.Select(character => Path.GetInvalidFileNameChars().Contains(character) ? '_' : character).ToArray()) + ".platz";
 
     private void SetTransformFields(Transform2D t)
     {
@@ -300,5 +378,6 @@ public partial class MainWindow
         _ => "Lamp"
     };
     private sealed record SwitchTargetItem(Guid? Id, string Label);
-    private sealed record SceneDrag(Guid Id, long Revision, double X, double Y, Transform2D Original, Transform2D Preview);
+    private enum DragMode { Move, Resize, Rotate }
+    private sealed record SceneDrag(Guid Id, long Revision, double X, double Y, Transform2D Original, Transform2D Preview, DragMode Mode);
 }

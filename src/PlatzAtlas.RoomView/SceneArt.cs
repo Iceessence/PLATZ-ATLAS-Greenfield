@@ -18,26 +18,30 @@ public static class SceneArt
         return new RasterTexture(pixels.Width, pixels.Height, pixels.Rgba);
     });
 
-    public static IEnumerable<SceneEntity> PaintOrder(IReadOnlyList<SceneEntity> entities) =>
-        entities.OrderBy(item => item.Component is WallPanel ? 0 : item.Component is SceneSprite ? 2 : 1).ThenBy(item => item.Id);
+    public static (RenderPoint Resize, RenderPoint Rotate) EditHandles(Transform2D t) =>
+        (Place(t, t.Width / 2, t.Height / 2), Place(t, 0, -t.Height / 2 - .045));
 
     public static RenderSnapshot Create(Guid projectId, long revision, IReadOnlyList<SceneEntity> entities,
         Guid? selected, bool grid = false, PlayRoomSnapshot? play = null, Guid? nearbySwitch = null,
-        IReadOnlyList<ProjectAsset>? assets = null)
+        IReadOnlyList<ProjectAsset>? assets = null, uint? backgroundRgb = null, IReadOnlyList<Guid>? paintOrder = null,
+        bool editHandles = false)
     {
         var triangles = new List<RenderTriangle>();
         var foreground = new List<RenderTriangle>();
         var sprites = new List<RenderSprite>();
         var surface = triangles;
+        var background = backgroundRgb is uint rgb ? Rgb((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb) : Background;
+        var chart = backgroundRgb is not null ? new RenderColor(
+            background.R * .85f + .10f, background.G * .85f + .10f, background.B * .85f + .10f) : Grid;
         if (grid)
         {
             for (var index = 1; index < 20; index++)
-                Quad(new Transform2D(index / 20.0, .5, .001, 1, 0), Grid);
+                Quad(new Transform2D(index / 20.0, .5, .001, 1, 0), chart);
             for (var index = 1; index < 12; index++)
-                Quad(new Transform2D(.5, index / 12.0, 1, .0015, 0), Grid);
+                Quad(new Transform2D(.5, index / 12.0, 1, .0015, 0), chart);
         }
 
-        foreach (var item in PaintOrder(entities))
+        foreach (var item in SceneAppearance.Ordered(entities, paintOrder))
         {
             if (play is not null && (item.Component is SceneSpawn || play.Progress?.Collected.Contains(item.Id) == true))
                 continue;
@@ -49,6 +53,12 @@ public static class SceneArt
                 AtLocal(t, .508, 0, .025, 1.026, Selection);
                 AtLocal(t, 0, -.508, 1.026, .025, Selection);
                 AtLocal(t, 0, .508, 1.026, .025, Selection);
+                if (editHandles)
+                {
+                    var (resize, rotate) = EditHandles(t);
+                    Quad(new Transform2D(resize.X, resize.Y, .018, .03, 0), Selection);
+                    Quad(new Transform2D(rotate.X, rotate.Y, .016, .026, 45), Rgb(126, 207, 230));
+                }
                 surface = triangles;
             }
             if (item.Component is WallPanel panel)
@@ -94,7 +104,7 @@ public static class SceneArt
                 assets?.FirstOrDefault(asset => asset.Id == sprite.AssetId) is { } asset)
             {
                 var (a, b, c, d) = Corners(t);
-                sprites.Add(new RenderSprite(Image(asset), a, b, c, d));
+                sprites.Add(new RenderSprite(Image(asset), a, b, c, d, triangles.Count));
             }
             else if (item.Component is SceneSpawn)
             {
@@ -125,7 +135,7 @@ public static class SceneArt
             Quad(new Transform2D(actor.X, actor.Y, .032, .054, 45), Rgb(47, 100, 148));
             Quad(new Transform2D(actor.X, actor.Y, .022, .037, 45), Rgb(125, 205, 243));
         }
-        return new RenderSnapshot(projectId, revision, Background, triangles,
+        return new RenderSnapshot(projectId, revision, background, triangles,
             playSessionId: play?.SessionId, playStep: play?.Step, sprites: sprites, foreground: foreground);
 
         void AtLocal(Transform2D t, double x, double y, double width, double height, RenderColor color)
@@ -157,6 +167,15 @@ public static class SceneArt
             RenderPoint Vertex(double x, double y) => new((float)(t.X + x * cos - y * sin),
                 (float)(t.Y + x * sin + y * cos));
         }
+    }
+
+    private static RenderPoint Place(Transform2D transform, double x, double y)
+    {
+        var angle = transform.Rotation * Math.PI / 180;
+        var cos = Math.Cos(angle);
+        var sin = Math.Sin(angle);
+        return new RenderPoint((float)Math.Clamp(transform.X + x * cos - y * sin, .012, .988),
+            (float)Math.Clamp(transform.Y + x * sin + y * cos, .018, .982));
     }
 
     private static RenderColor Rgb(byte r, byte g, byte b) => RenderColor.FromRgb(r, g, b);

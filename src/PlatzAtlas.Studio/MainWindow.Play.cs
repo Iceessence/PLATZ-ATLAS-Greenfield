@@ -110,7 +110,7 @@ public partial class MainWindow
         PlayBanner.Visibility = PlayPanel.Visibility = playing ? Visibility.Visible : Visibility.Collapsed;
         SideTabs.Visibility = playing ? Visibility.Collapsed : Visibility.Visible;
         Objects.IsEnabled = !playing;
-        SceneActions.IsEnabled = NewBlank.IsEnabled = !playing;
+        SceneActions.IsEnabled = NewBlank.IsEnabled = SnapToGrid.IsEnabled = !playing;
         PlayBannerText.Text = snapshot is null ? "" : snapshot.Progress is { } progress
             ? $"Playing saved r{snapshot.SourceRevision} · {progress.Summary}"
             : $"Playing saved r{snapshot.SourceRevision} · {snapshot.Step} switch {(snapshot.Step == 1 ? "action" : "actions")}";
