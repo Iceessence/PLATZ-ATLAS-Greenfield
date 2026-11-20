@@ -1,0 +1,7 @@
+# PLATZ ATLAS development and review
+
+- Identify the role assigned by the owner before editing. Implementation agents can author code, tests and the implementation section of the handoff. Independent reviewers reproduce frozen commits and record their own verdict in the handoff.
+- Read [the canonical handoff](docs/ai/ATLAS_HANDOFF.md), [the working record](WORKING.md), [the launch guide](README.md) and the relevant portions of [the master specification](docs/Ultimate_PLATZ_ATLAS_MASTER_Version_1.docx). Check Git status, HEAD, tags and the specification digest. Establish the last independently accepted baseline before extending it.
+- Use the pinned SDK and locked offline restore. Run the relevant automated tests, exercise real Studio or Player entry points, and preserve previous projects and recovery data. Use synthetic scratch data and place application evidence outside the checkout under `C:\PLATZ ATLAS\.platz-atlas-verification`.
+- Use separate commits for baseline repairs and distinct milestones. Record the scope actually exercised, build commands, evidence, failures and incomplete work. Only the independent reviewer can change the accepted baseline.
+- Keep the work local. Before changing the canonical handoff, confirm that the owner has assigned the active role to this session and check the current file and Git state. Only that session edits the handoff. The owner switches between sessions and sends the review assignment.
