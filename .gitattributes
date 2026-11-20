@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.platz text eol=lf
+*.docx binary
+*.spv binary

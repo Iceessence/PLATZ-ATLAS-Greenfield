@@ -1,0 +1,340 @@
+using System.Runtime.InteropServices;
+using Silk.NET.Vulkan;
+using Buffer = Silk.NET.Vulkan.Buffer;
+using Semaphore = Silk.NET.Vulkan.Semaphore;
+
+namespace PlatzAtlas.Rendering;
+
+public sealed unsafe partial class VulkanViewport
+{
+    private Buffer _vertices;
+    private DeviceMemory _vertexMemory;
+    private GpuVertex* _mappedVertices;
+    private int _vertexCapacity;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly struct GpuVertex(RenderVertex vertex, RenderColor color)
+    {
+        public readonly float X = vertex.X;
+        public readonly float Y = vertex.Y;
+        public readonly float R = color.R;
+        public readonly float G = color.G;
+        public readonly float B = color.B;
+    }
+
+    private void CreatePipeline()
+    {
+        var layout = new PipelineLayoutCreateInfo { SType = StructureType.PipelineLayoutCreateInfo };
+        Check(_vk.CreatePipelineLayout(_device, &layout, null, out _pipelineLayout), "create pipeline layout");
+
+        ShaderModule vertex = default;
+        ShaderModule fragment = default;
+        try
+        {
+            vertex = LoadShader("Viewport.vert.spv");
+            fragment = LoadShader("Viewport.frag.spv");
+            fixed (byte* main = "main\0"u8)
+                CreateGraphicsPipeline(vertex, fragment, main);
+        }
+        finally
+        {
+            if (fragment.Handle != 0)
+                _vk.DestroyShaderModule(_device, fragment, null);
+            if (vertex.Handle != 0)
+                _vk.DestroyShaderModule(_device, vertex, null);
+        }
+    }
+
+    private ShaderModule LoadShader(string name)
+    {
+        using Stream input = typeof(VulkanViewport).Assembly.GetManifestResourceStream($"PlatzAtlas.Rendering.Shaders.{name}")
+            ?? throw new VulkanViewportException($"The embedded Vulkan shader {name} is missing.");
+        var code = new uint[checked((int)input.Length / sizeof(uint))];
+        input.ReadExactly(MemoryMarshal.AsBytes(code.AsSpan()));
+        fixed (uint* first = code)
+        {
+            var create = new ShaderModuleCreateInfo
+            {
+                SType = StructureType.ShaderModuleCreateInfo,
+                CodeSize = (nuint)input.Length,
+                PCode = first
+            };
+            Check(_vk.CreateShaderModule(_device, &create, null, out var module), "create shader module");
+            return module;
+        }
+    }
+
+    private void CreateGraphicsPipeline(ShaderModule vertex, ShaderModule fragment, byte* main)
+    {
+        PipelineShaderStageCreateInfo* stages = stackalloc PipelineShaderStageCreateInfo[2]
+        {
+            new() { SType = StructureType.PipelineShaderStageCreateInfo, Stage = ShaderStageFlags.VertexBit, Module = vertex, PName = main },
+            new() { SType = StructureType.PipelineShaderStageCreateInfo, Stage = ShaderStageFlags.FragmentBit, Module = fragment, PName = main }
+        };
+        var binding = new VertexInputBindingDescription(0, (uint)sizeof(GpuVertex), VertexInputRate.Vertex);
+        VertexInputAttributeDescription* attributes = stackalloc VertexInputAttributeDescription[2]
+        {
+            new(0, 0, Format.R32G32Sfloat, 0),
+            new(1, 0, Format.R32G32B32Sfloat, 2 * sizeof(float))
+        };
+        var vertexInput = new PipelineVertexInputStateCreateInfo
+        {
+            SType = StructureType.PipelineVertexInputStateCreateInfo,
+            VertexBindingDescriptionCount = 1,
+            PVertexBindingDescriptions = &binding,
+            VertexAttributeDescriptionCount = 2,
+            PVertexAttributeDescriptions = attributes
+        };
+        var inputAssembly = new PipelineInputAssemblyStateCreateInfo
+        {
+            SType = StructureType.PipelineInputAssemblyStateCreateInfo,
+            Topology = PrimitiveTopology.TriangleList
+        };
+        var viewportState = new PipelineViewportStateCreateInfo
+        {
+            SType = StructureType.PipelineViewportStateCreateInfo,
+            ViewportCount = 1,
+            ScissorCount = 1
+        };
+        var rasterState = new PipelineRasterizationStateCreateInfo
+        {
+            SType = StructureType.PipelineRasterizationStateCreateInfo,
+            PolygonMode = PolygonMode.Fill,
+            CullMode = CullModeFlags.None,
+            FrontFace = FrontFace.CounterClockwise,
+            LineWidth = 1f
+        };
+        var sampleState = new PipelineMultisampleStateCreateInfo
+        {
+            SType = StructureType.PipelineMultisampleStateCreateInfo,
+            RasterizationSamples = SampleCountFlags.Count1Bit
+        };
+        var colorAttachment = new PipelineColorBlendAttachmentState
+        {
+            ColorWriteMask = ColorComponentFlags.RBit | ColorComponentFlags.GBit | ColorComponentFlags.BBit | ColorComponentFlags.ABit
+        };
+        var blend = new PipelineColorBlendStateCreateInfo
+        {
+            SType = StructureType.PipelineColorBlendStateCreateInfo,
+            AttachmentCount = 1,
+            PAttachments = &colorAttachment
+        };
+        DynamicState* dynamicStates = stackalloc DynamicState[2] { DynamicState.Viewport, DynamicState.Scissor };
+        var dynamicState = new PipelineDynamicStateCreateInfo
+        {
+            SType = StructureType.PipelineDynamicStateCreateInfo,
+            DynamicStateCount = 2,
+            PDynamicStates = dynamicStates
+        };
+        var request = new GraphicsPipelineCreateInfo
+        {
+            SType = StructureType.GraphicsPipelineCreateInfo,
+            StageCount = 2,
+            PStages = stages,
+            PVertexInputState = &vertexInput,
+            PInputAssemblyState = &inputAssembly,
+            PViewportState = &viewportState,
+            PRasterizationState = &rasterState,
+            PMultisampleState = &sampleState,
+            PColorBlendState = &blend,
+            PDynamicState = &dynamicState,
+            Layout = _pipelineLayout,
+            RenderPass = _renderPass,
+            BasePipelineIndex = -1
+        };
+        Pipeline pipeline = default;
+        Result created = _vk.CreateGraphicsPipelines(_device, default, 1, &request, null, &pipeline);
+        _pipeline = pipeline;
+        Check(created, "create graphics pipeline");
+    }
+
+    private bool TryPresent(RenderSnapshot snapshot)
+    {
+        uint vertexCount = UploadTriangles(snapshot.Triangles);
+        uint image = 0;
+        Result acquire = _swapchainApi.AcquireNextImage(_device, _swapchain, AcquireTimeout, _imageAcquired, default, &image);
+        if (acquire == Result.ErrorOutOfDateKhr)
+            return false;
+        if (acquire != Result.SuboptimalKhr)
+            Check(acquire, "acquire a swapchain image");
+
+        RecordDraw(snapshot.Background, image, vertexCount);
+        CommandBuffer commandBuffer = _commands;
+        Semaphore acquired = _imageAcquired;
+        Semaphore drawn = _renderComplete[image];
+        PipelineStageFlags wait = PipelineStageFlags.ColorAttachmentOutputBit;
+        var submit = new SubmitInfo
+        {
+            SType = StructureType.SubmitInfo,
+            WaitSemaphoreCount = 1,
+            PWaitSemaphores = &acquired,
+            PWaitDstStageMask = &wait,
+            CommandBufferCount = 1,
+            PCommandBuffers = &commandBuffer,
+            SignalSemaphoreCount = 1,
+            PSignalSemaphores = &drawn
+        };
+        Fence fence = _drawComplete;
+        Check(_vk.ResetFences(_device, 1, &fence), "reset the draw fence");
+        Check(_vk.QueueSubmit(_queue, 1, &submit, fence), "submit a frame");
+
+        // VK_KHR_swapchain releases the presentation semaphore when its image is acquired again.
+        // Each image has its own semaphore so a draw fence alone never controls its reuse.
+        SwapchainKHR swapchain = _swapchain;
+        var present = new PresentInfoKHR
+        {
+            SType = StructureType.PresentInfoKhr,
+            WaitSemaphoreCount = 1,
+            PWaitSemaphores = &drawn,
+            SwapchainCount = 1,
+            PSwapchains = &swapchain,
+            PImageIndices = &image
+        };
+        Result presented = _swapchainApi.QueuePresent(_queue, &present);
+        Check(_vk.WaitForFences(_device, 1, &fence, true, SubmitTimeout), "wait for the submitted frame");
+        if (presented == Result.ErrorOutOfDateKhr)
+            return false;
+        if (presented != Result.SuboptimalKhr)
+            Check(presented, "present a frame to the window");
+        return true;
+    }
+
+    private void RecordDraw(RenderColor background, uint image, uint vertexCount)
+    {
+        Check(_vk.ResetCommandBuffer(_commands, 0), "reset the draw commands");
+        var begin = new CommandBufferBeginInfo
+        {
+            SType = StructureType.CommandBufferBeginInfo,
+            Flags = CommandBufferUsageFlags.OneTimeSubmitBit
+        };
+        Check(_vk.BeginCommandBuffer(_commands, &begin), "begin draw commands");
+        if (_timestamps.Handle != 0)
+        {
+            _vk.CmdResetQueryPool(_commands, _timestamps, 0, 2);
+            _vk.CmdWriteTimestamp(_commands, PipelineStageFlags.ColorAttachmentOutputBit, _timestamps, 0);
+        }
+
+        RenderColor mapped = AttachmentColor(background);
+        var clear = new ClearValue(new ClearColorValue(mapped.R, mapped.G, mapped.B, 1f));
+        var area = new Rect2D(new Offset2D(0, 0), _extent);
+        var pass = new RenderPassBeginInfo
+        {
+            SType = StructureType.RenderPassBeginInfo,
+            RenderPass = _renderPass,
+            Framebuffer = _framebuffers[image],
+            RenderArea = area,
+            ClearValueCount = 1,
+            PClearValues = &clear
+        };
+        _vk.CmdBeginRenderPass(_commands, &pass, SubpassContents.Inline);
+        if (vertexCount > 0)
+        {
+            var viewport = new Viewport(0, 0, _extent.Width, _extent.Height, 0, 1);
+            _vk.CmdSetViewport(_commands, 0, 1, &viewport);
+            _vk.CmdSetScissor(_commands, 0, 1, &area);
+            _vk.CmdBindPipeline(_commands, PipelineBindPoint.Graphics, _pipeline);
+            Buffer vertices = _vertices;
+            ulong offset = 0;
+            _vk.CmdBindVertexBuffers(_commands, 0, 1, &vertices, &offset);
+            _vk.CmdDraw(_commands, vertexCount, 1, 0, 0);
+        }
+        _vk.CmdEndRenderPass(_commands);
+        if (_timestamps.Handle != 0)
+            _vk.CmdWriteTimestamp(_commands, PipelineStageFlags.BottomOfPipeBit, _timestamps, 1);
+        Check(_vk.EndCommandBuffer(_commands), "finish draw commands");
+    }
+
+    private double? ReadGpuTime()
+    {
+        if (_timestamps.Handle == 0)
+            return null;
+
+        ulong* samples = stackalloc ulong[2];
+        Result result = _vk.GetQueryPoolResults(_device, _timestamps, 0, 2, 2 * sizeof(ulong), samples, sizeof(ulong), QueryResultFlags.Result64Bit);
+        if (result == Result.NotReady)
+            return null;
+        Check(result, "read GPU frame timestamps");
+
+        ulong ticks = unchecked(samples[1] - samples[0]);
+        if (_timestampBits < 64)
+            ticks &= (1UL << (int)_timestampBits) - 1;
+        return ticks * (double)_timestampPeriod / 1_000_000.0;
+    }
+
+    private uint UploadTriangles(IReadOnlyList<RenderTriangle> triangles)
+    {
+        int vertexCount = checked(triangles.Count * 3);
+        if (vertexCount > _vertexCapacity)
+            CreateVertexBuffer(Math.Max(vertexCount, 64));
+
+        int i = 0;
+        foreach (RenderTriangle triangle in triangles)
+        {
+            _mappedVertices[i++] = new GpuVertex(triangle.A, AttachmentColor(triangle.A.Color));
+            _mappedVertices[i++] = new GpuVertex(triangle.B, AttachmentColor(triangle.B.Color));
+            _mappedVertices[i++] = new GpuVertex(triangle.C, AttachmentColor(triangle.C.Color));
+        }
+        return (uint)vertexCount;
+    }
+
+    private void CreateVertexBuffer(int capacity)
+    {
+        // Present waits for the graphics fence before returning, so no commands reference the old buffer.
+        DestroyVertexBuffer();
+        var create = new BufferCreateInfo
+        {
+            SType = StructureType.BufferCreateInfo,
+            Size = (ulong)capacity * (uint)sizeof(GpuVertex),
+            Usage = BufferUsageFlags.VertexBufferBit,
+            SharingMode = SharingMode.Exclusive
+        };
+        Check(_vk.CreateBuffer(_device, &create, null, out _vertices), "create the vertex buffer");
+        _vk.GetBufferMemoryRequirements(_device, _vertices, out var requirements);
+        var allocate = new MemoryAllocateInfo
+        {
+            SType = StructureType.MemoryAllocateInfo,
+            AllocationSize = requirements.Size,
+            MemoryTypeIndex = FindVertexMemoryType(requirements.MemoryTypeBits)
+        };
+        Check(_vk.AllocateMemory(_device, &allocate, null, out _vertexMemory), "allocate vertex memory");
+        Check(_vk.BindBufferMemory(_device, _vertices, _vertexMemory, 0), "bind vertex memory");
+        void* mapped = null;
+        Check(_vk.MapMemory(_device, _vertexMemory, 0, allocate.AllocationSize, 0, &mapped), "map vertex memory");
+        _mappedVertices = (GpuVertex*)mapped;
+        _vertexCapacity = capacity;
+    }
+
+    private uint FindVertexMemoryType(uint compatibleTypes)
+    {
+        const MemoryPropertyFlags required = MemoryPropertyFlags.HostVisibleBit | MemoryPropertyFlags.HostCoherentBit;
+        _vk.GetPhysicalDeviceMemoryProperties(_adapter, out var memory);
+        for (int i = 0; i < memory.MemoryTypeCount; i++)
+        {
+            if ((compatibleTypes & (1u << i)) != 0 && memory.MemoryTypes[i].PropertyFlags.HasFlag(required))
+                return (uint)i;
+        }
+        throw new VulkanViewportException("Vulkan has no host-visible, coherent memory for the first viewport profile.");
+    }
+
+    private void DestroyVertexBuffer()
+    {
+        if (_mappedVertices != null)
+            _vk.UnmapMemory(_device, _vertexMemory);
+        if (_vertices.Handle != 0)
+            _vk.DestroyBuffer(_device, _vertices, null);
+        if (_vertexMemory.Handle != 0)
+            _vk.FreeMemory(_device, _vertexMemory, null);
+        _mappedVertices = null;
+        _vertices = default;
+        _vertexMemory = default;
+        _vertexCapacity = 0;
+    }
+
+    private RenderColor AttachmentColor(RenderColor color) => UsesSrgbAttachment
+        ? new RenderColor(ToLinear(color.R), ToLinear(color.G), ToLinear(color.B))
+        : color;
+
+    private static float ToLinear(float channel) => channel <= .04045f
+        ? channel / 12.92f
+        : MathF.Pow((channel + .055f) / 1.055f, 2.4f);
+}

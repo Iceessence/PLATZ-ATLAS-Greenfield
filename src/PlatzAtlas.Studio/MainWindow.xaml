@@ -1,0 +1,167 @@
+<Window x:Class="PlatzAtlas.Studio.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:PlatzAtlas.Studio"
+        Title="PLATZ ATLAS Studio" Width="1340" Height="820" MinWidth="770" MinHeight="555"
+        WindowStartupLocation="CenterScreen" Background="{StaticResource Page}"
+        Foreground="{StaticResource Text}" FontFamily="Segoe UI" FontSize="14"
+        UseLayoutRounding="True">
+  <Window.CommandBindings>
+    <CommandBinding Command="ApplicationCommands.New" Executed="NewExecuted"/>
+    <CommandBinding Command="ApplicationCommands.Open" Executed="OpenExecuted"/>
+    <CommandBinding Command="ApplicationCommands.Save" Executed="SaveExecuted"/>
+    <CommandBinding Command="ApplicationCommands.SaveAs" Executed="SaveAsExecuted"/>
+    <CommandBinding Command="ApplicationCommands.Undo" Executed="UndoExecuted" CanExecute="CanUndo"/>
+    <CommandBinding Command="ApplicationCommands.Redo" Executed="RedoExecuted" CanExecute="CanRedo"/>
+  </Window.CommandBindings>
+  <Window.InputBindings>
+    <KeyBinding Key="S" Modifiers="Control+Shift" Command="ApplicationCommands.SaveAs"/>
+    <KeyBinding Key="Z" Modifiers="Control+Shift" Command="ApplicationCommands.Redo"/>
+  </Window.InputBindings>
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="64"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1">
+      <DockPanel Margin="19,0">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,25,0">
+          <Border Width="32" Height="32" CornerRadius="7" Background="{StaticResource Accent}" Margin="0,0,10,0">
+            <Path Width="17" Height="17" Stretch="Uniform" Fill="#221B16"
+                  Data="M 8,0 L 16,8 L 8,16 L 0,8 Z M 8,4 L 4,8 L 8,12 L 12,8 Z"/>
+          </Border>
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="PLATZ ATLAS" FontWeight="Bold" FontSize="15"/>
+            <TextBlock Text="Studio" Foreground="{StaticResource Muted}" FontSize="12"/>
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <Button Content="_New museum" Command="ApplicationCommands.New" Margin="0,0,6,0" ToolTip="New museum (Ctrl+N)" />
+          <Button Content="_Open…" Command="ApplicationCommands.Open" Margin="0,0,6,0" ToolTip="Open a local project (Ctrl+O)"/>
+          <Button Content="_Save" Command="ApplicationCommands.Save" Margin="0,0,6,0" ToolTip="Save the project (Ctrl+S)"/>
+          <Button Content="Save _as…" Command="ApplicationCommands.SaveAs" ToolTip="Save a local copy (Ctrl+Shift+S)"/>
+          <Border Width="1" Margin="12,3" Background="{StaticResource Border}"/>
+          <Button Content="_Undo" Command="ApplicationCommands.Undo" Margin="0,0,6,0" ToolTip="Undo (Ctrl+Z)"/>
+          <Button Content="_Redo" Command="ApplicationCommands.Redo" ToolTip="Redo (Ctrl+Y)"/>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="174"/>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="228"/>
+      </Grid.ColumnDefinitions>
+
+      <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="0,0,1,0">
+        <DockPanel Margin="13,21,13,12">
+          <StackPanel DockPanel.Dock="Top" Margin="3,0,0,13">
+            <TextBlock Text="Scene" FontSize="18" FontWeight="SemiBold"/>
+            <TextBlock x:Name="ObjectCount" Style="{StaticResource Caption}" Margin="0,4,0,0"/>
+          </StackPanel>
+          <ListBox x:Name="Objects" SelectionChanged="SelectionChanged" Background="Transparent" BorderThickness="0"
+                   AutomationProperties.Name="Scene objects" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemContainerStyle>
+              <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}"/>
+              </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <StackPanel Orientation="Horizontal">
+                  <Path Width="12" Height="16" Margin="0,3,9,0" VerticalAlignment="Top"
+                        Stretch="Uniform" Stroke="{StaticResource Accent}" StrokeThickness="1.2"
+                        Data="M 2,4 L 10,4 L 11,13 L 1,13 Z M 4,4 L 4,1 L 8,1 L 8,4 M 6,7 L 6,10"/>
+                  <StackPanel>
+                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                    <TextBlock Text="{Binding Location}" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0"/>
+                  </StackPanel>
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </Border>
+
+      <Grid Grid.Column="1" Margin="19,18,19,17">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <StackPanel Margin="1,0,0,14">
+          <TextBlock x:Name="RoomTitle" FontSize="28" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+          <TextBlock x:Name="RevisionLabel" Foreground="{StaticResource Muted}" FontSize="13" Margin="0,3,0,0"/>
+        </StackPanel>
+        <Border Grid.Row="1" BorderBrush="{StaticResource Border}" BorderThickness="1"
+                Background="#101A20">
+          <local:RoomViewport x:Name="Viewport" AutomationProperties.Name="Museum room preview"/>
+        </Border>
+        <Grid Grid.Row="2" Margin="0,9,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="8"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <Border x:Name="WestCard" BorderBrush="{StaticResource Border}" BorderThickness="1"
+                  Background="{StaticResource Panel}" CornerRadius="5" Padding="10,8">
+            <StackPanel>
+              <TextBlock x:Name="WestLabel" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+              <TextBlock x:Name="WestState" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0"/>
+            </StackPanel>
+          </Border>
+          <Border x:Name="EastCard" Grid.Column="2" BorderBrush="{StaticResource Border}" BorderThickness="1"
+                  Background="{StaticResource Panel}" CornerRadius="5" Padding="10,8">
+            <StackPanel>
+              <TextBlock x:Name="EastLabel" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+              <TextBlock x:Name="EastState" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0"/>
+            </StackPanel>
+          </Border>
+        </Grid>
+      </Grid>
+
+      <Border Grid.Column="2" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1,0,0,0">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="15,21,15,14">
+            <TextBlock Text="Inspector" FontWeight="SemiBold" FontSize="18"/>
+            <TextBlock x:Name="SelectedName" FontSize="25" FontWeight="SemiBold" Margin="0,18,0,0" TextWrapping="Wrap"/>
+            <TextBlock x:Name="SelectedLocation" Foreground="{StaticResource Muted}" Margin="0,3,0,0" TextWrapping="Wrap"/>
+            <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource Border}"
+                    BorderThickness="1" CornerRadius="6" Margin="0,20,0,0" Padding="11">
+              <StackPanel>
+                <TextBlock x:Name="SwitchHeading" FontWeight="SemiBold"/>
+                <TextBlock x:Name="SwitchTarget" Foreground="{StaticResource Muted}" FontSize="12"
+                           Margin="0,4,0,0" TextWrapping="Wrap"/>
+                <Button x:Name="ToggleLight" Click="ToggleLightClicked" Margin="0,12,0,0"
+                        Style="{StaticResource PrimaryButton}">
+                  <TextBlock x:Name="ToggleLabel" Foreground="#221B16"/>
+                </Button>
+              </StackPanel>
+            </Border>
+            <TextBlock Text="Object ID" Style="{StaticResource Caption}" Margin="0,22,0,4"/>
+            <TextBlock x:Name="ObjectId" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>
+            <TextBlock Text="Project ID" Style="{StaticResource Caption}" Margin="0,15,0,4"/>
+            <TextBlock x:Name="ProjectId" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+
+    <Border Grid.Row="2" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}"
+            BorderThickness="0,1,0,0" Padding="18,8">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <TextBlock x:Name="StatusText" VerticalAlignment="Center" Foreground="{StaticResource Muted}"
+                   FontSize="12" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+        <TextBlock x:Name="BackendText" Grid.Column="1" Margin="12,0,0,0" MaxWidth="250"
+                   Style="{StaticResource Caption}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

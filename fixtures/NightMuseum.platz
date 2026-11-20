@@ -1,0 +1,49 @@
+{
+  "sha256": "2cf59f6a4ea4a22d460a8554b0ca6518cac5fd42aeae3c40ca8d3d207b8564b3",
+  "project": {
+    "schemaVersion": 1,
+    "projectId": "9e67d909-655c-489f-87c1-0dbbfe50d4b1",
+    "sceneId": "a4a7368b-0dc9-4fc8-ad0f-94da9dc4a051",
+    "name": "Night Museum",
+    "revision": 1,
+    "units": "room-fraction",
+    "origin": "top-left, x-right, y-down",
+    "objects": [
+      {
+        "id": "43c4bcd1-42ea-4c62-af26-17bd1cec0101",
+        "name": "Lantern",
+        "location": "West Gallery",
+        "x": 0.27,
+        "y": 0.57,
+        "isOn": false,
+        "assetId": "a8909ebb-e39a-44dc-9acd-10d7d10700a0"
+      },
+      {
+        "id": "43c4bcd1-42ea-4c62-af26-17bd1cec0102",
+        "name": "Lantern",
+        "location": "East Gallery",
+        "x": 0.73,
+        "y": 0.57,
+        "isOn": true,
+        "assetId": "a8909ebb-e39a-44dc-9acd-10d7d10700a0"
+      }
+    ],
+    "switches": [
+      {
+        "id": "43c4bcd1-42ea-4c62-af26-17bd1cec0151",
+        "name": "West Switch",
+        "targetId": "43c4bcd1-42ea-4c62-af26-17bd1cec0101"
+      }
+    ],
+    "assets": [
+      {
+        "id": "a8909ebb-e39a-44dc-9acd-10d7d10700a0",
+        "name": "Lantern silhouette",
+        "mediaType": "image/x-portable-bitmap",
+        "contentBase64": "UDEKOSAxMQowMDAxMTEwMDAKMDAxMDAwMTAwCjAxMTExMTExMAowMTAwMDAwMTAKMDEwMDAwMDEwCjAxMDAxMDAxMAowMTAwMTAwMTAKMDEwMDAwMDEwCjAxMDAwMDAxMAowMTExMTExMTAKMDAxMTExMTAwCg==",
+        "sha256": "668f02752905707c9aa82d572b6993392bd1d3604e8e795ec0d27b02b6a391a9"
+      }
+    ],
+    "history": []
+  }
+}

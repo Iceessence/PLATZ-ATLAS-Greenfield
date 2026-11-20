@@ -1,0 +1,56 @@
+# PLATZ ATLAS Studio
+
+GF-001 is a local Windows editor for the Night Museum scene. The two lanterns share a display name. Studio identifies each by its gallery and stable object ID.
+
+## Build and launch
+
+Use an ordinary Windows 11 x64 account with PowerShell, Git for working with the source, and .NET SDK **10.0.401**. The SDK includes the .NET Desktop Runtime used by Studio. For a fresh machine, extract the portable SDK into a writable tools directory, put that directory at the front of the current shell's `PATH`, and set `DOTNET_ROOT_X64` to the same folder so the built executable can find its runtime. Microsoft's download page supplies the ZIP and its SHA-512 checksum. [Windows x64 SDK 10.0.401](https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/sdk-10.0.401-windows-x64-binaries-zip), [.NET app host environment variables](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-environment-variables#dotnet_root-dotnet_rootx86-dotnet_root_x86-dotnet_root_x64)
+
+Run these commands from the project root in PowerShell.
+
+```powershell
+dotnet --version
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\Build.ps1 -Test
+& '.\artifacts\bin\PlatzAtlas.Studio\release\PlatzAtlas.Studio.exe'
+```
+
+`Build.ps1` defaults to Release. Add `-Run` to launch after the build. Add `-Run -Cpu` to force the CPU Reference viewport, or `-Run -Project 'C:\path\NightMuseum.platz'` to open a particular file. The Studio executable also accepts `--cpu` and `--project 'C:\path\NightMuseum.platz'`. It can be launched by absolute path from another working directory.
+
+The first restore uses public NuGet packages and checks the versions and content hashes recorded in the lockfiles. Reuse that cache with `-Offline`. To prepare a transferable cache, set `$env:NUGET_PACKAGES` to an empty writable directory outside the checkout and run the build once with access to NuGet.org. Copy that directory to the offline machine, point `$env:NUGET_PACKAGES` at the copy, and run the build command with `-Offline -Test`. Offline restore uses only the specified cache and omits the online NuGet advisory lookup. The executable opens local project files without a package restore. [NuGet package cache](https://learn.microsoft.com/en-us/nuget/consume-packages/managing-the-global-packages-and-cache-folders), [Locked restore and NuGet Audit](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-restore)
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\Build.ps1 -Offline -Test
+```
+
+Vulkan presentation uses the machine's Vulkan loader and compatible display driver. Studio reports the active renderer and can show the scene with CPU Reference when Vulkan is unavailable. The source build uses checked-in SPIR-V, so the editor build needs no Vulkan SDK.
+
+## Try the museum
+
+1. Choose **New museum** or open [fixtures/NightMuseum.platz](fixtures/NightMuseum.platz). Both start an editable museum with a new project ID and the same starting layout. **West Gallery** starts off and **East Gallery** starts on.
+2. Choose **Save as…** and write a working copy to a folder outside the source checkout. Keep the original fixture for repeatable tests.
+3. Select **Lantern** in **West Gallery** using the scene list or the viewport. The inspector shows **West Switch**, its target, and the selected object's ID. Choose **Turn light on**. Both the west lantern's preview and state label change. East stays on.
+4. Choose **Undo**, then **Redo**, or use **Ctrl+Z** and **Ctrl+Y**. Watch the west light and the current revision. The original revision remains visible beside it.
+5. Save with **Ctrl+S**, close Studio, then launch it again and open your working copy. The west light should be on, the east light should still be on, and the saved revision and object IDs should match.
+6. After replacing a saved revision, use the **Recover previous** file filter in **Open…** to open the adjacent `.platz.previous` backup. Save the recovered scene to a new file.
+
+[WORKING.md](WORKING.md) records which paths were exercised, the evidence and the next milestone.
+
+For local verification, launch Studio with `--diagnostics 'C:\path\studio.ndjson'` to record startup, open, save and render events. Choose a new filename in an existing directory. Add `--measure-frames` to warm the stationary viewport for 10 frames and log 120 measured redraws. Add `--simulate-device-loss` in a separate run to exercise CPU fallback after the first Vulkan presentation.
+
+## Dependencies and provenance
+
+| Dependency | Version and license |
+| --- | --- |
+| Microsoft .NET SDK and Desktop Runtime | SDK 10.0.401 pinned in [global.json](global.json). The tested desktop runtime is 10.0.12. Microsoft SDK and runtime distributions include their own license and third-party notices. WPF and the .NET runtime source use MIT. [WPF license](https://github.com/dotnet/wpf/blob/main/LICENSE.TXT), [.NET runtime license](https://github.com/dotnet/runtime/blob/main/LICENSE.TXT) |
+| Silk.NET Vulkan bindings | `Silk.NET.Vulkan`, `Silk.NET.Vulkan.Extensions.KHR` and transitive `Silk.NET.Core` 2.23.0, MIT. Package metadata identifies source commit `94605142f7b7bd6e69c9201e8e721d245c69eb7e`. [Silk.NET license](https://github.com/dotnet/Silk.NET/blob/main/LICENSE.md) |
+| Microsoft NuGet transitive dependencies | `Microsoft.DotNet.PlatformAbstractions` 3.1.6 and `Microsoft.Extensions.DependencyModel` 9.0.9, MIT. The packages include license and third-party notice files. Exact application package digests are in the [renderer lockfile](src/PlatzAtlas.Rendering/packages.lock.json). |
+| Optional shader rebuild | `Silk.NET.Shaderc` 2.23.0, MIT, and `Silk.NET.Shaderc.Native` 2.23.0, Apache-2.0. [Shader build lockfile](tools/ShaderBuild/packages.lock.json), [shaderc license](https://github.com/google/shaderc/blob/main/LICENSE) |
+
+If you change the GLSL source, restore the locked shader tool packages and regenerate the embedded SPIR-V.
+
+```powershell
+dotnet restore tools/ShaderBuild --locked-mode
+dotnet run --no-restore --project tools/ShaderBuild -- src/PlatzAtlas.Rendering/Shaders
+```
+
+The museum fixture and room artwork were created for this project. The product specification is preserved byte-for-byte in [docs](docs/Ultimate_PLATZ_ATLAS_MASTER_Version_1.docx).
