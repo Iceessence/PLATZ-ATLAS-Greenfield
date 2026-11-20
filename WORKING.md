@@ -2,15 +2,27 @@
 
 ## Current assignment
 
-The owner assigned GF-012 through GF-016 after Gemini Neon's audit. The latest independently accepted baseline is **NONE**. The prior Night Museum checkpoint is **REPAIRS_REQUIRED** in the audit. This session repaired the four audit findings and verified the fixes on the reference host. The repair and feature commits still need independent review.
+The owner assigned Step 0 and GF-017 through GF-021 after Gemini Neon's audit. The independently accepted baseline is **`da4cfb1` (`gf-013`)**. The implementation candidate is **`29e9fbf` (`gf-021`)** and awaits review. The specification digest is `ee95a50f205f85a3867488d7fc4a5e066b694b291f5657764eda8b35a2b32ebc`.
 
-- **GF-012 · PENDING_INDEPENDENT_REVIEW** at `6f838d2` (`gf-012`). Blank projects, stable scene objects, two editable object types, direct dragging, numeric transforms, persistent undo/redo, save/recovery and standalone scene readback.
-- **GF-013 · PENDING_INDEPENDENT_REVIEW** at `da4cfb1` (`gf-013`). PNG import, asset browser, textured placements on Vulkan, OpenGL and CPU Reference, embedded asset validation and standalone readback.
-- **GF-014 · PENDING_INDEPENDENT_REVIEW** at `97de488` (`gf-014`). Placeable switches and doors, editable stable links, proximity, collision, isolated Play and standalone room export.
-- **GF-015 · PENDING_INDEPENDENT_REVIEW** at `57b887a` (`gf-015`). Version 2 project evidence, inspection of arbitrary saved objects, source navigation, typed previews and checked, reversible approved saves.
-- **GF-016 · PENDING_INDEPENDENT_REVIEW** at local tag `gf-016`. Studio starts in an empty room. The original locally trained router and reproducible benchmark are delivered. Learned routing **FAILED_QUALIFICATION** and Studio retains deterministic behavior. The canonical [agent handoff](docs/ai/ATLAS_HANDOFF.md) tracks the review scope and next steps.
+- **Step 0** at `1f751b0`, `78d15f8`, and `e77ef40`. Save As dismisses the old ATLAS review, an incomplete rename is rejected before evidence is opened, and OpenGL's translucent pixel matches Vulkan's RGBA.
+- **GF-017** at `76360f4`. Draw, erase, eyedrop, fill, undo/redo, clone, and export PNG in the Pixel Editor. Place the new artwork and export it embedded in the room.
+- **GF-018** at `37fe49c`. Author a spawn, keys and a win condition, link a switch to two targets, and play the same room in Studio and Player. Projects open in schemas 1–5. Player opens room packages v1–v3.
+- **GF-019** at `9e8ee31`. Drag viewport transform handles, snap, duplicate, change paint order, and save room names and floor colors with durable history.
+- **GF-020** at `a596fa8`. Diagnose room health and review scoped wire, unlink, resize, rotate, add, and duplicate operations. Confirmed changes leave stable receipts and can be undone after reopening.
+- **GF-021** at `29e9fbf`. The offline specialist resolved 110/110 held-out supported object IDs. Calibrated routing abstained on all requests, yielding 0/110 supported and 0/108 unsafe accepts. Both original model experiments remain outside Studio and Player. The [canonical handoff](docs/ai/ATLAS_HANDOFF.md) contains the review assignment and [the specialist instructions](tools/AtlasSpecialist/README.md) reproduce the failure.
 
 ### Reference-host receipt
+
+Run `Build.ps1 -Offline -Test -Bundle` from the checkout. All 27 groups passed. Evidence lives in `C:\PLATZ ATLAS\.platz-atlas-verification\gf-017-021`. Open `lumen-dash-atlas.platz` in Studio or launch its matching export from PowerShell.
+
+```powershell
+$demo = 'C:\PLATZ ATLAS\.platz-atlas-verification\gf-017-021'
+& "$demo\player-gf021\PlatzAtlas.Player.exe" --room "$demo\lumen-dash-atlas.platzroom"
+```
+
+Press **Up** six times, **E**, and **Up** up to twelve more times to reach **Goal complete · Launch bay**. **Restart room** restores the key, shutter and signal. In Studio, allow ATLAS to inspect the saved scene and try `Inspect Launch bay` or **Check scene health**. See [the authoring walkthrough](README.md#create-and-play-an-original-room) and the canonical handoff for exact logs and known limits.
+
+### Historical GF-012 through GF-016 author receipt
 
 - Run `Build.ps1 -Offline -Test -Bundle` from the checkout. The final build passed 23 test groups. Evidence, fixtures and probes are in `C:\PLATZ ATLAS\.platz-atlas-verification\gf-012-016`.
 - The extracted Release bundle is in `player-final`. All 24 manifest entries matched. Two builds produced SHA-256 `3dfca061bad256a0f36bffd1a6a917a789a255387396865c8b55d368c3827a60`. The publication path keeps identical archives in place and retries transient Windows sharing errors on replacement.
@@ -36,7 +48,7 @@ For this small scene, measure input handling through scheduling the next frame o
 - Last independently accepted revision: **NONE**.
 - Candidate: **GF-007–GF-011 · PENDING_INDEPENDENT_REVIEW**. Author-tested export, standalone play, walk-to-use, editable switch behavior and Windows distribution.
 - Last verified result: Studio saved and reopened **Turn on** in schema 3 after Undo and Redo. Player used the same west switch twice in two exports. Toggle at r5 went off → on → off. Turn on at r8 went off → on → on. East stayed on in both. The extracted Windows player presented the saved room on Vulkan with Studio closed. Two builds produced an identical ZIP on this host.
-- Next action for the current batch is independent reproduction, including a second Windows machine, DPI and screen reader checks, and review of the router experiment with untouched evaluation data. No milestone has been promoted.
+- This batch's historical next action was independent reproduction, including a second Windows machine, DPI and screen reader checks, and review of the router experiment with untouched evaluation data.
 
 ## Product objective
 
@@ -57,6 +69,8 @@ GF-006 rechecked the master checksum, **A first hour with the intended applicati
 GF-007–GF-011 rechecked the checksum and read **A first hour with the intended application**, **U3 Author and play a complete room**, **Make exports reproducible and explainable**, and the **Phase 05 Detail** gate for editable behavior.
 
 GF-012–GF-016 rechecked the master checksum and read the first-hour walkthrough, U3, the Phase 02–07 gates, **The project identity that survives the trip**, **The smallest exchange protocol**, and **From a suggestion to a reversible edit**. The owner-supplied batch assignment sets the delivery scope.
+
+GF-017–GF-021 rechecked the master checksum, the first-hour walkthrough, U3, U5, U6, and the applicable Phase 02 and Phase 04–08 sections. The implemented 2D workflows cover authoring, reversible edits, Play isolation, and package readback. The master still defines the broader creative application and locally owned specialist intelligence.
 
 ## How to reproduce
 

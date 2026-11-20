@@ -1,6 +1,6 @@
 # PLATZ ATLAS Studio
 
-PLATZ ATLAS Studio is a local Windows room editor. Create an original room from blank, configure a switch and door, and export the saved revision to PLATZ Player. The Night Museum template also includes the initial ATLAS workflow for saved evidence and owner-approved light changes.
+PLATZ ATLAS Studio is a local Windows room editor. Draw sprite artwork, give a room an objective, play it in Studio, and export the saved revision to PLATZ Player. Ask ATLAS to inspect the saved room or preview an edit before approving it.
 
 ## Build and launch
 
@@ -26,14 +26,29 @@ Vulkan presentation uses the machine's Vulkan loader and compatible display driv
 
 ## Create and play an original room
 
-1. Studio opens with a blank room. Choose **Blank project** any time to start another. Use **+ Wall**, **+ Lamp**, **+ Door**, or **+ Switch**. Select objects in the Scene list or on the canvas. Drag to move. The Inspector accepts exact room fractions for X, Y, width and height, and degrees for rotation. Click **Apply transform** after typing values. Rename, delete, undo and redo work on stable object IDs.
-2. To build the Observatory Gate layout, set a door to **X 0.50**, **Y 0.60**, **width 0.20**, **height 0.09**, **rotation 0**. Leave it initially closed. Set a switch at **X 0.54**, **Y 0.73**. In the switch Inspector, choose the door as **Switch target**, leave **Toggle** selected, and choose **Apply switch link**. Add other walls or lamps around the room, leaving the approach from the bottom clear.
-3. **Save**, then choose **Play**. From spawn, press **Up** six times. The closed door blocks the sixth step. Press **E** when the switch is in range and press **Up** five more times to go through. **Stop** restores the saved state. You can also use the visible movement and interaction controls.
-4. Choose **Export room…** and open the package in Player. The package contains the source revision, object transforms, and links. The door starts closed and can be opened again without Studio.
+1. Start with **Blank project**. In **Assets**, choose **Draw sprite…**, paint a symbol, and choose **Add to assets**. Select it and choose **Place selected image**. On the canvas, drag the object to move, the square handle to resize, and the diamond handle to rotate. **Snap to grid** uses 0.05 room units and 15-degree angles. **Ctrl+D** duplicates the placement. The Inspector has **Bring forward**, **Send backward**, and **Room appearance**. Try the name **Lumen Dash** and floor color **1C303C**.
+2. To reproduce the Lumen Dash game, add and rename the objects below. Enter the fractions in the Inspector and choose **Apply transform**. Keep the artwork off the center path.
 
-New scenes use project schema 4. Studio continues to open and edit the original museum projects in schemas 1–3, including their receipts and history. Back up a prior saved revision through **Open… → Recover previous**.
+   | Type and name | X | Y | Width | Height | Rotation |
+   | --- | ---: | ---: | ---: | ---: | ---: |
+   | Spawn · Dock entrance | 0.50 | 0.90 | 0.065 | 0.105 | 0° |
+   | Wall · West bulkhead | 0.20 | 0.60 | 0.36 | 0.09 | 0° |
+   | Wall · East bulkhead | 0.80 | 0.60 | 0.36 | 0.09 | 0° |
+   | Door · Relay shutter | 0.50 | 0.60 | 0.21 | 0.09 | 0° |
+   | Lamp · Power signal | 0.22 | 0.24 | 0.09 | 0.15 | 0° |
+   | Key · Copper key | 0.50 | 0.78 | 0.056 | 0.096 | 0° |
+   | Goal · Launch bay | 0.50 | 0.24 | 0.17 | 0.15 | 0° |
+   | Switch · Relay console | 0.50 | 0.70 | 0.045 | 0.077 | 45° |
 
-## Import and place PNG artwork
+3. Start **Relay shutter** closed and **Power signal** off. Set **Relay console** to target **Relay shutter** and **Power signal**, choose **Turn on / Open**, and select **Apply switch link**. Set **Launch bay** to require **1** key and choose **Apply goal rule**.
+4. **Save**, then choose **Play**. Press **Up** six times to pick up the key and stop at the shutter. Press **E** to open the shutter and light the signal. Press **Up** up to twelve more times to reach **Goal complete · Launch bay**. **Stop** returns to the editor with the saved state.
+5. Choose **Export room…** and open the package in Player. Repeat the same steps. **Restart room** puts the key back, closes the shutter, and turns the signal off.
+
+Studio supports project schemas 1–5. A blank room starts in schema 4 and uses schema 5 when you add the new mechanics or styling features. Player reads room packages v1–v3. **Open… → Recover previous** can reopen the adjacent backup.
+
+## Draw, edit, and place PNG artwork
+
+**Assets → Draw sprite…** starts a transparent 16 × 16 or 32 × 32 image. Use **Paint**, **Erase**, **Eyedropper**, and **Fill** with a palette swatch or an eight-digit `RRGGBBAA` color. A continuous stroke takes one Undo. **Edit image copy…** starts a new editable square from a selected catalog image. A larger source is resampled into the canvas. **Add to assets** adds a new project asset, and **Export PNG…** writes a transparent PNG file. Once you place the asset, the room export embeds it for Player.
 
 Open **Assets** and choose **Import PNG…**. Select a PNG up to 256 × 256 pixels and 2 MiB. The browser lists each imported image with its dimensions. Select one and choose **Place selected image**. Place the same art again for a second instance. Each instance has its own stable ID, position, size and rotation. Studio stores the decoded RGBA pixels in the project and includes referenced images in the room export. The project supports up to 262,144 imported pixels, including imports retained in history.
 
@@ -43,9 +58,10 @@ Transparent pixels blend with the scene in Vulkan, OpenGL and CPU Reference. The
 
 1. **Save**. Select any object in the Scene list and open **ATLAS → Allow scene read**. Try **Inspect selection**, **Where is Bench light?**, or **What does Badge reader control?** with matching names in your room. Use the full object ID if multiple objects share a name.
 2. **Show object** and **Show linked target** navigate to the objects cited by the answer. **Saved source details** shows the project, scene, revision, stable object ID, exact transform and evidence digest.
-3. Try **Move Bench light to 0.62, 0.33**, **Rename Bench light to Desk lamp**, **Set Bench light off**, or **Set Observatory gate open**. Choose **Preview change** and inspect the named file and change. Choose **Confirm and save** within one minute or **Cancel preview**. The commit records the stable object and operation IDs. Undo and Redo work after reopen.
+3. Choose **Check scene health** to find unlinked switches, duplicate names, a blocked spawn, or goals that need more keys than the room has.
+4. Try **Wire Relay console to Power signal**, **Unlink Relay console**, **Resize Relay shutter to 0.22, 0.09**, **Rotate Relay console to 30**, or **Add Lamp named Service beacon at 0.82, 0.18**. **Duplicate Service beacon** makes a distinct object. Choose **Preview change** and inspect the named file and change. Choose **Confirm and save** within one minute or **Cancel preview**. The commit records the stable object and operation IDs. Undo and Redo work after reopen.
 
-The Studio lookup is deterministic and reads only the granted saved revision. The locally trained router failed its qualification gate and remains an offline experiment. [Dataset, model and evaluation](tools/AtlasSpecialist/README.md)
+Studio uses deterministic reads scoped to the granted saved revision. The original router and the grounded two-stage candidate both failed their qualification gates and are available for offline reproduction. [Datasets and evaluation](tools/AtlasSpecialist/README.md)
 
 ## Try the museum
 
