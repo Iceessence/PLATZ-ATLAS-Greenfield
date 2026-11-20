@@ -1,5 +1,41 @@
 # PLATZ ATLAS Greenfield — Independent Audit & Persistent Agent Handoff
 
+## GPT implementation handoff · owner-directed GF-022 through GF-026
+
+The owner assigned GPT the sole implementation role for this batch at `c019f3d` and reprioritized GF-022–GF-026. The last independently accepted linear baseline remains **`e77ef40`**. The independent GF-017 repair gate and the individual GF-018–GF-020 verdicts below still govern acceptance. The original-model experiments remain quarantined. The candidate for review is **`bf42c09c178e0d14a693bdca99a0977447521c21`**. The [owner report](ATLAS_OWNER_REPORT.md) records walkthroughs, builds and limitations.
+
+| Work | Exact commit | Author result |
+| --- | --- | --- |
+| GF-017 Step 0 | `c1a41d614fb142087ee3d163ba09ea893fa0a2b3` | Fixed capture ownership and interrupted Undo, Redo, Resize, and Space. Invalid hex stays visible. A shown WPF window exercises capture, routed editor controls and bitmap readback. |
+| GF-022 | `21c0a7982d51a3492a3994c2cfd878c9a41a4149` | Working revisions, unsaved scoped ATLAS approval, invalidation on edit, isolated Play and Restart, explicit first Save, and a saved-head export guard. |
+| GF-023 | `bc981bc735a4ff5c353eda18d949aab11ec62c34`, `bf42c09c178e0d14a693bdca99a0977447521c21` | Resizable outliner/viewport/Inspector and ATLAS workspace, Examples, settings, reusable preset files and variant lineage, readable IDs and world zoom. Generic descriptors, docking and persisted layout preferences remain open. |
+| GF-024 partial | `0b277147329412f0e964a03e690db53ccbb3ef59` | 16–256 square canvases, animation with frame editing and timing, sprite sheet with metadata, and animation in Studio and standalone Player. Advanced drawing and animation tooling, nonrectangular scene geometry, pressure plates, and held-key locomotion remain open. |
+| GF-025 pending | — | 3D scene representation, native rendering, picking, manipulation, and 3D Play remain open. No separate legacy PLATZ Engine checkout was identified in the assigned workspace. |
+| GF-026 partial | `731b949798f92d13894271a46e11abad91fe8161` | A deterministic keyed-gate request produces a detached, versioned plan, scoped approval, a playable room, exact grouped receipt and one Undo/Redo. The developer workspace and original-model training are pending. |
+
+### Preserved backlog from Neon's original assignment
+
+The owner directive replaced the active milestone scopes below. Their independent definitions are preserved in the preceding audit history at `c019f3d`, Section 7.
+
+- Neon GF-022 proposed multi-room projects, portals, arrival spawns, persistent progression and portable multi-room packages. This remains open.
+- Neon GF-023 proposed real-time held input, wall slide, pressure plates, hazards, checkpoints and a richer HUD. This remains open.
+- Neon GF-024 proposed animation, asset management and tiled or ambient backdrops. Frame animation has author verification this batch. Remaining items stay open.
+- Neon GF-025 proposed cross-room connectivity diagnostics and scoped multistep plans. This batch implements one single-room plan on an empty working scene. Cross-room diagnostics and general composition remain open.
+- Neon GF-026 proposed clause-aware native safety training and fresh evaluator-held families. This remains open with the original gates intact.
+
+The master remains authoritative for professional 2D and 3D, voxel and 2.5D tools, portals, event-condition-action logic, physics, prefabs, multiformat creation, authorized development sessions, the three genuine Master roles and local original intelligence.
+
+### Verification evidence
+
+Use `C:\PLATZ ATLAS\.platz-atlas-verification\gf-022-026`. `source-bf42c09` is the exact source archive export used for the clean offline build. `clean-build.txt` records 31 test groups. `clean-gui.txt` records all five WPF GUI scenarios with screenshots and project artifacts in `clean-ui`. `clean-rendering.txt` records the Vulkan/OpenGL native probe. `clean-bundle.txt` records 24 verified manifest entries. `compatibility.json` records v1–v3 acceptance and tamper rejection. `birch-player.ndjson` records the standalone win/reset, and `animated-player.ndjson` records Vulkan gameplay during playback of the animated asset. The owner report records the read-only ATLAS Next findings and the frozen launch commands.
+
+### Next independent review
+
+1. Freeze `bf42c09` and recheck the Step 0 crash paths, including Ctrl+Z and Space with a held pointer, capture loss, invalid hex and continued paint. Run the Windows GUI suite and the clean offline build. Only the independent reviewer records acceptance.
+2. Build a fresh unsaved room with different names and inspect it without a path. Check stale preview retirement after a manual edit and Save As. Confirm memory-only ATLAS application on a project already saved on disk. Exercise F5, Restart, and Stop. Verify a saved export still rejects an unsaved or externally replaced head.
+3. Try presets and derived variants, select by readable ID after duplicate/delete/Undo/reopen, compare v1–v3 compatibility, and repeat pointer-centered zoom, pan and snap on all declared 2D backends. Try the small and high-DPI layout. Verify animation frame bounds, clone, timeline order and exported sheet bytes. Play the frozen animation package outside Studio.
+4. Use a fresh lane and name for a keyed gate. Verify the explanation and preview, stale and revoked approvals, mixed requests, malformed grouped history, and one grouped Undo/Redo after reopen. Retain the restricted execution boundary for any developer workspace. Evaluate future models with protected independent tasks and report task completion, wrong changes and prior controls. No new native advantage was established this batch.
+
 ## Authoritative Independent Audit — Step 0 Repairs (`e77ef40`) & GF-017 through GF-021 (`3435833`)
 
 > **Audit role notice:** This audit section was authored independently by Gemini Neon against the frozen repository through `3435833bf5f1c282f5bd25e9e74e121b1b4bd708` (`main`, tag `gf-021` at `29e9fbf`). Product source code, tests, lockfiles, and `WORKING.md` were not modified during this audit, and nothing was pushed to `origin`.

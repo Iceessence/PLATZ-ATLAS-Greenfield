@@ -1,6 +1,6 @@
 # PLATZ ATLAS Studio
 
-PLATZ ATLAS Studio is a local Windows room editor. Draw sprite artwork, give a room an objective, play it in Studio, and export the saved revision to PLATZ Player. Ask ATLAS to inspect the saved room or preview an edit before approving it.
+PLATZ ATLAS Studio is a local Windows room editor. Draw and animate sprite artwork, build a room from reusable presets, play your unsaved work, and export a saved revision to PLATZ Player. The ATLAS workspace can inspect the current room, preview an edit, or lay out a complete keyed gate for approval.
 
 ## Build and launch
 
@@ -22,12 +22,19 @@ The first restore uses public NuGet packages and checks the versions and content
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\Build.ps1 -Offline -Test
 ```
 
-Vulkan presentation uses the machine's Vulkan loader and compatible display driver, with OpenGL 3.3 Core compatibility and CPU Reference fallbacks. The Inspector includes a **Renderer** selector (**Auto**, **Vulkan**, **OpenGL**, **CPU**) and Studio reports the active backend in the status bar. The source build uses checked-in SPIR-V, so the editor build needs no Vulkan SDK. Set `PLATZ_ATLAS_VK_VALIDATION=1` in the environment to enable `VK_LAYER_KHRONOS_validation` diagnostics when the Khronos validation layer is available on the host.
+Vulkan presentation uses the machine's Vulkan loader and compatible display driver, with OpenGL 3.3 Core compatibility and CPU Reference fallbacks. Choose **Settings → Graphics settings** to select a renderer. Studio reports the active renderer in the status bar. The source build uses checked-in SPIR-V and needs no Vulkan SDK. Set `PLATZ_ATLAS_VK_VALIDATION=1` to enable Khronos diagnostics when the validation layer is available.
+
+## Build a playable room with ATLAS
+
+1. Open Studio to a blank room. In the ATLAS panel, choose **Allow scene read** and ask `Build a keyed gate named Birch on the left`.
+2. Choose **Preview change**. The canvas shows the detached plan. Expand **Working source details** for the eight changes. Choose **Apply to room** within one minute.
+3. Press **F5**. Press **Up** six times to pick up the key and reach the door. Press **E** to open it, then **Up** up to twelve more times to reach **Goal complete · Birch exit**. **Restart** resets the playtest. Press **F5** again to return to the room you were editing.
+4. **Undo** removes the whole plan in one step. **Redo** restores it. Use **Save** when you want a project file, then **Export room…** to play it in the standalone Player.
 
 ## Create and play an original room
 
-1. Start with **Blank project**. In **Assets**, choose **Draw sprite…**, paint a symbol, and choose **Add to assets**. Select it and choose **Place selected image**. On the canvas, drag the object to move, the square handle to resize, and the diamond handle to rotate. **Snap to grid** uses 0.05 room units and 15-degree angles. **Ctrl+D** duplicates the placement. The Inspector has **Bring forward**, **Send backward**, and **Room appearance**. Try the name **Lumen Dash** and floor color **1C303C**.
-2. To reproduce the Lumen Dash game, add and rename the objects below. Enter the fractions in the Inspector and choose **Apply transform**. Keep the artwork off the center path.
+1. Start with **Blank project**. In **Assets**, choose **Draw sprite…**, paint a symbol, and choose **Add to assets**. Select it and choose **Place selected image**. Mouse wheel zooms under the pointer, middle drag pans, and **Fit** returns to the full room. The square handle resizes and the diamond rotates. **Settings** contains room appearance and grid spacing, while **Snap** and **Frame selected** are above the viewport. **Ctrl+D** duplicates the placement.
+2. To reproduce Lumen Dash, use **Browse presets…** in the outliner and search for Bulkhead, Shutter, Signal lamp, Relay switch, Player start, Collectible key, and Exit pad. Configure names and sizes before placement, or enter the values below in the Inspector and choose **Apply transform**. Keep artwork off the center path. Use **Settings → Room settings** to set the room title and floor color.
 
    | Type and name | X | Y | Width | Height | Rotation |
    | --- | ---: | ---: | ---: | ---: | ---: |
@@ -41,14 +48,18 @@ Vulkan presentation uses the machine's Vulkan loader and compatible display driv
    | Switch · Relay console | 0.50 | 0.70 | 0.045 | 0.077 | 45° |
 
 3. Start **Relay shutter** closed and **Power signal** off. Set **Relay console** to target **Relay shutter** and **Power signal**, choose **Turn on / Open**, and select **Apply switch link**. Set **Launch bay** to require **1** key and choose **Apply goal rule**.
-4. **Save**, then choose **Play**. Press **Up** six times to pick up the key and stop at the shutter. Press **E** to open the shutter and light the signal. Press **Up** up to twelve more times to reach **Goal complete · Launch bay**. **Stop** returns to the editor with the saved state.
-5. Choose **Export room…** and open the package in Player. Repeat the same steps. **Restart room** puts the key back, closes the shutter, and turns the signal off.
+4. Press **F5**. Press **Up** six times to pick up the key and stop at the shutter. Press **E** to open the shutter and light the signal. Press **Up** up to twelve more times to reach **Goal complete · Launch bay**. **Stop** or **F5** returns to your working room.
+5. **Save**, then choose **Export room…** and open the package in Player. **Restart room** puts the key back, closes the shutter, and turns the signal off.
+
+**Save as preset…** in the Inspector creates a reusable `.platzpreset` from a supported object. Reopen it in the preset browser in any room. **Save variant…** carries the parent preset identity. Room-specific switch targets are configured after placement.
 
 Studio supports project schemas 1–5. A blank room starts in schema 4 and uses schema 5 when you add the new mechanics or styling features. Player reads room packages v1–v3. **Open… → Recover previous** can reopen the adjacent backup.
 
 ## Draw, edit, and place PNG artwork
 
-**Assets → Draw sprite…** starts a transparent 16 × 16 or 32 × 32 image. Use **Paint**, **Erase**, **Eyedropper**, and **Fill** with a palette swatch or an eight-digit `RRGGBBAA` color. A continuous stroke takes one Undo. **Edit image copy…** starts a new editable square from a selected catalog image. A larger source is resampled into the canvas. **Add to assets** adds a new project asset, and **Export PNG…** writes a transparent PNG file. Once you place the asset, the room export embeds it for Player.
+**Assets → Draw sprite…** offers square canvases from 16 × 16 to 256 × 256. Use **Paint**, **Erase**, **Eyedropper**, and **Fill** with a swatch or an eight-digit `RRGGBBAA` color. A continuous stroke takes one Undo. Zoom with the buttons or **Ctrl+wheel**, and middle-drag to pan a zoomed canvas. **Edit image copy…** creates a new asset draft from the selected image or animation.
+
+Choose a canvas size, then **Add blank** or **Duplicate** in Frames. Edit each frame, set its duration in milliseconds, reorder it with the arrow buttons, and choose **Play frames** to preview the loop. **Export sheet…** writes a ZIP containing a PNG sheet and frame timing JSON. **Export PNG…** writes just the selected frame. **Add to assets**, then **Place selected image** puts the animation in the room. Frame changes appear in Studio and Player. A project supports 262,144 pixels across all frames and retained asset history.
 
 Open **Assets** and choose **Import PNG…**. Select a PNG up to 256 × 256 pixels and 2 MiB. The browser lists each imported image with its dimensions. Select one and choose **Place selected image**. Place the same art again for a second instance. Each instance has its own stable ID, position, size and rotation. Studio stores the decoded RGBA pixels in the project and includes referenced images in the room export. The project supports up to 262,144 imported pixels, including imports retained in history.
 
@@ -56,16 +67,16 @@ Transparent pixels blend with the scene in Vulkan, OpenGL and CPU Reference. The
 
 ## Ask ATLAS about an original room
 
-1. **Save**. Select any object in the Scene list and open **ATLAS → Allow scene read**. Try **Inspect selection**, **Where is Bench light?**, or **What does Badge reader control?** with matching names in your room. Use the full object ID if multiple objects share a name.
-2. **Show object** and **Show linked target** navigate to the objects cited by the answer. **Saved source details** shows the project, scene, revision, stable object ID, exact transform and evidence digest.
+1. Select any object in the outliner and choose **Allow scene read** in ATLAS. Try **Inspect selection**, **Where is Bench light?**, or **What does Badge reader control?** with matching names in your room. You can ask `Inspect #000012` using an ID shown in the outliner.
+2. **Show object** and **Show linked target** navigate to the cited objects. **Working source details** shows the project, workspace, scene, revision, stable object ID, exact transform and evidence digest.
 3. Choose **Check scene health** to find unlinked switches, duplicate names, a blocked spawn, or goals that need more keys than the room has.
-4. Try **Wire Relay console to Power signal**, **Unlink Relay console**, **Resize Relay shutter to 0.22, 0.09**, **Rotate Relay console to 30**, or **Add Lamp named Service beacon at 0.82, 0.18**. **Duplicate Service beacon** makes a distinct object. Choose **Preview change** and inspect the named file and change. Choose **Confirm and save** within one minute or **Cancel preview**. The commit records the stable object and operation IDs. Undo and Redo work after reopen.
+4. Try **Wire Relay console to Power signal**, **Unlink Relay console**, **Resize Relay shutter to 0.22, 0.09**, **Rotate Relay console to 30**, or **Add Lamp named Service beacon at 0.82, 0.18**. Choose **Preview change**, then **Apply to room** within one minute or **Cancel preview**. A manual edit retires the preview and its grant. Use **Save** when you want to keep an applied change on disk. Undo and Redo work after reopening the saved project.
 
-Studio uses deterministic reads scoped to the granted saved revision. The original router and the grounded two-stage candidate both failed their qualification gates and are available for offline reproduction. [Datasets and evaluation](tools/AtlasSpecialist/README.md)
+Studio uses deterministic reads scoped to the granted working revision. Both original-model experiments failed qualification and remain offline. [Datasets and evaluation](tools/AtlasSpecialist/README.md)
 
 ## Try the museum
 
-1. Choose **New museum** or open [fixtures/NightMuseum.platz](fixtures/NightMuseum.platz). Both start an editable museum with a new project ID and the same starting layout. **West Gallery** starts off and **East Gallery** starts on.
+1. Choose **Examples → Night Museum** or open [fixtures/NightMuseum.platz](fixtures/NightMuseum.platz). Both start an editable museum with a new project ID and the same starting layout. **West Gallery** starts off and **East Gallery** starts on.
 2. Choose **Save as…** and write a working copy to a folder outside the source checkout. Keep the original fixture for repeatable tests.
 3. Select **Lantern** in **West Gallery** using the scene list or the viewport. The inspector shows **West Switch**, its target, and the selected object's ID. Choose **Turn light on**. Both the west lantern's preview and state label change. East stays on.
 4. Choose **Undo**, then **Redo**, or use **Ctrl+Z** and **Ctrl+Y**. Watch the west light and the current revision. The original revision remains visible beside it.
@@ -78,7 +89,7 @@ Studio uses deterministic reads scoped to the granted saved revision. The origin
 2. Under **Switches**, choose **Use West Switch** twice. With the default **Toggle** behavior, the west lantern changes each time. The panel reports the gallery and old and new light states. East stays as it was in the saved room.
 3. Choose **Stop** or press **F5** again to return to the saved view. For an easy comparison, use the switch a third time before stopping. Closing Studio during Play also ends that session.
 
-Play starts from the exact saved revision and keeps its switch state in memory. If another window saved a newer revision before you started, reopen the file to Play that revision.
+Play starts from a frozen copy of the current working revision and keeps gameplay state in memory. Reopen a project to play a revision saved by a different window.
 
 ## Export and play a room
 
@@ -105,7 +116,7 @@ $studio = '.\artifacts\bin\PlatzAtlas.Studio\release\PlatzAtlas.Studio.exe'
 ## Ask about the saved museum
 
 1. Open a saved museum or save a new one. Select the east lantern first if you want to see citation navigation change the selection.
-2. Open the **ATLAS** tab beside **Inspector**. Choose **Allow project read** and **Ask ATLAS** with the supplied question, “Which lantern does the west switch control?”
+2. In the **ATLAS** panel, choose **Allow project read** and **Ask ATLAS** with the supplied question, “Which lantern does the west switch control?”
 3. The answer identifies the West Gallery lantern and its saved light state. Expand **Source details** for the switch target, object field references, project and scene IDs, and snapshot checksum. Choose **Show in scene** to select the cited lantern and open its Inspector.
 4. Return to **ATLAS** and choose **Revoke access**. The answer and source details clear. After a manual edit, save the new revision and allow a new read to ask again.
 

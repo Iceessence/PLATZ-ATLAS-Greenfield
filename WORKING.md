@@ -2,7 +2,18 @@
 
 ## Current assignment
 
-The owner assigned Step 0 and GF-017 through GF-021 after Gemini Neon's audit. The independently accepted baseline is **`da4cfb1` (`gf-013`)**. The implementation candidate is **`29e9fbf` (`gf-021`)** and awaits review. The specification digest is `ee95a50f205f85a3867488d7fc4a5e066b694b291f5657764eda8b35a2b32ebc`.
+The owner reprioritized GF-022–GF-026 after Neon's audit at `c019f3d`. The independently accepted baseline is **`e77ef40`**. Neon accepted GF-018, GF-019 and GF-020 individually, and required repairs to GF-017 before advancing the linear baseline. The GF-021 model failed qualification. The master specification SHA-256 remains `ee95a50f205f85a3867488d7fc4a5e066b694b291f5657764eda8b35a2b32ebc`.
+
+- **Step 0 · `c1a41d6`**. Undo, Redo and Resize end the active pointer stroke. Space during a pointer stroke is consumed, and invalid hex feedback remains visible.
+- **GF-022 · `21c0a79`**. The working room has its own identity and immutable revisions. ATLAS reads and applies approved previews in memory. F5 plays an isolated copy and Restart restores it. Export retains the explicit saved-revision requirement.
+- **GF-023 · `bc981bc`, `bf42c09`**. Resizable workspace, dedicated ATLAS and settings, reusable searchable presets, readable IDs, pointer-centered zoom and world grid. Generic variable descriptors and layout persistence remain open.
+- **GF-024 partial · `0b27714`**. Larger canvases, sprite zoom and pan, editable frame animation, PNG sheets and timing metadata, and animation during Studio and standalone play. The complete drawing toolkit, authored nonrectangular collision and new triggers remain open.
+- **GF-025 pending**. Native 3D authoring, rendering and Play remain open.
+- **GF-026 partial · `731b949`**. A bounded deterministic request builds a playable keyed gate from blank through a detached plan and grouped Undo. Coding assistance, conversational history, and a new qualified original model remain open.
+
+The current implementation candidate is **`bf42c09`**. Use the [owner report](docs/ai/ATLAS_OWNER_REPORT.md) for the tested launch paths and [canonical handoff](docs/ai/ATLAS_HANDOFF.md) for the next review and backlog.
+
+### Historical GF-017 through GF-021 author receipt
 
 - **Step 0** at `1f751b0`, `78d15f8`, and `e77ef40`. Save As dismisses the old ATLAS review, an incomplete rename is rejected before evidence is opened, and OpenGL's translucent pixel matches Vulkan's RGBA.
 - **GF-017** at `76360f4`. Draw, erase, eyedrop, fill, undo/redo, clone, and export PNG in the Pixel Editor. Place the new artwork and export it embedded in the room.
